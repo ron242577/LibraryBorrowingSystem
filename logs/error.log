@@ -1,0 +1,116 @@
+[2026-04-14 11:50:44] Unknown database 'library_borrowing_system' in C:\xampp\htdocs\LibraryBorrowingSystem\db.php on line 12
+[2026-04-14 11:50:44] PHP Warning:  mysqli_connect(): (HY000/1049): Unknown database 'library_borrowing_system' in C:\xampp\htdocs\LibraryBorrowingSystem\db.php on line 12
+[2026-04-14 11:50:44] PHP Warning:  mysqli_connect(): (HY000/1049): Unknown database 'library_borrowing_system' in C:\xampp\htdocs\LibraryBorrowingSystem\db.php on line 12
+[2026-04-14 13:04:23] Inventory dashboard error: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:04:41] Inventory dashboard error: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:04:52] Inventory dashboard error: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:27:32] Setup error: Duplicate entry 'STU-QR-001' for key 'qr_code'
+[2026-04-14 13:27:46] Setup error: Duplicate entry 'STU-QR-001' for key 'qr_code'
+[2026-04-14 13:27:47] Setup error: Duplicate entry 'STU-QR-001' for key 'qr_code'
+[2026-04-14 13:35:58] Error fetching inventory stats: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:35:58] Error fetching low stock books: Unknown column 'available_copies' in 'field list'
+[2026-04-14 13:35:58] Error fetching books inventory: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:07] Error fetching inventory stats: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:07] Error fetching low stock books: Unknown column 'available_copies' in 'field list'
+[2026-04-14 13:36:07] Error fetching books inventory: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:08] Error fetching inventory stats: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:08] Error fetching low stock books: Unknown column 'available_copies' in 'field list'
+[2026-04-14 13:36:08] Error fetching books inventory: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:12] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:16] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:25] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:26] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:35] Error fetching inventory stats: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:35] Error fetching low stock books: Unknown column 'available_copies' in 'field list'
+[2026-04-14 13:36:35] Error fetching books inventory: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:36:42] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:43:04] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-14 13:43:27] Error fetching books: Unknown column 'total_copies' in 'field list'
+[2026-04-15 12:11:18] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:11:47] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:11:51] Report generated: borrowing_trends from 2026-04-01 to 2026-04-15
+[2026-04-15 12:17:20] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:21:25] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:23:28] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:24:17] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:24:31] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:24:36] Report generated: overdue_books from 2026-04-01 to 2026-04-15
+[2026-04-15 12:24:39] Report generated: system_metrics from 2026-04-01 to 2026-04-15
+[2026-04-15 12:24:53] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:30:54] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:31:26] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:33:44] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:33:47] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:33:48] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:33:49] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:33:49] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:34:09] Report generated: borrowing_trends from 2026-04-01 to 2026-04-15
+[2026-04-15 12:42:42] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:42:42] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:42:49] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:42:56] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:42:59] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:03] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:06] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:06] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:21] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:21] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:22] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:22] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:22] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:43:22] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:45:48] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:45:58] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:46:07] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:46:11] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:47:02] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:47:09] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:50:10] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:50:13] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:02] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:02] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:03] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 12:53:07] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:07] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:08] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:08] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:08] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:08] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:08] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:08] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:09] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:14] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:53:14] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:55:25] Error retrieving audit logs: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:55:25] Error getting filter options: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 12:58:42] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 13:56:31] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 13:57:23] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 13:59:02] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 14:03:12] AuditLogger error: Table 'library_borrowing_system.audit_logs' doesn't exist
+[2026-04-15 15:03:44] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 15:03:52] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 15:10:39] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 15:10:59] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 15:11:12] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 15:12:33] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-15 15:15:36] Report generated: dashboard from 2026-04-01 to 2026-04-15
+[2026-04-16 11:12:50] Report generated: dashboard from 2026-04-01 to 2026-04-16
+[2026-04-16 11:14:12] Report generated: dashboard from 2026-04-01 to 2026-04-16
+[2026-04-20 02:27:57] Report generated: dashboard from 2026-04-01 to 2026-04-20
+[2026-04-20 02:31:59] Report generated: dashboard from 2026-04-01 to 2026-04-20
+[2026-04-20 04:46:23] QR Code generation error: Failed to download QR code from API
+[2026-04-20 04:48:41] Report generated: dashboard from 2026-04-01 to 2026-04-20
+[2026-04-20 05:44:22] Report generated: dashboard from 2026-04-01 to 2026-04-20
+[2026-04-20 05:44:22] Report generated: dashboard from 2026-04-01 to 2026-04-20
+[2026-04-20 07:18:57] Report generated: dashboard from 2026-04-01 to 2026-04-20
+[2026-04-20 07:36:15] Error fetching librarian dashboard statistics: MySQL server has gone away
+[2026-04-20 07:36:19] No connection could be made because the target machine actively refused it
+[2026-04-22 13:11:39] Unknown database 'library_borrowing_system'
