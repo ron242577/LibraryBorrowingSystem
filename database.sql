@@ -1,99 +1,217 @@
--- Create Database for Multi-User QR Library Borrowing System
-CREATE DATABASE IF NOT EXISTS library_borrowing_system;
-USE library_borrowing_system;
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Apr 24, 2026 at 01:56 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
--- Drop existing tables if they exist (in reverse order of dependencies)
-DROP TABLE IF EXISTS transactions;
-DROP TABLE IF EXISTS books;
-DROP TABLE IF EXISTS students;
-DROP TABLE IF EXISTS users;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
 
--- 1. Users Table (for login - super_admin and librarian)
-CREATE TABLE users (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
-    full_name VARCHAR(255) NOT NULL,
-    username VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL COMMENT 'Hashed password',
-    role ENUM('super_admin', 'librarian') NOT NULL DEFAULT 'librarian',
-    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username),
-    INDEX idx_status (status)
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `library_borrowing_system`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `books`
+--
+
+CREATE TABLE `books` (
+  `book_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `author` varchar(255) NOT NULL,
+  `qr_code` varchar(255) NOT NULL,
+  `book_status` enum('available','out_of_stock','damaged','lost') NOT NULL DEFAULT 'available',
+  `total_copies` int(11) DEFAULT 1 COMMENT 'Total number of copies of this book in the library',
+  `available_copies` int(11) DEFAULT 1 COMMENT 'Number of copies currently available for borrowing',
+  `borrowed_copies` int(11) DEFAULT 0 COMMENT 'Number of copies currently borrowed',
+  `lost_copies` int(11) DEFAULT 0 COMMENT 'Number of copies that are lost or damaged',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. Students Table
-CREATE TABLE students (
-    student_id INT AUTO_INCREMENT PRIMARY KEY,
-    full_name VARCHAR(255) NOT NULL,
-    contact_number VARCHAR(20),
-    qr_code VARCHAR(255) UNIQUE NOT NULL,
-    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_qr_code (qr_code),
-    INDEX idx_status (status)
+--
+-- Dumping data for table `books`
+--
+
+INSERT INTO `books` (`book_id`, `title`, `author`, `qr_code`, `book_status`, `total_copies`, `available_copies`, `borrowed_copies`, `lost_copies`, `created_at`, `updated_at`) VALUES
+(1, 'The Great Gatsby', 'F. Scott Fitzgerald', 'BOOK-QR-001', 'available', 3, 2, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(2, 'To Kill a Mockingbird', 'Harper Lee', 'BOOK-QR-002', 'available', 2, 2, 0, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(3, '1984', 'George Orwell', 'BOOK-QR-003', 'out_of_stock', 4, 0, 3, 1, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(4, 'Pride and Prejudice', 'Jane Austen', 'BOOK-QR-004', 'available', 5, 4, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `students`
+--
+
+CREATE TABLE `students` (
+  `student_id` int(11) NOT NULL,
+  `full_name` varchar(255) NOT NULL,
+  `contact_number` varchar(20) DEFAULT NULL,
+  `qr_code` varchar(255) NOT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. Books Table
-CREATE TABLE books (
-    book_id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    author VARCHAR(255) NOT NULL,
-    qr_code VARCHAR(255) UNIQUE NOT NULL,
-    book_status ENUM('available', 'out_of_stock', 'damaged', 'lost') NOT NULL DEFAULT 'available',
-    total_copies INT DEFAULT 1 COMMENT 'Total number of copies of this book in the library',
-    available_copies INT DEFAULT 1 COMMENT 'Number of copies currently available for borrowing',
-    borrowed_copies INT DEFAULT 0 COMMENT 'Number of copies currently borrowed',
-    lost_copies INT DEFAULT 0 COMMENT 'Number of copies that are lost or damaged',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_qr_code (qr_code),
-    INDEX idx_book_status (book_status),
-    INDEX idx_title (title),
-    INDEX idx_available_copies (available_copies),
-    INDEX idx_borrowed_copies (borrowed_copies)
+--
+-- Dumping data for table `students`
+--
+
+INSERT INTO `students` (`student_id`, `full_name`, `contact_number`, `qr_code`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'John Doe', '9876543210', 'STU-QR-001', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(2, 'Jane Smith', '9876543211', 'STU-QR-002', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(3, 'Michael Johnson', '9876543212', 'STU-QR-003', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(4, 'Marcus Dominique Muico', '09457352866', 'STU-20260424-IPDXQ', 'active', '2026-04-24 10:02:37', '2026-04-24 10:02:37');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `transactions`
+--
+
+CREATE TABLE `transactions` (
+  `transaction_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `book_id` int(11) NOT NULL,
+  `date_borrowed` datetime NOT NULL,
+  `due_date` datetime NOT NULL,
+  `return_date` datetime DEFAULT NULL,
+  `penalty_amount` decimal(10,2) DEFAULT 0.00,
+  `status` enum('borrowed','returned','overdue') NOT NULL DEFAULT 'borrowed',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4. Transactions Table
-CREATE TABLE transactions (
-    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
-    book_id INT NOT NULL,
-    date_borrowed DATETIME NOT NULL,
-    due_date DATETIME NOT NULL,
-    return_date DATETIME,
-    penalty_amount DECIMAL(10, 2) DEFAULT 0.00,
-    status ENUM('borrowed', 'returned', 'overdue') NOT NULL DEFAULT 'borrowed',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (book_id) REFERENCES books(book_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    INDEX idx_student_id (student_id),
-    INDEX idx_book_id (book_id),
-    INDEX idx_status (status),
-    INDEX idx_date_borrowed (date_borrowed)
+--
+-- Dumping data for table `transactions`
+--
+
+INSERT INTO `transactions` (`transaction_id`, `student_id`, `book_id`, `date_borrowed`, `due_date`, `return_date`, `penalty_amount`, `status`, `created_at`, `updated_at`) VALUES
+(1, 1, 3, '2026-04-24 16:51:11', '2026-05-08 16:51:11', NULL, 0.00, 'borrowed', '2026-04-24 08:51:11', '2026-04-24 08:51:11');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `user_id` int(11) NOT NULL,
+  `full_name` varchar(255) NOT NULL,
+  `username` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL COMMENT 'Hashed password',
+  `role` enum('super_admin','librarian') NOT NULL DEFAULT 'librarian',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create sample data (optional - remove if not needed)
--- Insert sample users
-INSERT INTO users (full_name, username, password, role, status) VALUES
-('Super Administrator', 'admin', SHA2('admin123', 256), 'super_admin', 'active'),
-('Librarian User', 'librarian', SHA2('librarian123', 256), 'librarian', 'active');
+--
+-- Dumping data for table `users`
+--
 
--- Insert sample students
-INSERT INTO students (full_name, contact_number, qr_code, status) VALUES
-('John Doe', '9876543210', 'STU-QR-001', 'active'),
-('Jane Smith', '9876543211', 'STU-QR-002', 'active'),
-('Michael Johnson', '9876543212', 'STU-QR-003', 'active');
+INSERT INTO `users` (`user_id`, `full_name`, `username`, `password`, `role`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'Super Administrator', 'admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'super_admin', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(2, 'Librarian User', 'librarian', 'ab8e89c55367f55a2f933b8dc8a9994d61f997df2b402274eb943fa22d77394a', 'librarian', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11');
 
--- Insert sample books with inventory
-INSERT INTO books (title, author, qr_code, book_status, total_copies, available_copies, borrowed_copies, lost_copies) VALUES
-('The Great Gatsby', 'F. Scott Fitzgerald', 'BOOK-QR-001', 'available', 3, 2, 1, 0),
-('To Kill a Mockingbird', 'Harper Lee', 'BOOK-QR-002', 'available', 2, 2, 0, 0),
-('1984', 'George Orwell', 'BOOK-QR-003', 'out_of_stock', 4, 0, 3, 1),
-('Pride and Prejudice', 'Jane Austen', 'BOOK-QR-004', 'available', 5, 4, 1, 0);
+--
+-- Indexes for dumped tables
+--
 
--- Insert sample transaction
-INSERT INTO transactions (student_id, book_id, date_borrowed, due_date, status) VALUES
-(1, 3, NOW(), DATE_ADD(NOW(), INTERVAL 14 DAY), 'borrowed');
+--
+-- Indexes for table `books`
+--
+ALTER TABLE `books`
+  ADD PRIMARY KEY (`book_id`),
+  ADD UNIQUE KEY `qr_code` (`qr_code`),
+  ADD KEY `idx_qr_code` (`qr_code`),
+  ADD KEY `idx_book_status` (`book_status`),
+  ADD KEY `idx_title` (`title`),
+  ADD KEY `idx_available_copies` (`available_copies`),
+  ADD KEY `idx_borrowed_copies` (`borrowed_copies`);
+
+--
+-- Indexes for table `students`
+--
+ALTER TABLE `students`
+  ADD PRIMARY KEY (`student_id`),
+  ADD UNIQUE KEY `qr_code` (`qr_code`),
+  ADD KEY `idx_qr_code` (`qr_code`),
+  ADD KEY `idx_status` (`status`);
+
+--
+-- Indexes for table `transactions`
+--
+ALTER TABLE `transactions`
+  ADD PRIMARY KEY (`transaction_id`),
+  ADD KEY `idx_student_id` (`student_id`),
+  ADD KEY `idx_book_id` (`book_id`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_date_borrowed` (`date_borrowed`);
+
+--
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`user_id`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD KEY `idx_username` (`username`),
+  ADD KEY `idx_status` (`status`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `books`
+--
+ALTER TABLE `books`
+  MODIFY `book_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `students`
+--
+ALTER TABLE `students`
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `transactions`
+--
+ALTER TABLE `transactions`
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `transactions`
+--
+ALTER TABLE `transactions`
+  ADD CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `transactions_ibfk_2` FOREIGN KEY (`book_id`) REFERENCES `books` (`book_id`) ON UPDATE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
