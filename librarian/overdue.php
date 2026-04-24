@@ -60,8 +60,6 @@ try {
     logError('Error fetching overdue books: ' . $e->getMessage());
 }
 
-// Include navbar
-require_once __DIR__ . '/../navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -339,10 +337,12 @@ require_once __DIR__ . '/../navbar.php';
     </style>
 </head>
 <body>
+    <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>⏰ Overdue Books Tracking</h1>
+            <h1>Overdue Books Tracking</h1>
             <p>Monitor students with overdue books and track penalty calculations (5 PHP per day)</p>
         </div>
         
@@ -363,7 +363,7 @@ require_once __DIR__ . '/../navbar.php';
         
         <!-- Table Section -->
         <div class="table-section">
-            <h2>📋 Overdue Book List</h2>
+            <h2>Overdue Book List</h2>
             
             <?php if (count($overdue_books) > 0): ?>
                 <div class="table-wrapper">
@@ -407,7 +407,6 @@ require_once __DIR__ . '/../navbar.php';
                 </div>
             <?php else: ?>
                 <div class="empty-state">
-                    <div class="empty-state-icon">📚</div>
                     <div class="empty-state-text">
                         No overdue books
                         <strong>✓ All books have been returned on time!</strong>

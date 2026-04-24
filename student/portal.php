@@ -557,6 +557,13 @@ if ($student_qr) {
             display: block;
         }
         
+        .manual-entry-form {
+            display: block;
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid #e5e7eb;
+        }
+        
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -860,7 +867,7 @@ if ($student_qr) {
     <div class="container">
         <?php if ($qr_error): ?>
         <div class="qr-error-banner" id="error-banner">
-            <span style="font-size: 20px; margin-right: 12px;">⚠️</span>
+            <span style="font-size: 20px; margin-right: 12px;"></span>
             <div>
                 <strong>Entry Failed</strong>
                 <p><?php echo htmlspecialchars($qr_error); ?></p>
@@ -874,64 +881,46 @@ if ($student_qr) {
         <div class="welcome-section">
             <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo" class="welcome-icon">
             <h1>Welcome to the Student Portal</h1>
-            <p>Access your library account</p>
-            <span class="subtitle">View borrowed books, due dates, and penalties</span>
+            <p>Search books and view your profile separately</p>
+            <span class="subtitle">Search books from the library catalog</span>
         </div>
         
         <div class="login-form-container">
             <div class="form-header">
-                <h2>🔐 Access Your Account</h2>
+                <h2>Access Your Account</h2>
             </div>
             
             <div class="form-content">
-                <!-- Input Mode Toggle -->
-                <div class="input-mode-toggle">
-                    <button type="button" class="toggle-btn active" id="qr-mode-btn" onclick="switchMode('qr')">
-                        📱 QR Scanner
-                    </button>
-                    <button type="button" class="toggle-btn" id="manual-mode-btn" onclick="switchMode('manual')">
-                        🆔 Manual Entry
-                    </button>
-                </div>
-                
                 <!-- QR Code Scanner Form -->
                 <div id="qr-form" class="input-form active">
                     <div class="form-group-custom">
-                        <label>📱 QR Code Scanner</label>
+                        <label>QR Code Scanner</label>
                         <div class="qr-scanner-container">
                             <div id="qr-reader"></div>
-                            <div id="qr-result" class="scanner-result">✓ QR code scanned successfully! Processing...</div>
+                            <div id="qr-result" class="scanner-result">QR code scanned successfully! Processing...</div>
                             <div id="qr-scan-error" class="scanner-error"></div>
                             <div id="qr-reader-controls">
-                                <button type="button" class="scanner-btn" id="start-scan-btn" onclick="startQrScanner()">📹 Start Camera</button>
-                                <button type="button" class="scanner-btn" id="stop-scan-btn" onclick="stopQrScanner()" style="display:none;">⏹️ Stop Camera</button>
+                                <button type="button" class="scanner-btn" id="stop-scan-btn" onclick="stopQrScanner()" style="display:none;">Stop Camera</button>
                             </div>
                         </div>
-                        <div class="helper-text">📌 Click "Start Camera" to use your device camera for scanning. Point at a QR code to scan.</div>
+                        <div class="helper-text">Camera opens automatically. Point it at your QR code to scan.</div>
                     </div>
                     <form method="GET" id="qr-submit-form" style="display:none;">
                         <input type="hidden" id="qr-result-value" name="qr">
                     </form>
-                </div>
-                
-                <!-- Manual Entry Form -->
-                <form method="GET" id="manual-form" class="input-form">
-                    <div class="form-group-custom">
-                        <label for="student-id">Student QR Code</label>
-                        <input type="text" 
-                               id="student-id" 
-                               name="qr" 
-                               placeholder="e.g., STU-QR-001" 
-                               autocomplete="off" 
-                               required>
-                        <div class="helper-text">Enter your student QR code exactly as provided on your ID card.</div>
-                    </div>
-                    <button type="submit" class="btn-login">🔐 Access Account</button>
-                </form>
-                
-                <!-- Info Box -->
-                <div class="info-box">
-                    <strong>💡 Tip:</strong> If you're having trouble scanning, switch to manual entry and type or paste your QR code directly.
+                    <form method="GET" id="manual-form" class="manual-entry-form">
+                        <div class="form-group-custom">
+                            <label for="student-id">Manual Entry</label>
+                            <input type="text"
+                                   id="student-id"
+                                   name="qr"
+                                   placeholder="Enter or paste your student QR code"
+                                   autocomplete="off"
+                                   required>
+                            <div class="helper-text">Type or paste your QR code here, then press Enter or click Access Account.</div>
+                        </div>
+                        <button type="submit" class="btn-login">Access Account</button>
+                    </form>
                 </div>
                 
                 
@@ -949,7 +938,7 @@ if ($student_qr) {
             
             if (html5QrcodeScanner) {
                 html5QrcodeScanner.render(onScanSuccess, onScanError);
-                startBtn.style.display = 'none';
+                if (startBtn) startBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-block';
                 return;
             }
@@ -968,11 +957,11 @@ if ($student_qr) {
                 onScanSuccess,
                 onScanError
             ).catch(err => {
-                errorDiv.textContent = '❌ Unable to access camera. Please check permissions or try manual entry.';
+                errorDiv.textContent = 'Unable to access camera. Please check permissions or use manual entry below.';
                 errorDiv.classList.add('show');
             });
             
-            startBtn.style.display = 'none';
+            if (startBtn) startBtn.style.display = 'none';
             stopBtn.style.display = 'inline-block';
         }
         
@@ -982,7 +971,7 @@ if ($student_qr) {
             
             if (html5QrcodeScanner) {
                 html5QrcodeScanner.stop().then(() => {
-                    startBtn.style.display = 'inline-block';
+                    if (startBtn) startBtn.style.display = 'inline-block';
                     stopBtn.style.display = 'none';
                 }).catch(err => {
                     console.error('Error stopping scanner:', err);
@@ -1020,38 +1009,21 @@ if ($student_qr) {
             }
         }
         
-        function switchMode(mode) {
-            const qrForm = document.getElementById('qr-form');
-            const manualForm = document.getElementById('manual-form');
-            const qrModeBtn = document.getElementById('qr-mode-btn');
-            const manualModeBtn = document.getElementById('manual-mode-btn');
-            
-            if (mode === 'qr') {
-                qrForm.classList.add('active');
-                manualForm.classList.remove('active');
-                qrModeBtn.classList.add('active');
-                manualModeBtn.classList.remove('active');
-            } else {
-                stopQrScanner();
-                manualForm.classList.add('active');
-                qrForm.classList.remove('active');
-                manualModeBtn.classList.add('active');
-                qrModeBtn.classList.remove('active');
-                document.getElementById('student-id').focus();
-            }
-        }
+        document.addEventListener("DOMContentLoaded", function() {
+            setTimeout(startQrScanner, 400);
+        });
     </script>
         <?php else: ?>
             <!-- Student Info -->
             <div class="header">
-                <h1>👋 Welcome, <?php echo htmlspecialchars($student['full_name']); ?></h1>
+                <h1>Welcome, <?php echo htmlspecialchars($student['full_name']); ?></h1>
                 <p>Here's your library account information</p>
             </div>
             
             <!-- Student Details -->
             <div class="card">
                 <div class="card-header">
-                    <span>📋</span>
+                    
                     <span>Your Information</span>
                 </div>
                 <div class="card-body">
@@ -1076,7 +1048,7 @@ if ($student_qr) {
                     
                     <?php if ($total_penalty > 0): ?>
                         <div class="penalty-info">
-                            <span style="font-size: 20px;">⚠️</span>
+                            <span style="font-size: 20px;"></span>
                             <div>
                                 <strong>Outstanding Penalty:</strong><br>
                                 <strong>$<?php echo number_format($total_penalty, 2); ?></strong>
@@ -1103,13 +1075,13 @@ if ($student_qr) {
             <!-- Borrowed Books -->
             <div class="card">
                 <div class="card-header">
-                    <span>📖</span>
+                    
                     <span>Borrowed Books</span>
                 </div>
                 <div class="card-body">
                     <?php if (empty($borrowed_books)): ?>
                         <div class="empty-state">
-                            <div class="empty-state-icon">📚</div>
+                            
                             <p>You have no borrowed books right now!</p>
                             <a href="/LibraryBorrowingSystem/student/borrow.php" style="display: inline-block; margin-top: 20px;">📤 Start Borrowing</a>
                         </div>
@@ -1144,18 +1116,18 @@ if ($student_qr) {
                                     
                                     <div class="book-dates">
                                         <div class="date-row">
-                                            <span class="date-label">📅 Borrowed:</span>
+                                            <span class="date-label">Borrowed:</span>
                                             <span class="date-value"><?php echo date('M d, Y', strtotime($book['date_borrowed'])); ?></span>
                                         </div>
                                         <div class="date-row">
-                                            <span class="date-label">📆 Due:</span>
+                                            <span class="date-label">Due:</span>
                                             <span class="date-value"><?php echo date('M d, Y', strtotime($book['due_date'])); ?></span>
                                         </div>
                                     </div>
                                     
                                     <div style="padding-top: 12px; border-top: 1px solid #ecf0f1; margin-top: 12px; text-align: right;">
                                         <?php if ($is_overdue): ?>
-                                            <div style="color: #d35400; font-weight: 700; font-size: 16px;">💲 $<?php echo number_format($penalty, 2); ?> penalty</div>
+                                            <div style="color: #d35400; font-weight: 700; font-size: 16px;">â±<?php echo number_format($penalty, 2); ?> penalty</div>
                                             <div style="color: #7f8c8d; font-size: 12px; margin-top: 4px;"><?php echo $days_late; ?> <?php echo $days_late === 1 ? 'day' : 'days'; ?> late</div>
                                         <?php else: ?>
                                             <div style="color: #27ae60; font-weight: 700; font-size: 16px;">⏰ <?php echo $days_left; ?> <?php echo $days_left === 1 ? 'day' : 'days'; ?> left</div>

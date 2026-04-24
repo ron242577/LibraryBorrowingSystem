@@ -77,8 +77,6 @@ try {
     logError('Error counting transactions: ' . $e->getMessage());
 }
 
-// Include navbar
-require_once __DIR__ . '/../navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -419,10 +417,12 @@ require_once __DIR__ . '/../navbar.php';
     </style>
 </head>
 <body>
+    <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>📋 All Transactions</h1>
+            <h1>All Transactions</h1>
             <p>View complete borrowing and return transaction history with detailed information</p>
         </div>
         
@@ -451,7 +451,7 @@ require_once __DIR__ . '/../navbar.php';
         
         <!-- Filter Section -->
         <div class="filter-section">
-            <h3>🔍 Search & Filter</h3>
+            <h3>Search & Filter</h3>
             <form method="GET" class="filter-controls">
                 <div class="search-box">
                     <input type="text" 
@@ -467,7 +467,7 @@ require_once __DIR__ . '/../navbar.php';
         
         <!-- Transactions Table Section -->
         <div class="table-section">
-            <h2>📊 Transaction Records</h2>
+            <h2>Transaction Records</h2>
             
             <?php if (count($transactions) > 0): ?>
                 <div class="result-count">
@@ -535,7 +535,6 @@ require_once __DIR__ . '/../navbar.php';
                 </div>
             <?php else: ?>
                 <div class="empty-state">
-                    <div class="empty-state-icon">📚</div>
                     <div class="empty-state-text">
                         <?php if (!empty($search_query) || $filter_status !== 'all'): ?>
                             No transactions found matching your criteria

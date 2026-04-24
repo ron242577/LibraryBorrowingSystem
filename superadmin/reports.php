@@ -575,6 +575,7 @@ try {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
 
     <div class="container">
         <!-- Breadcrumb -->
@@ -586,13 +587,13 @@ try {
 
         <!-- Page Header -->
         <div class="page-header">
-            <h1>📊 Reports & Analytics</h1>
+            <h1>Reports & Analytics</h1>
             <p>Comprehensive insights into borrowing patterns, overdue tracking, and system usage</p>
         </div>
 
         <!-- Filter Section -->
         <div class="filter-section">
-            <h2>⚙️ Filter Options</h2>
+            <h2>Filter Options</h2>
             <form method="GET" action="">
                 <div class="filter-grid">
                     <div class="filter-group">
@@ -615,7 +616,7 @@ try {
                 </div>
 
                 <div class="filter-actions">
-                    <button type="submit" class="btn btn-primary">🔍 Apply Filters</button>
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
                     <a href="?report=dashboard" class="btn btn-secondary">↺ Reset</a>
                 </div>
             </form>
@@ -627,15 +628,15 @@ try {
         <!-- BORROWING TRENDS SECTION -->
         <div class="metrics-grid">
             <div class="metric-card success">
-                <h3>📈 Total Borrows</h3>
+                <h3>Total Borrows</h3>
                 <div class="value"><?php echo !empty($borrowing_trends) ? $borrowing_trends['total_borrows'] : 0; ?></div>
             </div>
             <div class="metric-card success">
-                <h3>✅ Total Returns</h3>
+                <h3>Total Returns</h3>
                 <div class="value"><?php echo !empty($borrowing_trends) ? $borrowing_trends['total_returns'] : 0; ?></div>
             </div>
             <div class="metric-card">
-                <h3>📚 Avg Return Rate</h3>
+                <h3>Avg Return Rate</h3>
                 <div class="value">
                     <?php 
                     if (!empty($borrowing_trends) && $borrowing_trends['total_borrows'] > 0) {
@@ -651,7 +652,7 @@ try {
         <!-- Most Borrowed Books Table -->
         <?php if (!empty($borrowing_trends['most_borrowed_books'])): ?>
         <div class="table-container">
-            <h3>📚 Top 10 Most Borrowed Books</h3>
+            <h3>Top 10 Most Borrowed Books</h3>
             <table>
                 <thead>
                     <tr>
@@ -681,7 +682,7 @@ try {
         <?php if (!empty($borrowing_trends['borrowing_by_month'])): ?>
         <div class="charts-grid">
             <div class="chart-container">
-                <h3>📅 Borrowing by Month</h3>
+                <h3>Borrowing by Month</h3>
                 <div class="chart-wrapper">
                     <canvas id="borrowingByMonthChart"></canvas>
                 </div>
@@ -689,7 +690,7 @@ try {
 
             <?php if (!empty($borrowing_trends['borrowing_by_day'])): ?>
             <div class="chart-container">
-                <h3>🗓️ Borrowing by Day of Week</h3>
+                <h3>Borrowing by Day of Week</h3>
                 <div class="chart-wrapper">
                     <canvas id="borrowingByDayChart"></canvas>
                 </div>
@@ -701,7 +702,7 @@ try {
         <!-- Top Borrowers by Student -->
         <?php if (!empty($borrowing_trends['borrowing_by_student'])): ?>
         <div class="table-container">
-            <h3>👥 Top Student Borrowers</h3>
+            <h3>Top Student Borrowers</h3>
             <table>
                 <thead>
                     <tr>
@@ -740,11 +741,11 @@ try {
 
         <div class="metrics-grid">
             <div class="metric-card danger">
-                <h3>⚠️ Total Overdue Items</h3>
+                <h3>Total Overdue Items</h3>
                 <div class="value"><?php echo !empty($overdue_data) ? $overdue_data['total_overdue_count'] : 0; ?></div>
             </div>
             <div class="metric-card warning">
-                <h3>💰 Total Penalty Amount</h3>
+                <h3>Total Penalty Amount</h3>
                 <div class="value">$<?php echo !empty($overdue_data) ? number_format($overdue_data['total_penalty_amount'], 0) : 0; ?></div>
             </div>
         </div>
@@ -752,7 +753,7 @@ try {
         <!-- Current Overdue Items -->
         <?php if (!empty($overdue_data['overdues_list'])): ?>
         <div class="table-container">
-            <h3>📋 Current Overdue Items (Latest 15)</h3>
+            <h3>Current Overdue Items (Latest 15)</h3>
             <table>
                 <thead>
                     <tr>
@@ -785,13 +786,12 @@ try {
             </table>
         </div>
         <?php else: ?>
-        <div class="no-data">✅ No overdue items at this time. Great job!</div>
         <?php endif; ?>
 
         <!-- Overdue by User -->
         <?php if (!empty($overdue_data['overdue_by_user'])): ?>
         <div class="table-container">
-            <h3>👤 Overdue Summary by Student</h3>
+            <h3>Overdue Summary by Student</h3>
             <table>
                 <thead>
                     <tr>
@@ -820,7 +820,7 @@ try {
         <!-- Repeated Offenders -->
         <?php if (!empty($overdue_data['repeated_offenders'])): ?>
         <div class="table-container">
-            <h3>🚨 Repeated Offenders (3+ Late Returns)</h3>
+            <h3>Repeated Offenders (3+ Late Returns)</h3>
             <table>
                 <thead>
                     <tr>
@@ -853,27 +853,27 @@ try {
 
         <div class="metrics-grid">
             <div class="metric-card success">
-                <h3>👥 Active Students</h3>
+                <h3>Active Students</h3>
                 <div class="value"><?php echo $system_metrics['active_students'] ?? 0; ?></div>
             </div>
             <div class="metric-card">
-                <h3>👤 Total Students</h3>
+                <h3>Total Students</h3>
                 <div class="value"><?php echo $system_metrics['total_students'] ?? 0; ?></div>
             </div>
             <div class="metric-card success">
-                <h3>👨‍💼 Active Staff</h3>
+                <h3>Active Staff</h3>
                 <div class="value"><?php echo $system_metrics['active_users'] ?? 0; ?></div>
             </div>
             <div class="metric-card">
-                <h3>📚 Total Books</h3>
+                <h3>Total Books</h3>
                 <div class="value"><?php echo $system_metrics['total_books'] ?? 0; ?></div>
             </div>
             <div class="metric-card success">
-                <h3>✅ Available</h3>
+                <h3>Available</h3>
                 <div class="value"><?php echo $system_metrics['available_books'] ?? 0; ?></div>
             </div>
             <div class="metric-card warning">
-                <h3>📤 Borrowed</h3>
+                <h3>Borrowed</h3>
                 <div class="value"><?php echo $system_metrics['borrowed_books'] ?? 0; ?></div>
             </div>
         </div>
@@ -882,7 +882,7 @@ try {
         <?php if (!empty($inventory_status)): ?>
         <div class="charts-grid">
             <div class="chart-container">
-                <h3>📊 Inventory Status Distribution</h3>
+                <h3>Inventory Status Distribution</h3>
                 <div class="chart-wrapper">
                     <canvas id="inventoryStatusChart"></canvas>
                 </div>
@@ -893,7 +893,7 @@ try {
         <!-- Inventory Table -->
         <?php if (!empty($inventory_status)): ?>
         <div class="table-container">
-            <h3>📚 Detailed Inventory Status</h3>
+            <h3>Detailed Inventory Status</h3>
             <table>
                 <thead>
                     <tr>

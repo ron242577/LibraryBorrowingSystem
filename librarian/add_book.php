@@ -77,6 +77,125 @@ function generateUniqueBookQRId() {
     return 'BOOK-' . $date . '-' . $random;
 }
 
+// Handle book list exports from Add Book page
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['export_books'])) {
+    $export_type = strtolower(trim($_GET['export_books']));
+    $export_books = [];
+
+    try {
+        $export_result = $conn->query("SELECT book_id, title, author, qr_code, book_status, total_copies, available_copies, borrowed_copies, lost_copies, created_at FROM books ORDER BY title ASC, author ASC");
+        if ($export_result) {
+            while ($row = $export_result->fetch_assoc()) {
+                $export_books[] = $row;
+            }
+        }
+    } catch (Exception $e) {
+        logError('Book export error: ' . $e->getMessage());
+        $export_books = [];
+    }
+
+    $filename_date = date('Y-m-d');
+
+    if ($export_type === 'csv') {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="books_list_' . $filename_date . '.csv"');
+        $output = fopen('php://output', 'w');
+        fputcsv($output, ['Book ID', 'Title', 'Author', 'QR Code', 'Status', 'Total Copies', 'Available Copies', 'Borrowed Copies', 'Lost Copies', 'Added Date']);
+        foreach ($export_books as $book) {
+            fputcsv($output, [
+                $book['book_id'],
+                $book['title'],
+                $book['author'],
+                $book['qr_code'],
+                $book['book_status'],
+                $book['total_copies'],
+                $book['available_copies'],
+                $book['borrowed_copies'],
+                $book['lost_copies'],
+                $book['created_at']
+            ]);
+        }
+        fclose($output);
+        exit();
+    }
+
+    if ($export_type === 'pdf') {
+        header('Content-Type: text/html; charset=utf-8');
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Books List PDF Export</title>
+            <style>
+                body { font-family: Arial, sans-serif; color: #222; margin: 24px; }
+                .export-header { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #8B0000; padding-bottom: 12px; margin-bottom: 18px; }
+                .export-header img { width: 48px; height: 48px; object-fit: contain; }
+                h1 { margin: 0; font-size: 20px; color: #8B0000; }
+                .meta { margin: 8px 0 18px; font-size: 13px; color: #555; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #8B0000; color: #fff; }
+                tr:nth-child(even) { background: #f7f7f7; }
+                .actions { margin-bottom: 18px; }
+                .actions button, .actions a { display: inline-block; padding: 9px 12px; margin-right: 8px; background: #8B0000; color: #fff; text-decoration: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 13px; }
+                @media print { .actions { display: none; } body { margin: 12px; } }
+            </style>
+        </head>
+        <body>
+            <div class="actions">
+                <button type="button" onclick="window.print()">Print / Save PDF</button>
+                <a href="/LibraryBorrowingSystem/librarian/add_book.php">Back</a>
+            </div>
+            <div class="export-header">
+                <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo">
+                <div>
+                    <h1>Arellano University Book Borrowing</h1>
+                    <div>Books List Export</div>
+                </div>
+            </div>
+            <div class="meta">Generated on <?php echo date('F d, Y h:i A'); ?> | Total books: <?php echo count($export_books); ?></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>QR Code</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Available</th>
+                        <th>Borrowed</th>
+                        <th>Lost</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($export_books as $book): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($book['book_id']); ?></td>
+                        <td><?php echo htmlspecialchars($book['title']); ?></td>
+                        <td><?php echo htmlspecialchars($book['author']); ?></td>
+                        <td><?php echo htmlspecialchars($book['qr_code']); ?></td>
+                        <td><?php echo htmlspecialchars($book['book_status']); ?></td>
+                        <td><?php echo htmlspecialchars($book['total_copies']); ?></td>
+                        <td><?php echo htmlspecialchars($book['available_copies']); ?></td>
+                        <td><?php echo htmlspecialchars($book['borrowed_copies']); ?></td>
+                        <td><?php echo htmlspecialchars($book['lost_copies']); ?></td>
+                        <td><?php echo htmlspecialchars($book['created_at']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 300); });</script>
+        </body>
+        </html>
+        <?php
+        exit();
+    }
+}
+
 // Handle add book form
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add') {
     $title = trim($_POST['title'] ?? '');
@@ -144,6 +263,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+
+
+// Handle import books CSV upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'import_books') {
+    $imported_count = 0;
+    $skipped_count = 0;
+    $import_errors = [];
+
+    if (!isset($_FILES['books_file']) || $_FILES['books_file']['error'] !== UPLOAD_ERR_OK) {
+        $message = 'Please choose a valid CSV file to import.';
+        $message_type = 'error';
+    } else {
+        $file_tmp = $_FILES['books_file']['tmp_name'];
+        $file_name = $_FILES['books_file']['name'];
+        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+
+        if ($file_ext !== 'csv') {
+            $message = 'Invalid file type. Please upload a CSV file only.';
+            $message_type = 'error';
+        } else {
+            try {
+                $handle = fopen($file_tmp, 'r');
+                if ($handle === false) {
+                    throw new Exception('Unable to open uploaded CSV file.');
+                }
+
+                $row_number = 0;
+                $conn->begin_transaction();
+
+                while (($row = fgetcsv($handle, 10000, ',')) !== false) {
+                    $row_number++;
+
+                    // Skip empty rows
+                    if (count(array_filter($row, function($value) { return trim((string)$value) !== ''; })) === 0) {
+                        continue;
+                    }
+
+                    $title = trim($row[0] ?? '');
+                    $author = trim($row[1] ?? '');
+                    $total_copies = isset($row[2]) && trim($row[2]) !== '' ? (int) trim($row[2]) : 1;
+
+                    // Skip a header row if present
+                    if ($row_number === 1 && strtolower($title) === 'title' && strtolower($author) === 'author') {
+                        continue;
+                    }
+
+                    if ($title === '' || $author === '') {
+                        $skipped_count++;
+                        $import_errors[] = 'Row ' . $row_number . ': Missing title or author.';
+                        continue;
+                    }
+
+                    if ($total_copies < 1) {
+                        $total_copies = 1;
+                    }
+
+                    // Generate a unique QR code and make sure it is not already used
+                    do {
+                        $book_qr_code = generateUniqueBookQRId();
+                        $check_stmt = $conn->prepare("SELECT book_id FROM books WHERE qr_code = ?");
+                        $check_stmt->bind_param('s', $book_qr_code);
+                        $check_stmt->execute();
+                        $check_result = $check_stmt->get_result();
+                        $exists = $check_result->num_rows > 0;
+                        $check_stmt->close();
+                    } while ($exists);
+
+                    $qr_path = generateBookQRCode($book_qr_code);
+                    $status = 'available';
+                    $available_copies = $total_copies;
+                    $borrowed_copies = 0;
+                    $lost_copies = 0;
+
+                    $insert_stmt = $conn->prepare("INSERT INTO books (title, author, qr_code, book_status, total_copies, available_copies, borrowed_copies, lost_copies) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $insert_stmt->bind_param('ssssiiii', $title, $author, $book_qr_code, $status, $total_copies, $available_copies, $borrowed_copies, $lost_copies);
+
+                    if (!$insert_stmt->execute()) {
+                        $skipped_count++;
+                        $import_errors[] = 'Row ' . $row_number . ': ' . $insert_stmt->error;
+                        $insert_stmt->close();
+                        continue;
+                    }
+
+                    $insert_stmt->close();
+                    $imported_count++;
+                }
+
+                fclose($handle);
+                $conn->commit();
+
+                if ($imported_count > 0) {
+                    $message = 'Import completed. Added ' . $imported_count . ' book(s).';
+                    if ($skipped_count > 0) {
+                        $message .= ' Skipped ' . $skipped_count . ' row(s).';
+                    }
+                    if (!empty($import_errors)) {
+                        $message .= ' First issue: ' . $import_errors[0];
+                    }
+                    $message_type = 'success';
+                    header("Refresh: 3; url=/LibraryBorrowingSystem/librarian/add_book.php#import-books");
+                } else {
+                    $message = 'No books were imported. Please check your CSV format: title, author, total_copies.';
+                    if (!empty($import_errors)) {
+                        $message .= ' First issue: ' . $import_errors[0];
+                    }
+                    $message_type = 'error';
+                }
+            } catch (Exception $e) {
+                if ($conn->errno === 0) {
+                    // no-op; keeps compatibility with hosts that do not expose transaction state
+                }
+                @$conn->rollback();
+                $message = 'Import failed: ' . htmlspecialchars($e->getMessage());
+                $message_type = 'error';
+                logError('Book import error: ' . $e->getMessage());
+            }
+        }
+    }
+}
+
 // Fetch all books
 try {
     $result = $conn->query("SELECT book_id, title, author, qr_code, book_status, total_copies, available_copies, borrowed_copies, lost_copies, created_at FROM books ORDER BY created_at DESC LIMIT 20");
@@ -196,6 +435,50 @@ try {
             font-size: 28px;
         }
         
+
+        .page-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 18px;
+            background: #8B0000;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .action-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4);
+        }
+
+        .template-note {
+            background: #f8f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #8B0000;
+            color: #333;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .template-note code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #8B0000;
+        }
+
         .alert {
             padding: 15px;
             border-radius: 5px;
@@ -245,7 +528,8 @@ try {
             font-size: 14px;
         }
         
-        input[type="text"] {
+        input[type="text"],
+        input[type="file"] {
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
@@ -254,7 +538,8 @@ try {
             transition: border-color 0.3s;
         }
         
-        input[type="text"]:focus {
+        input[type="text"]:focus,
+        input[type="file"]:focus {
             outline: none;
             border-color: #8B0000;
             box-shadow: 0 0 5px rgba(139, 0, 0, 0.2);
@@ -463,10 +748,11 @@ try {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="page-header">
-            <h2>📚 Add New Book</h2>
+            <h2>Add New Book</h2>
         </div>
         
         <?php if (!empty($message)): ?>
@@ -478,7 +764,7 @@ try {
         
         <!-- Add Book Form -->
         <div class="section">
-            <h3>➕ Book Registration</h3>
+            <h3>Book Registration</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="add">
                 
@@ -495,7 +781,7 @@ try {
                 </div>
                 
                 <div class="qr-info">
-                    <strong>ℹ️ QR Code & Status:</strong><br>
+                    <strong>QR Code & Status:</strong><br>
                     A unique QR code will be automatically generated and saved for each book copy. The book status will be set to "Available" by default.
                 </div>
                 
@@ -506,9 +792,37 @@ try {
             </form>
         </div>
         
+        <!-- Import and Export Books -->
+        <div class="section" id="import-books">
+            <h3>Import and Export Books</h3>
+            <div class="template-note">
+                Upload a CSV file with this format: <code>title, author, total_copies</code><br>
+                Example: <code>Noli Me Tangere, Jose Rizal, 3</code><br>
+                The <code>total_copies</code> column is optional. If empty, it will automatically use 1 copy.
+            </div>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="import_books">
+                <div class="form-group">
+                    <label for="books_file">Select CSV File *</label>
+                    <input type="file" id="books_file" name="books_file" accept=".csv,text/csv" required>
+                </div>
+                <div class="button-group">
+                    <button type="submit">Import Books</button>
+                    <button type="reset">Clear</button>
+                </div>
+            </form>
+            <div class="template-note" style="margin-top: 18px;">
+                Export the full books list as a CSV file or printable PDF.
+            </div>
+            <div class="button-group">
+                <a href="/LibraryBorrowingSystem/librarian/add_book.php?export_books=csv" class="action-link">Export CSV</a>
+                <a href="/LibraryBorrowingSystem/librarian/add_book.php?export_books=pdf" class="action-link" target="_blank">Export PDF</a>
+            </div>
+        </div>
+        
         <!-- Recent Books List -->
         <div class="section">
-            <h3>📚 Recent Books (Last 20)</h3>
+            <h3>Recent Books (Last 20)</h3>
             
             <?php if (count($books) > 0): ?>
                 <div class="table-wrapper">
@@ -558,7 +872,7 @@ try {
     <div id="qrModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>📱 QR Code Preview</h3>
+                <h3>QR Code Preview</h3>
                 <p id="qrBookInfo" style="color: #666; margin-top: 5px; font-size: 13px;"></p>
             </div>
             

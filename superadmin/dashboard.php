@@ -338,10 +338,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="welcome-section">
-            <h2>Welcome, <?php echo htmlspecialchars(getUserFullName()); ?>! 👋</h2>
+            <h2>Welcome, <?php echo htmlspecialchars(getUserFullName()); ?>!</h2>
             <p>You are logged in as a <strong>Super Administrator</strong>.</p>
             <p>This dashboard provides you with full control over the Library Borrowing System. As a super admin, you have access to all features including user management, system configuration, and reporting.</p>
             <span class="role-badge">SUPER ADMIN</span>
@@ -349,40 +350,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon">👥</div>
                 <div class="stat-label">Total Librarians</div>
                 <div class="stat-number"><?php echo $total_librarians; ?></div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">👨‍🎓</div>
                 <div class="stat-label">Total Students</div>
                 <div class="stat-number"><?php echo $total_students; ?></div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">📚</div>
                 <div class="stat-label">Total Books</div>
                 <div class="stat-number"><?php echo $total_books; ?></div>
             </div>
         </div>
-        
-        <div class="backup-section">
-            <h3>💾 Database Management</h3>
-            <p>Backup your entire database in SQL format. This export includes all tables, structure, and data. You can use this file to restore your database or transfer it to another server.</p>
-            
-            <form method="POST" style="display: inline;">
-                <input type="hidden" name="action" value="backup">
-                <button type="submit" class="backup-btn">
-                    <span>⬇️</span> Download Backup
-                </button>
-            </form>
-        </div>
-        
         <div class="dashboard-grid">
             <a href="/LibraryBorrowingSystem/superadmin/librarian_management.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">👥</div>
                     <h2>Librarian Management</h2>
                     <p>Add new librarians, reset passwords, and manage account status.</p>
                 </div>
@@ -390,7 +374,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             <a href="/LibraryBorrowingSystem/superadmin/reports.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">📊</div>
                     <h2>Reports & Analytics</h2>
                     <p>Generate detailed reports on borrowing trends, overdue books, and system usage.</p>
                 </div>
@@ -398,9 +381,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             <a href="/LibraryBorrowingSystem/superadmin/student_records.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">👨‍🎓</div>
                     <h2>Student Records</h2>
                     <p>Access and manage student information and borrowing history.</p>
+                </div>
+            </a>
+
+            <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="card-link">
+                <div class="card">
+                    <h2>Add Student</h2>
+                    <p>Register new students and auto-generate unique QR codes for tracking.</p>
+                </div>
+            </a>
+            
+            <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="card-link">
+                <div class="card">
+                    <h2>Add Book</h2>
+                    <p>Register new books and auto-generate unique QR codes for inventory.</p>
+                </div>
+            </a>
+            
+            <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" class="card-link">
+                <div class="card">
+                    <h2>Book Borrowing</h2>
+                    <p>Process student book borrowing using QR code scanner.</p>
+                </div>
+            </a>
+            
+            <a href="/LibraryBorrowingSystem/librarian/qr_return.php" class="card-link">
+                <div class="card">
+                    <h2>Book Returns</h2>
+                    <p>Record book returns using QR scanner and calculate penalties.</p>
+                </div>
+            </a>
+            
+            <a href="/LibraryBorrowingSystem/librarian/search.php" class="card-link">
+                <div class="card">
+                    <h2>Student Search</h2>
+                    <p>Search and view student information and borrowing history.</p>
+                </div>
+            </a>
+
+            <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="card-link">
+                <div class="card">
+                    <h2>Inventory Status</h2>
+                    <p>View current book availability and status of all library items.</p>
+                </div>
+            </a>
+            
+            <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="card-link">
+                <div class="card">
+                    <h2>Overdue Books</h2>
+                    <p>Monitor and track overdue books with penalty calculations.</p>
+                </div>
+            </a>
+            
+            <a href="/LibraryBorrowingSystem/librarian/transactions.php" class="card-link">
+                <div class="card">
+                    <h2>Transactions</h2>
+                    <p>View all borrowing and return transactions with detailed information.</p>
                 </div>
             </a>
         </div>

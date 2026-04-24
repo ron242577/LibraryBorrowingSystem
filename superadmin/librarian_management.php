@@ -488,10 +488,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="page-header">
-            <h2>📚 Librarian Management</h2>
+            <h2>Librarian Management</h2>
         </div>
         
         <?php if (!empty($message)): ?>
@@ -503,7 +504,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         <!-- Add Librarian Section -->
         <div class="section">
-            <h3>➕ Add New Librarian</h3>
+            <h3>Add New Librarian</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="add">
                 
@@ -533,7 +534,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         <!-- Librarians List Section -->
         <div class="section">
-            <h3>👥 Librarian Accounts (<?php echo count($librarians); ?>)</h3>
+            <h3>Librarian Accounts (<?php echo count($librarians); ?>)</h3>
             
             <?php if (count($librarians) > 0): ?>
                 <div class="table-wrapper">

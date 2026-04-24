@@ -4,12 +4,16 @@
  * Include in <body>: <?php include __DIR__ . '/navbar.php'; ?>
  */
 
-$current_page = basename($_SERVER['PHP_SELF']);
+$current_path = $_SERVER['REQUEST_URI'] ?? '';
 $role = $_SESSION['role'] ?? '';
 $full_name = $_SESSION['full_name'] ?? 'User';
+
+function isActiveNav($path) {
+    $current_path = $_SERVER['REQUEST_URI'] ?? '';
+    return strpos($current_path, $path) !== false ? 'active' : '';
+}
 ?>
 <style>
-    /* Root CSS Variables */
     :root {
         --sidebar-width: 260px;
         --sidebar-width-collapsed: 80px;
@@ -19,7 +23,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
-    /* Sidebar Styles */
     .sidebar {
         position: fixed;
         left: 0;
@@ -40,7 +43,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         width: var(--sidebar-width-collapsed);
     }
 
-    /* Sidebar Brand */
     .sidebar-brand {
         padding: 20px 15px;
         display: flex;
@@ -50,13 +52,21 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         font-weight: bold;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         transition: opacity var(--transition-speed);
-        min-height: 70px;
+        min-height: 64px;
         justify-content: center;
+        background: var(--primary-color);
+        box-sizing: border-box;
     }
 
     .sidebar.collapsed .sidebar-brand {
         padding: 15px;
         font-size: 24px;
+    }
+
+    .sidebar-brand-icon {
+        font-size: 24px;
+        line-height: 1;
+        flex-shrink: 0;
     }
 
     .sidebar-brand-text {
@@ -67,7 +77,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         display: none;
     }
 
-    /* Hamburger Button */
     .hamburger-btn {
         position: fixed;
         top: 20px;
@@ -113,12 +122,12 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         transform: rotate(-45deg) translateY(-11px);
     }
 
-    /* Sidebar Menu */
     .sidebar-menu {
         flex: 1;
-        padding: 20px 0;
+        padding: 14px 0;
         overflow-y: auto;
         list-style: none;
+        margin: 0;
     }
 
     .sidebar-item {
@@ -130,7 +139,7 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         flex: 1;
         color: white;
         text-decoration: none;
-        padding: 14px 18px;
+        padding: 13px 18px;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -158,23 +167,14 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         padding-left: 22px;
     }
 
-    .sidebar-link:hover::before {
-        transform: scaleY(1);
-    }
-
-    .sidebar-link.active {
-        background-color: rgba(255, 255, 255, 0.2);
-        font-weight: 600;
-    }
-
+    .sidebar-link:hover::before,
     .sidebar-link.active::before {
         transform: scaleY(1);
     }
 
-    .sidebar-link-icon {
-        font-size: 18px;
-        min-width: 24px;
-        transition: transform var(--transition-speed);
+    .sidebar-link.active {
+        background-color: rgba(255, 255, 255, 0.22);
+        font-weight: 700;
     }
 
     .sidebar-link-text {
@@ -186,14 +186,12 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         display: none;
     }
 
-    /* Sidebar User Section */
     .sidebar-user {
         padding: 15px 18px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
         display: flex;
         flex-direction: column;
         gap: 10px;
-        transition: all var(--transition-speed);
     }
 
     .sidebar-user-info {
@@ -208,10 +206,10 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        transition: opacity var(--transition-speed);
     }
 
-    .sidebar.collapsed .sidebar-user-name {
+    .sidebar.collapsed .sidebar-user-name,
+    .sidebar.collapsed .sidebar-user-role {
         display: none;
     }
 
@@ -221,11 +219,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         padding: 4px 8px;
         border-radius: 12px;
         font-weight: 500;
-        transition: opacity var(--transition-speed);
-    }
-
-    .sidebar.collapsed .sidebar-user-role {
-        display: none;
     }
 
     .sidebar-logout {
@@ -254,11 +247,10 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         padding: 8px;
     }
 
-    .sidebar.collapsed .sidebar-logout span {
+    .sidebar.collapsed .sidebar-logout span:last-child {
         display: none;
     }
 
-    /* Overlay for mobile */
     .sidebar-overlay {
         display: none;
         position: fixed;
@@ -280,15 +272,14 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         to { opacity: 1; }
     }
 
-    /* Main content adjustment */
     body {
         margin: 0;
         padding: 0;
     }
 
-    body.sidebar-normal main, 
-    body.sidebar-normal .main-content, 
-    body.sidebar-normal .content, 
+    body.sidebar-normal main,
+    body.sidebar-normal .main-content,
+    body.sidebar-normal .content,
     body.sidebar-normal .container {
         transition: margin-left var(--transition-speed) ease;
     }
@@ -301,7 +292,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         transition: margin-left var(--transition-speed) ease;
     }
 
-    /* Default for non-mobile */
     @media (min-width: 769px) {
         body {
             margin-left: var(--sidebar-width);
@@ -315,9 +305,12 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         body.sidebar-mobile {
             margin-left: 0;
         }
+
+        .sidebar-toggle-mobile {
+            display: none;
+        }
     }
 
-    /* Responsive Design - Tablet/Mobile */
     @media (max-width: 768px) {
         :root {
             --sidebar-width: 260px;
@@ -342,10 +335,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
 
         main, .main-content, .content {
             margin-left: 0;
-        }
-
-        .sidebar-overlay {
-            display: none;
         }
 
         .sidebar-overlay.active {
@@ -375,148 +364,143 @@ $full_name = $_SESSION['full_name'] ?? 'User';
             font-size: 13px;
         }
     }
-
-    /* Utility: Hide toggle on desktop when sidebar is collapsed */
-    @media (min-width: 769px) {
-        .sidebar-toggle-mobile {
-            display: none;
-        }
-    }
 </style>
 
-<!-- Sidebar Overlay -->
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-<!-- Hamburger Menu Button -->
 <button id="hamburgerBtn" class="hamburger-btn" aria-label="Toggle sidebar">
     <span class="hamburger-line"></span>
     <span class="hamburger-line"></span>
     <span class="hamburger-line"></span>
 </button>
 
-<!-- Sidebar Navigation -->
 <aside class="sidebar" id="sidebar">
-    <!-- Brand -->
     <div class="sidebar-brand">
-        <span style="font-size: 28px;">📚</span>
-        <span class="sidebar-brand-text">Library</span>
+        <span class="sidebar-brand-text">Arellano University Library</span>
     </div>
 
-    <!-- Menu Items -->
     <ul class="sidebar-menu">
         <?php if ($role === 'super_admin'): ?>
-            <!-- Super Admin Menu -->
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/superadmin/dashboard.php" 
-                   class="sidebar-link <?php echo $current_page === 'dashboard.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📊</span>
+                <a href="/LibraryBorrowingSystem/superadmin/dashboard.php" class="sidebar-link <?php echo isActiveNav('/superadmin/dashboard.php'); ?>">
                     <span class="sidebar-link-text">Dashboard</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/superadmin/librarian_management.php" 
-                   class="sidebar-link <?php echo $current_page === 'librarian_management.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">👥</span>
+                <a href="/LibraryBorrowingSystem/superadmin/librarian_management.php" class="sidebar-link <?php echo isActiveNav('/superadmin/librarian_management.php'); ?>">
                     <span class="sidebar-link-text">Manage Librarians</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/superadmin/reports.php" 
-                   class="sidebar-link <?php echo $current_page === 'reports.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📊</span>
+                <a href="/LibraryBorrowingSystem/superadmin/reports.php" class="sidebar-link <?php echo isActiveNav('/superadmin/reports.php'); ?>">
                     <span class="sidebar-link-text">Reports & Analytics</span>
                 </a>
             </li>
-            
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/superadmin/student_records.php" 
-                   class="sidebar-link <?php echo $current_page === 'student_records.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">👨‍🎓</span>
+                <a href="/LibraryBorrowingSystem/superadmin/student_records.php" class="sidebar-link <?php echo isActiveNav('/superadmin/student_records.php'); ?>">
                     <span class="sidebar-link-text">Student Records</span>
                 </a>
             </li>
-
-        <?php elseif ($role === 'librarian'): ?>
-            <!-- Librarian Menu -->
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/dashboard.php" 
-                   class="sidebar-link <?php echo $current_page === 'dashboard.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📊</span>
-                    <span class="sidebar-link-text">Dashboard</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/add_student.php" 
-                   class="sidebar-link <?php echo $current_page === 'add_student.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">➕</span>
+                <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_student.php'); ?>">
                     <span class="sidebar-link-text">Add Student</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/add_book.php" 
-                   class="sidebar-link <?php echo $current_page === 'add_book.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📖</span>
+                <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_book.php'); ?>">
                     <span class="sidebar-link-text">Add Book</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/search.php" 
-                   class="sidebar-link <?php echo $current_page === 'search.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">🔍</span>
+                <a href="/LibraryBorrowingSystem/librarian/search.php" class="sidebar-link <?php echo isActiveNav('/librarian/search.php'); ?>">
                     <span class="sidebar-link-text">Search Students</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" 
-                   class="sidebar-link <?php echo $current_page === 'qr_borrow.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📤</span>
+                <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
                     <span class="sidebar-link-text">Borrow Book</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/overdue.php" 
-                   class="sidebar-link <?php echo $current_page === 'overdue.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">⏰</span>
+                <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="sidebar-link <?php echo isActiveNav('/librarian/overdue.php'); ?>">
                     <span class="sidebar-link-text">Overdue Books</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/qr_return.php" 
-                   class="sidebar-link <?php echo $current_page === 'qr_return.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📥</span>
+                <a href="/LibraryBorrowingSystem/librarian/qr_return.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
                     <span class="sidebar-link-text">Return Book</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/inventory.php" 
-                   class="sidebar-link <?php echo $current_page === 'inventory.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📦</span>
+                <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="sidebar-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
                     <span class="sidebar-link-text">Inventory</span>
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/transactions.php" 
-                   class="sidebar-link <?php echo $current_page === 'transactions.php' ? 'active' : ''; ?>">
-                    <span class="sidebar-link-icon">📋</span>
+                <a href="/LibraryBorrowingSystem/librarian/transactions.php" class="sidebar-link <?php echo isActiveNav('/librarian/transactions.php'); ?>">
                     <span class="sidebar-link-text">Transactions</span>
                 </a>
             </li>
 
+        <?php elseif ($role === 'librarian'): ?>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/dashboard.php" class="sidebar-link <?php echo isActiveNav('/librarian/dashboard.php'); ?>">
+                    <span class="sidebar-link-text">Dashboard</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_student.php'); ?>">
+                    <span class="sidebar-link-text">Add Student</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_book.php'); ?>">
+                    <span class="sidebar-link-text">Add Book</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/search.php" class="sidebar-link <?php echo isActiveNav('/librarian/search.php'); ?>">
+                    <span class="sidebar-link-text">Search Students</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
+                    <span class="sidebar-link-text">Borrow Book</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="sidebar-link <?php echo isActiveNav('/librarian/overdue.php'); ?>">
+                    <span class="sidebar-link-text">Overdue Books</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/qr_return.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
+                    <span class="sidebar-link-text">Return Book</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="sidebar-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
+                    <span class="sidebar-link-text">Inventory</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/LibraryBorrowingSystem/librarian/transactions.php" class="sidebar-link <?php echo isActiveNav('/librarian/transactions.php'); ?>">
+                    <span class="sidebar-link-text">Transactions</span>
+                </a>
+            </li>
         <?php endif; ?>
     </ul>
 
-    <!-- User Section -->
     <div class="sidebar-user">
         <div class="sidebar-user-info">
             <div class="sidebar-user-name" title="<?php echo htmlspecialchars($full_name); ?>">
                 <?php echo htmlspecialchars($full_name); ?>
             </div>
             <div class="sidebar-user-role">
-                <?php echo $role === 'super_admin' ? '🔐 Admin' : '📚 Librarian'; ?>
+                <?php echo $role === 'super_admin' ? 'Admin' : 'Librarian'; ?>
             </div>
         </div>
         <a href="/LibraryBorrowingSystem/logout.php" class="sidebar-logout">
-            <span>🚪</span>
             <span>Logout</span>
         </a>
     </div>
@@ -526,7 +510,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
     (function() {
         'use strict';
 
-        // DOM Elements
         const hamburgerBtn = document.getElementById('hamburgerBtn');
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebarOverlay');
@@ -534,7 +517,6 @@ $full_name = $_SESSION['full_name'] ?? 'User';
         let isCollapsed = false;
         let isMobile = false;
 
-        // Initialize body class on desktop
         function initializeBodyClass() {
             checkMobile();
             if (isMobile) {
@@ -547,12 +529,10 @@ $full_name = $_SESSION['full_name'] ?? 'User';
             }
         }
 
-        // Check if device is mobile
         function checkMobile() {
             isMobile = window.innerWidth <= 768;
         }
 
-        // Update body class based on sidebar state
         function updateBodyClass() {
             if (isMobile) {
                 body.classList.add('sidebar-mobile');
@@ -569,16 +549,15 @@ $full_name = $_SESSION['full_name'] ?? 'User';
             }
         }
 
-        // Initialize on page load
         window.addEventListener('DOMContentLoaded', initializeBodyClass);
 
-        // Toggle sidebar on hamburger click
         hamburgerBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             if (isMobile) {
                 sidebar.classList.toggle('active');
                 overlay.classList.toggle('active');
                 hamburgerBtn.classList.toggle('active');
+                document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
             } else {
                 sidebar.classList.toggle('collapsed');
                 isCollapsed = sidebar.classList.contains('collapsed');
@@ -587,37 +566,34 @@ $full_name = $_SESSION['full_name'] ?? 'User';
             }
         });
 
-        // Close sidebar when overlay is clicked (mobile)
         overlay.addEventListener('click', function() {
             if (isMobile) {
                 sidebar.classList.remove('active');
                 overlay.classList.remove('active');
                 hamburgerBtn.classList.remove('active');
+                document.body.style.overflow = '';
             }
         });
 
-        // Close sidebar when a link is clicked (mobile)
-        const sidebarLinks = document.querySelectorAll('.sidebar-link');
-        sidebarLinks.forEach(link => {
+        document.querySelectorAll('.sidebar-link').forEach(function(link) {
             link.addEventListener('click', function() {
                 if (isMobile) {
                     sidebar.classList.remove('active');
                     overlay.classList.remove('active');
                     hamburgerBtn.classList.remove('active');
+                    document.body.style.overflow = '';
                 }
             });
         });
 
-        // Handle window resize
         window.addEventListener('resize', function() {
             const wasMobile = isMobile;
             checkMobile();
-
-            // Reset sidebar state when switching between mobile and desktop
             if (wasMobile !== isMobile) {
                 sidebar.classList.remove('active');
                 overlay.classList.remove('active');
                 hamburgerBtn.classList.remove('active');
+                document.body.style.overflow = '';
                 if (isMobile) {
                     sidebar.classList.remove('collapsed');
                     isCollapsed = false;
@@ -626,29 +602,12 @@ $full_name = $_SESSION['full_name'] ?? 'User';
             }
         });
 
-        // Close sidebar when pressing Escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && isMobile && sidebar.classList.contains('active')) {
                 sidebar.classList.remove('active');
                 overlay.classList.remove('active');
                 hamburgerBtn.classList.remove('active');
-            }
-        });
-
-        // Prevent scrolling when sidebar is open on mobile
-        function toggleBodyScroll(disable) {
-            if (disable) {
-                document.body.style.overflow = 'hidden';
-            } else {
                 document.body.style.overflow = '';
-            }
-        }
-
-        overlay.addEventListener('click', () => toggleBodyScroll(false));
-        hamburgerBtn.addEventListener('click', function() {
-            if (isMobile) {
-                const isActive = sidebar.classList.contains('active');
-                toggleBodyScroll(isActive);
             }
         });
     })();

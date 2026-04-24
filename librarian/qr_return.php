@@ -427,10 +427,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="page-header">
-            <h2>📥 QR Code Book Return</h2>
+            <h2>QR Code Book Return</h2>
             <p style="color: #666; margin-top: 10px;">Scan the book QR code to process the return and calculate any applicable penalties</p>
         </div>
         
@@ -443,7 +444,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         <?php if ($return_details): ?>
             <div class="section">
-                <h3>📋 Return Details</h3>
+                <h3>Return Details</h3>
                 
                 <div class="return-details">
                     <h4>✓ Book Successfully Returned</h4>
@@ -483,7 +484,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     
                     <?php if ($return_details['days_late'] > 0): ?>
                         <div class="penalty-box">
-                            <strong>⚠️ Late Return Penalty</strong><br>
+                            <strong>Late Return Penalty</strong><br>
                             Days Late: <?php echo $return_details['days_late']; ?> days<br>
                             Penalty Rate: $5 per day<br>
                             <div class="penalty-amount">Total Penalty: $<?php echo number_format($return_details['penalty_amount'], 2); ?></div>
@@ -500,7 +501,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         <!-- QR Scanner Section -->
         <div class="section">
-            <h3>📷 QR Code Scanner</h3>
+            <h3>QR Code Scanner</h3>
             
             <div class="info-box">
                 <strong>ℹ️ How to use:</strong><br>
@@ -515,15 +516,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             </div>
             
             <div class="scanner-controls">
-                <button type="button" class="btn-small" id="startBtn" onclick="startScanner()">📷 Start Camera</button>
+                <button type="button" class="btn-small" id="startBtn" onclick="startScanner()">Start Camera</button>
                 <button type="button" class="btn-small" id="stopBtn" onclick="stopScanner()" style="display: none; background: #f44336;">🛑 Stop Camera</button>
-                <button type="button" class="btn-small" id="resetBtn" onclick="resetForm()">🔄 Reset</button>
+                <button type="button" class="btn-small" id="resetBtn" onclick="resetForm()">Reset</button>
             </div>
         </div>
         
         <!-- Form Section -->
         <div class="section">
-            <h3>📋 Return Information</h3>
+            <h3>Return Information</h3>
             
             <form method="POST" id="returnForm">
                 <input type="hidden" name="action" value="process_return">
@@ -534,7 +535,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 
                 <div class="info-box">
-                    <strong>📅 Return Process:</strong><br>
+                    <strong>Return Process:</strong><br>
                     • Penalty calculated automatically if returned after due date<br>
                     • Penalty: $5 per day late<br>
                     • Book status updated to "Available" immediately<br>

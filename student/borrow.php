@@ -415,13 +415,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .grid {
             display: grid;
-            grid-template-columns: 1fr 2fr;
+            grid-template-columns: 1fr;
             gap: 30px;
             align-items: start;
         }
         
         /* Student Info Column */
         .student-info-section {
+            display: none;
             background: white;
             border-radius: 12px;
             padding: 25px;
@@ -950,25 +951,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             color: #764ba2;
         }
         
-        .logout-btn {
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .student-menu {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .student-menu-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: #003366;
             color: white;
             border: none;
             border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            font-weight: 700;
             font-size: 14px;
+            cursor: pointer;
+            box-shadow: none;
         }
-        
-        .logout-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+
+        .student-menu-toggle:hover {
+            background: #00264d;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .student-menu-name {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .student-menu-caret {
+            font-size: 11px;
+            line-height: 1;
+        }
+
+        .student-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            min-width: 190px;
+            background: #ffffff;
+            border: 1px solid #e2e6ea;
+            border-radius: 8px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+            padding: 8px 0;
+            display: none;
+            z-index: 1200;
+        }
+
+        .student-dropdown.show {
+            display: block;
+        }
+
+        .student-dropdown a {
+            display: block;
+            padding: 12px 18px;
+            color: #2c3e50;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .student-dropdown a:hover,
+        .student-dropdown a.active {
+            background: #f0f3f8;
+            color: #003366;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .student-dropdown .dropdown-divider {
+            height: 1px;
+            background: #e8edf2;
+            margin: 6px 0;
         }
         
         /* Adjust body to account for fixed header */
@@ -1010,9 +1073,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 font-size: 14px;
             }
             
-            .logout-btn {
-                padding: 8px 16px;
+            .student-menu-toggle {
+                padding: 8px 10px;
                 font-size: 12px;
+            }
+
+            .student-menu-name {
+                max-width: 130px;
             }
             
             body {
@@ -1024,21 +1091,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <body>
     <!-- Header -->
     <header class="page-header">
-        <a href="/LibraryBorrowingSystem/student/portal.php" class="header-brand">
+        <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="header-brand">
             <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo">
-            <span class="header-brand-text">Arellano_University</span>
+            <span class="header-brand-text">Arellano University Book Borrowing</span>
         </a>
-            <!-- Logout Button -->
-        <a href="/LibraryBorrowingSystem/student/portal.php" class="logout-btn">
-            Logout
-        </a>
+        <div class="student-menu">
+            <button type="button" class="student-menu-toggle" id="studentMenuToggle" aria-haspopup="true" aria-expanded="false">
+                <span class="student-menu-name"><?php echo $student ? htmlspecialchars($student['full_name']) : 'Student'; ?></span>
+                <span class="student-menu-caret">▼</span>
+            </button>
+            <div class="student-dropdown" id="studentDropdown">
+                <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="active">Dashboard</a>
+                <?php if ($student_qr): ?>
+                    <a href="/LibraryBorrowingSystem/student/profile.php?qr=<?php echo urlencode($student_qr); ?>">Profile</a>
+                <?php endif; ?>
+                <div class="dropdown-divider"></div>
+                <a href="/LibraryBorrowingSystem/student/portal.php">Logout</a>
+            </div>
+        </div>
     </header>
     
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>📚 Borrow Books</h1>
-            <p>Browse available books and borrow them instantly</p>
+            <h1>Search Books</h1>
+            <p>Search available library books by title or author</p>
         </div>
         
         <!-- Search Section -->
@@ -1066,7 +1143,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     
                     <!-- Student Header -->
                     <div class="student-header">
-                        <div class="student-avatar">👨‍🎓</div>
                         <div class="student-details">
                             <h3><?php echo htmlspecialchars($student['full_name']); ?></h3>
                             <p>Member Since: <?php echo date('M d, Y', strtotime($student['created_at'])); ?></p>
@@ -1094,7 +1170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     </div>
                 <?php else: ?>
                     <div class="no-selection">
-                        <div class="no-selection-icon">👤</div>
                         <p>Unable to load student information</p>
                     </div>
                 <?php endif; ?>
@@ -1102,17 +1177,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             <!-- Books Results Column -->
             <div class="results-section">
-                <h2>📖 Available Books (<span id="bookCount"><?php echo count($books); ?></span>)</h2>
+                <h2>Available Books (<span id="bookCount"><?php echo count($books); ?></span>)</h2>
                 
                 <div class="results-list" id="booksList">
                     <?php if (empty($books) && $student): ?>
                         <div class="empty-results">
-                            <div class="empty-results-icon">📚</div>
                             <p>No books available at the moment</p>
                         </div>
                     <?php elseif (!$student): ?>
                         <div class="empty-results">
-                            <div class="empty-results-icon">🔒</div>
                             <p>Unable to load books. Please verify your QR code.</p>
                         </div>
                     <?php else: ?>
@@ -1449,5 +1522,23 @@ function escapeHtml(text) {
     });
 </script>
 <?php endif; ?>
+
+    <script>
+        const studentMenuToggle = document.getElementById('studentMenuToggle');
+        const studentDropdown = document.getElementById('studentDropdown');
+
+        if (studentMenuToggle && studentDropdown) {
+            studentMenuToggle.addEventListener('click', function (event) {
+                event.stopPropagation();
+                const isOpen = studentDropdown.classList.toggle('show');
+                studentMenuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            });
+
+            document.addEventListener('click', function () {
+                studentDropdown.classList.remove('show');
+                studentMenuToggle.setAttribute('aria-expanded', 'false');
+            });
+        }
+    </script>
 </body>
 </html>

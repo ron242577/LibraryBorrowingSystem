@@ -191,8 +191,6 @@ function getStatusBadge($available_copies, $total_copies) {
     }
 }
 
-// Include navbar
-require_once __DIR__ . '/../navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -663,10 +661,12 @@ require_once __DIR__ . '/../navbar.php';
     </style>
 </head>
 <body>
+    <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     <div class="container">
         <!-- Page Header -->
         <div class="page-header">
-            <h1>📦 Inventory Status</h1>
+            <h1>Inventory Status</h1>
             <p>Real-time monitoring of library book inventory</p>
         </div>
         
@@ -680,31 +680,26 @@ require_once __DIR__ . '/../navbar.php';
         <!-- Summary Cards -->
         <div class="stats-grid">
             <div class="stat-card blue">
-                <div class="icon">📚</div>
                 <div class="label">Total Book Titles</div>
                 <div class="value"><?php echo $stats['total_titles'] ?? 0; ?></div>
             </div>
             
             <div class="stat-card green">
-                <div class="icon">📖</div>
                 <div class="label">Total Copies</div>
                 <div class="value"><?php echo $stats['total_copies'] ?? 0; ?></div>
             </div>
             
             <div class="stat-card green">
-                <div class="icon">✓</div>
                 <div class="label">Available Copies</div>
                 <div class="value"><?php echo $stats['available_copies'] ?? 0; ?></div>
             </div>
             
             <div class="stat-card orange">
-                <div class="icon">📤</div>
                 <div class="label">Borrowed Copies</div>
                 <div class="value"><?php echo $stats['borrowed_copies'] ?? 0; ?></div>
             </div>
             
             <div class="stat-card red">
-                <div class="icon">⚠️</div>
                 <div class="label">Lost/Damaged</div>
                 <div class="value"><?php echo $stats['lost_copies'] ?? 0; ?></div>
             </div>
@@ -712,7 +707,7 @@ require_once __DIR__ . '/../navbar.php';
         
         <!-- Low Stock Alert -->
         <div class="alert-panel">
-            <h3>⚠️ Low Stock Alert</h3>
+            <h3>Low Stock Alert</h3>
             <div class="alert-panel-content">
                 <?php if (empty($low_stock_books)): ?>
                     <p class="no-low-stock">✓ All books have sufficient stock</p>

@@ -327,10 +327,11 @@ try {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="welcome-section">
-            <h2>Welcome, <?php echo htmlspecialchars(getUserFullName()); ?>! 👋</h2>
+            <h2>Welcome, <?php echo htmlspecialchars(getUserFullName()); ?>!</h2>
             <p>You are logged in as a <strong>Librarian</strong>.</p>
             <p>This dashboard allows you to manage day-to-day library operations including book borrowing, student records, and transaction tracking.</p>
             <span class="role-badge">LIBRARIAN</span>
@@ -338,32 +339,28 @@ try {
         
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon">👨‍🎓</div>
                 <div class="stat-label">Total Students</div>
                 <div class="stat-number"><?php echo $total_students; ?></div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">📚</div>
                 <div class="stat-label">Total Books</div>
                 <div class="stat-number"><?php echo $total_books; ?></div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">📤</div>
                 <div class="stat-label">Borrowed Books</div>
                 <div class="stat-number"><?php echo $borrowed_books; ?></div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-icon">⏰</div>
                 <div class="stat-label">Overdue Books</div>
                 <div class="stat-number"><?php echo $overdue_books; ?></div>
             </div>
         </div>
         
         <div class="transactions-section">
-            <h3>📋 Latest Transactions (Last 10)</h3>
+            <h3>Latest Transactions (Last 10)</h3>
             
             <?php if (count($latest_transactions) > 0): ?>
                 <div class="table-wrapper">
@@ -406,7 +403,6 @@ try {
         <div class="dashboard-grid">
             <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">➕</div>
                     <h2>Add Student</h2>
                     <p>Register new students and auto-generate unique QR codes for tracking.</p>
                 </div>
@@ -414,7 +410,6 @@ try {
             
             <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">📚</div>
                     <h2>Add Book</h2>
                     <p>Register new books and auto-generate unique QR codes for inventory.</p>
                 </div>
@@ -422,7 +417,6 @@ try {
             
             <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">📤</div>
                     <h2>Book Borrowing</h2>
                     <p>Process student book borrowing using QR code scanner.</p>
                 </div>
@@ -430,7 +424,6 @@ try {
             
             <a href="/LibraryBorrowingSystem/librarian/qr_return.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">📥</div>
                     <h2>Book Returns</h2>
                     <p>Record book returns using QR scanner and calculate penalties.</p>
                 </div>
@@ -438,7 +431,6 @@ try {
             
             <a href="/LibraryBorrowingSystem/librarian/search.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">👨‍🎓</div>
                     <h2>Student Search</h2>
                     <p>Search and view student information and borrowing history.</p>
                 </div>
@@ -446,7 +438,6 @@ try {
 
             <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">📚</div>
                     <h2>Inventory Status</h2>
                     <p>View current book availability and status of all library items.</p>
                 </div>
@@ -454,7 +445,6 @@ try {
             
             <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">⏰</div>
                     <h2>Overdue Books</h2>
                     <p>Monitor and track overdue books with penalty calculations.</p>
                 </div>
@@ -462,7 +452,6 @@ try {
             
             <a href="/LibraryBorrowingSystem/librarian/transactions.php" class="card-link">
                 <div class="card">
-                    <div class="card-icon">📋</div>
                     <h2>Transactions</h2>
                     <p>View all borrowing and return transactions with detailed information.</p>
                 </div>

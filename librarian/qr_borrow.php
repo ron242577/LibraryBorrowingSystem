@@ -153,8 +153,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             padding: 0 20px;
         }
         
+
         .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 15px;
             margin-bottom: 30px;
+        }
+
+        .page-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 18px;
+            background: #8B0000;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+        }
+
+        .action-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .page-header {
+                flex-direction: column;
+            }
         }
         
         .page-header h2 {
@@ -537,11 +574,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="page-header">
-            <h2>📱 QR Code Book Borrowing System</h2>
-            <p style="color: #666; margin-top: 10px;">Complete the student and book scanning process to process a book borrowing transaction</p>
+            <div>
+                <h2>QR Code Book Borrowing System</h2>
+                <p style="color: #666; margin-top: 10px;">Complete the student and book scanning process to process a book borrowing transaction</p>
+            </div>
         </div>
         
         <?php if (!empty($message)): ?>
@@ -573,7 +613,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <!-- STEP 1: STUDENT QR SCANNER -->
             <div class="section scanner-section" id="studentScannerSection">
                 <div class="scanner-header">
-                    <div class="scanner-icon">👤</div>
                     <div>
                         <div class="scanner-title">Step 1: Scan Student QR Code</div>
                         <div class="scanner-subtitle">Identify which student is borrowing the book</div>
@@ -586,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 
                 <div class="info-box">
-                    <strong>📝 Instructions:</strong><br>
+                    <strong>Instructions:</strong><br>
                     1. Click "Start Camera" button below<br>
                     2. Point your camera at the student's QR code<br>
                     3. The system will automatically detect and scan it<br>
@@ -598,8 +637,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 
                 <div class="scanner-controls">
-                    <button type="button" class="btn-small" id="startBtnStudent" onclick="startScannerStudent()">📷 Start Camera</button>
-                    <button type="button" class="btn-small" id="stopBtnStudent" onclick="stopScannerStudent()" style="display: none; background: #f44336;">🛑 Stop Camera</button>
+                    <button type="button" class="btn-small" id="startBtnStudent" onclick="startScannerStudent()">Start Camera</button>
+                    <button type="button" class="btn-small" id="stopBtnStudent" onclick="stopScannerStudent()" style="display: none; background: #f44336;">Stop Camera</button>
                 </div>
                 
                 <div class="form-group">
@@ -623,11 +662,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <!-- STEP 2: BOOK QR SCANNER -->
             <div class="section scanner-section" id="bookScannerSection">
                 <div class="scanner-locked-notice" id="bookLockedNotice" style="display: none;">
-                    🔒 Please complete Step 1 (Student QR) first to enable this scanner
+                    Please complete Step 1 (Student QR) first to enable this scanner
                 </div>
                 
                 <div class="scanner-header">
-                    <div class="scanner-icon">📚</div>
+                    
                     <div>
                         <div class="scanner-title">Step 2: Scan Book QR Code</div>
                         <div class="scanner-subtitle">Select which book to borrow</div>
@@ -640,7 +679,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 
                 <div class="info-box">
-                    <strong>📝 Instructions:</strong><br>
+                    <strong>Instructions:</strong><br>
                     1. Click "Start Camera" button below<br>
                     2. Point your camera at the book's QR code<br>
                     3. The system will automatically detect and scan it<br>
@@ -652,8 +691,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 
                 <div class="scanner-controls">
-                    <button type="button" class="btn-small" id="startBtnBook" onclick="startScannerBook()">📷 Start Camera</button>
-                    <button type="button" class="btn-small" id="stopBtnBook" onclick="stopScannerBook()" style="display: none; background: #f44336;">🛑 Stop Camera</button>
+                    <button type="button" class="btn-small" id="startBtnBook" onclick="startScannerBook()">Start Camera</button>
+                    <button type="button" class="btn-small" id="stopBtnBook" onclick="stopScannerBook()" style="display: none; background: #f44336;">Stop Camera</button>
                 </div>
                 
                 <div class="form-group">
@@ -669,7 +708,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <?php endif; ?>
                 
                 <div class="info-box">
-                    <strong>📅 Borrowing Terms:</strong><br>
+                    <strong>Borrowing Terms:</strong><br>
                     • Loan Period: 14 days<br>
                     • Status: Active borrowing<br>
                     • Auto-calculation of due date
@@ -737,14 +776,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     alert('✓ Student QR scanned successfully!\n\nStudent Code: ' + text + '\n\nNow proceed to Step 2 and scan the book QR code.');
                 }
             } else {
-                alert('⚠️ Invalid QR Code\n\nPlease scan a student QR code (starts with STU-)');
+                alert('Invalid QR Code\n\nPlease scan a student QR code (starts with STU-)');
             }
         }
         
         // ============ BOOK QR SCANNER ============
         function startScannerBook() {
             if (!studentScanned) {
-                alert('⚠️ Please complete Step 1 first!\n\nScan the student QR code before scanning the book.');
+                alert('Please complete Step 1 first!\n\nScan the student QR code before scanning the book.');
                 return;
             }
             
@@ -782,7 +821,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     alert('✓ Book QR scanned successfully!\n\nBook Code: ' + text + '\n\nClick "Process Book Borrowing" to complete the transaction.');
                 }
             } else {
-                alert('⚠️ Invalid QR Code\n\nPlease scan a book QR code (starts with BOOK-)');
+                alert('Invalid QR Code\n\nPlease scan a book QR code (starts with BOOK-)');
             }
         }
         

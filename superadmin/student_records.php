@@ -404,15 +404,16 @@ if ($result) {
 </head>
 <body>
     <?php require_once __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
 
     <div class="container">
         <div class="page-header">
-            <h1>👥 Student Records</h1>
+            <h1>Student Records</h1>
         </div>
 
         <!-- Filter Section -->
         <div class="filter-section">
-            <h3>🔍 Search & Filter</h3>
+            <h3>Search & Filter</h3>
             <form method="GET" id="filterForm">
                 <div class="filter-grid">
                     <div class="filter-group">
@@ -451,7 +452,7 @@ if ($result) {
                 </div>
 
                 <div class="filter-actions" style="margin-top: 15px;">
-                    <button type="submit" class="btn btn-search">🔍 Search</button>
+                    <button type="submit" class="btn btn-search">Search</button>
                     <a href="student_records.php" class="btn btn-reset">↺ Reset</a>
                 </div>
             </form>
@@ -488,13 +489,13 @@ if ($result) {
         <!-- Student Records Table -->
         <div class="table-section">
             <div class="table-header">
-                <h3>📋 Student Information</h3>
+                <h3>Student Information</h3>
                 <span><?php echo number_format($total_students); ?> students found</span>
             </div>
 
             <?php if (empty($students)): ?>
                 <div class="no-data">
-                    📭 No student records found. <?php echo !empty($search) ? 'Try adjusting your search.' : 'No students registered yet.'; ?>
+                    No student records found. <?php echo !empty($search) ? 'Try adjusting your search.' : 'No students registered yet.'; ?>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">

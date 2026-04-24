@@ -110,8 +110,6 @@ if (isset($_GET['student_id'])) {
     }
 }
 
-// Include navbar
-require_once __DIR__ . '/../navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -479,10 +477,12 @@ require_once __DIR__ . '/../navbar.php';
     </style>
 </head>
 <body>
+    <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>🔍 Student Search & Borrowing History</h1>
+            <h1>Student Search & Borrowing History</h1>
             <p>Search for students and view their complete borrowing history</p>
         </div>
         
@@ -502,16 +502,14 @@ require_once __DIR__ . '/../navbar.php';
         <div class="grid">
             <!-- Search Results Column -->
             <div class="results-section">
-                <h2>📋 Students (<?php echo count($search_results); ?>)</h2>
+                <h2>Students (<?php echo count($search_results); ?>)</h2>
                 
                 <?php if (empty($search_results) && !empty($search_query)): ?>
                     <div class="empty-results">
-                        <div class="empty-results-icon">🔎</div>
                         <p>No students found matching "<?php echo htmlspecialchars($search_query); ?>"</p>
                     </div>
                 <?php elseif (empty($search_results)): ?>
                     <div class="empty-results">
-                        <div class="empty-results-icon">📚</div>
                         <p>Enter a search query to find students</p>
                     </div>
                 <?php else: ?>
@@ -519,7 +517,6 @@ require_once __DIR__ . '/../navbar.php';
                         <?php foreach ($search_results as $student): ?>
                             <div class="result-item <?php echo ($selected_student && $selected_student['student_id'] === $student['student_id']) ? 'active' : ''; ?>" 
                                  onclick="location.href='?search=<?php echo urlencode($search_query); ?>&student_id=<?php echo $student['student_id']; ?>'">
-                                <div class="result-icon">👤</div>
                                 <div class="result-info">
                                     <div class="result-name"><?php echo htmlspecialchars($student['full_name']); ?></div>
                                     <div class="result-id"><?php echo htmlspecialchars($student['qr_code']); ?></div>
@@ -535,7 +532,6 @@ require_once __DIR__ . '/../navbar.php';
                 <?php if ($selected_student): ?>
                     <!-- Student Header -->
                     <div class="student-header">
-                        <div class="student-avatar">👨‍🎓</div>
                         <div class="student-info">
                             <h2><?php echo htmlspecialchars($selected_student['full_name']); ?></h2>
                             <p>Student Since: <?php echo date('M d, Y', strtotime($selected_student['created_at'])); ?></p>
@@ -573,7 +569,7 @@ require_once __DIR__ . '/../navbar.php';
                     <!-- Borrowing History -->
                     <?php if (!empty($student_transactions)): ?>
                         <div class="transactions-section">
-                            <h3>📚 Borrowing History</h3>
+                            <h3>Borrowing History</h3>
                             <div class="table-wrapper">
                                 <table>
                                     <thead>
@@ -622,7 +618,6 @@ require_once __DIR__ . '/../navbar.php';
                     <?php endif; ?>
                 <?php else: ?>
                     <div class="no-selection">
-                        <div class="no-selection-icon">👈</div>
                         <p>Select a student to view details</p>
                     </div>
                 <?php endif; ?>

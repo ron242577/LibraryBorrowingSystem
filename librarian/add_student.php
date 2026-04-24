@@ -443,10 +443,11 @@ try {
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
+    <?php include __DIR__ . '/../header.php'; ?>
     
     <div class="container">
         <div class="page-header">
-            <h2>👨‍🎓 Add New Student</h2>
+            <h2>Add New Student</h2>
         </div>
         
         <?php if (!empty($message)): ?>
@@ -458,7 +459,7 @@ try {
         
         <!-- Add Student Form -->
         <div class="section">
-            <h3>➕ Student Registration</h3>
+            <h3>Student Registration</h3>
             <form method="POST">
                 <input type="hidden" name="action" value="add">
                 
@@ -488,7 +489,7 @@ try {
         
         <!-- Recent Students List -->
         <div class="section">
-            <h3>📋 Recent Students (Last 20)</h3>
+            <h3>Recent Students (Last 20)</h3>
             
             <?php if (count($students) > 0): ?>
                 <div class="table-wrapper">
@@ -542,7 +543,7 @@ try {
     <div id="qrModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>📱 QR Code Preview</h3>
+                <h3>QR Code Preview</h3>
                 <p id="qrCodeId" style="color: #666; margin-top: 5px; font-size: 14px;"></p>
             </div>
             
