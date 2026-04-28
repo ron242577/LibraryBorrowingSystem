@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 24, 2026 at 01:56 PM
+-- Generation Time: Apr 28, 2026 at 06:41 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -49,7 +49,9 @@ INSERT INTO `books` (`book_id`, `title`, `author`, `qr_code`, `book_status`, `to
 (1, 'The Great Gatsby', 'F. Scott Fitzgerald', 'BOOK-QR-001', 'available', 3, 2, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
 (2, 'To Kill a Mockingbird', 'Harper Lee', 'BOOK-QR-002', 'available', 2, 2, 0, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
 (3, '1984', 'George Orwell', 'BOOK-QR-003', 'out_of_stock', 4, 0, 3, 1, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
-(4, 'Pride and Prejudice', 'Jane Austen', 'BOOK-QR-004', 'available', 5, 4, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11');
+(4, 'Pride and Prejudice', 'Jane Austen', 'BOOK-QR-004', 'available', 5, 4, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(5, 'asdas', 'sir jayr', 'BOOK-20260427-ZHAWV', 'available', 1, 1, 0, 0, '2026-04-27 03:53:14', '2026-04-27 03:53:14'),
+(6, 'asdas', 'sir jayr', 'BOOK-20260427-HIJCT', 'available', 1, 1, 0, 0, '2026-04-27 03:53:15', '2026-04-27 03:53:15');
 
 -- --------------------------------------------------------
 
@@ -75,7 +77,10 @@ INSERT INTO `students` (`student_id`, `full_name`, `contact_number`, `qr_code`, 
 (1, 'John Doe', '9876543210', 'STU-QR-001', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
 (2, 'Jane Smith', '9876543211', 'STU-QR-002', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
 (3, 'Michael Johnson', '9876543212', 'STU-QR-003', 'active', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
-(4, 'Marcus Dominique Muico', '09457352866', 'STU-20260424-IPDXQ', 'active', '2026-04-24 10:02:37', '2026-04-24 10:02:37');
+(4, 'Marcus Dominique Muico', '09457352866', 'STU-20260424-IPDXQ', 'active', '2026-04-24 10:02:37', '2026-04-24 10:02:37'),
+(5, 'Divine Abanador', '09121231234', 'STU-20260428-BAW0U', 'active', '2026-04-28 13:31:46', '2026-04-28 13:31:46'),
+(6, 'Tracy Caryll Alamo', '09211231234', 'STU-20260428-ZTPU8', 'active', '2026-04-28 13:32:24', '2026-04-28 13:32:24'),
+(7, 'Arron Perlas', '09131231234', 'STU-20260428-YXGZV', 'active', '2026-04-28 13:33:33', '2026-04-28 13:33:33');
 
 -- --------------------------------------------------------
 
@@ -180,13 +185,13 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `books`
 --
 ALTER TABLE `books`
-  MODIFY `book_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `book_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `transactions`
