@@ -266,6 +266,97 @@ function isActiveNav($path) {
     .sidebar-overlay.active {
         display: block;
     }
+    /* DROPDOWN FIXED STRUCTURE */
+.dropdown {
+    flex-direction: column;
+    width: 100%;
+}
+
+/* Parent (Books) */
+.dropdown-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Submenu container */
+.dropdown-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: none;
+    width: 100%;
+}
+
+/* Show dropdown */
+.dropdown.open .dropdown-menu {
+    display: block;
+}
+
+/* Each submenu item */
+.dropdown-menu li {
+    width: 100%;
+}
+
+/* Submenu links */
+.dropdown-link {
+    display: block;
+    width: 100%;
+    padding: 10px 18px 10px 40px; /* INDENT HERE */
+    font-size: 13px;
+    color: #ddd;
+    text-decoration: none;
+    transition: 0.2s;
+}
+
+/* Hover */
+.dropdown-link:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+/* Arrow rotation */
+.dropdown-icon {
+    font-size: 12px;
+    transition: transform 0.3s;
+}
+
+.dropdown.open .dropdown-icon {
+    transform: rotate(180deg);
+}
+.dropdown-link {
+    border-left: 2px solid transparent;
+}
+
+.dropdown-link:hover {
+    border-left: 2px solid #fff;
+}
+/* OPEN STATE */
+.dropdown.open .dropdown-menu {
+    max-height: 500px; /* enough for items */
+}
+
+/* rotate arrow */
+.dropdown.open .dropdown-icon {
+    transform: rotate(180deg);
+}
+
+/* submenu items */
+.dropdown-link {
+    display: block;
+    padding: 10px 18px 10px 40px;
+    font-size: 13px;
+    color: #ddd;
+    text-decoration: none;
+    transition: 0.2s;
+}
+
+.dropdown-link:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
 
     @keyframes fadeIn {
         from { opacity: 0; }
@@ -401,35 +492,28 @@ function isActiveNav($path) {
                     <span class="sidebar-link-text">Student Records</span>
                 </a>
             </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_student.php'); ?>">
-                    <span class="sidebar-link-text">Add Student</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_book.php'); ?>">
-                    <span class="sidebar-link-text">Add Book</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/search.php" class="sidebar-link <?php echo isActiveNav('/librarian/search.php'); ?>">
-                    <span class="sidebar-link-text">Search Students</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
-                    <span class="sidebar-link-text">Borrow Book</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="sidebar-link <?php echo isActiveNav('/librarian/overdue.php'); ?>">
-                    <span class="sidebar-link-text">Overdue Books</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/qr_return.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
-                    <span class="sidebar-link-text">Return Book</span>
-                </a>
+            <li class="sidebar-item dropdown">
+                <div class="sidebar-link dropdown-toggle">
+                    <span class="sidebar-link-text">Books</span>
+                    <span class="dropdown-icon">▼</span>
+                </div>
+
+                <ul class="dropdown-menu">
+
+                    <li>
+                        <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" 
+                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
+                            Borrow Book
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="/LibraryBorrowingSystem/librarian/qr_return.php" 
+                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
+                            Return Book
+                        </a>
+                    </li>
+                </ul>
             </li>
             <li class="sidebar-item">
                 <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="sidebar-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
@@ -449,34 +533,32 @@ function isActiveNav($path) {
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_student.php'); ?>">
-                    <span class="sidebar-link-text">Add Student</span>
+                <a href="/LibraryBorrowingSystem/superadmin/student_records.php" class="sidebar-link <?php echo isActiveNav('/superadmin/student_records.php'); ?>">
+                    <span class="sidebar-link-text">Student Records</span>
                 </a>
             </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="sidebar-link <?php echo isActiveNav('/librarian/add_book.php'); ?>">
-                    <span class="sidebar-link-text">Add Book</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/search.php" class="sidebar-link <?php echo isActiveNav('/librarian/search.php'); ?>">
-                    <span class="sidebar-link-text">Search Students</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
-                    <span class="sidebar-link-text">Borrow Book</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="sidebar-link <?php echo isActiveNav('/librarian/overdue.php'); ?>">
-                    <span class="sidebar-link-text">Overdue Books</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/qr_return.php" class="sidebar-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
-                    <span class="sidebar-link-text">Return Book</span>
-                </a>
+            <li class="sidebar-item dropdown">
+                <div class="sidebar-link dropdown-toggle">
+                    <span class="sidebar-link-text">Books</span>
+                    <span class="dropdown-icon">▼</span>
+                </div>
+
+                <ul class="dropdown-menu">
+
+                    <li>
+                        <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" 
+                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
+                            Borrow Book
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="/LibraryBorrowingSystem/librarian/qr_return.php" 
+                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
+                            Return Book
+                        </a>
+                    </li>
+                </ul>
             </li>
             <li class="sidebar-item">
                 <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="sidebar-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
@@ -611,4 +693,27 @@ function isActiveNav($path) {
             }
         });
     })();
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+    document.querySelectorAll('.dropdown-toggle').forEach(function(toggle) {
+        toggle.addEventListener('click', function () {
+            const parent = this.closest('.dropdown');
+
+            // optional: close others
+            document.querySelectorAll('.dropdown').forEach(d => {
+                if (d !== parent) d.classList.remove('open');
+            });
+
+            parent.classList.toggle('open');
+        });
+    });
+
+    // AUTO OPEN ACTIVE
+    const activeLink = document.querySelector('.dropdown-link.active');
+    if (activeLink) {
+        activeLink.closest('.dropdown')?.classList.add('open');
+    }
+});
 </script>

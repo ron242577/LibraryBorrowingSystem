@@ -386,14 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
             </a>
 
-            <a href="/LibraryBorrowingSystem/librarian/add_student.php" class="card-link">
-                <div class="card">
-                    <h2>Add Student</h2>
-                    <p>Register new students and auto-generate unique QR codes for tracking.</p>
-                </div>
-            </a>
-            
-            <a href="/LibraryBorrowingSystem/librarian/add_book.php" class="card-link">
+            <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="card-link">
                 <div class="card">
                     <h2>Add Book</h2>
                     <p>Register new books and auto-generate unique QR codes for inventory.</p>
@@ -413,25 +406,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <p>Record book returns using QR scanner and calculate penalties.</p>
                 </div>
             </a>
-            
-            <a href="/LibraryBorrowingSystem/librarian/search.php" class="card-link">
-                <div class="card">
-                    <h2>Student Search</h2>
-                    <p>Search and view student information and borrowing history.</p>
-                </div>
-            </a>
 
             <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="card-link">
                 <div class="card">
                     <h2>Inventory Status</h2>
                     <p>View current book availability and status of all library items.</p>
-                </div>
-            </a>
-            
-            <a href="/LibraryBorrowingSystem/librarian/overdue.php" class="card-link">
-                <div class="card">
-                    <h2>Overdue Books</h2>
-                    <p>Monitor and track overdue books with penalty calculations.</p>
                 </div>
             </a>
             
