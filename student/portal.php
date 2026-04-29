@@ -29,7 +29,7 @@ if ($student_qr) {
             
             // Redirect to borrow.php with QR parameter
             $qr_code_param = '?qr=' . urlencode($student_qr);
-            header('Location: /LibraryBorrowingSystem/student/borrow.php' . $qr_code_param);
+            header('Location: /LibraryBorrowingSystem/student/profile.php' . $qr_code_param);
             exit();
         } else {
             $qr_error = 'Invalid or inactive QR code. Please check your code and try again or use manual entry.';

@@ -266,12 +266,10 @@ if (!$student_qr) {
                 <span class="student-menu-caret">▼</span>
             </button>
             <div class="student-dropdown" id="studentDropdown">
-                <?php if ($student_qr): ?>
-                    <a href="/LibraryBorrowingSystem/student/borrow.php?qr=<?php echo urlencode($student_qr); ?>">Dashboard</a>
-                <?php else: ?>
-                    <a href="/LibraryBorrowingSystem/student/portal.php">Dashboard</a>
-                <?php endif; ?>
                 <a href="/LibraryBorrowingSystem/student/profile.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="active">Profile</a>
+                <?php if ($student_qr): ?>
+                    <a href="/LibraryBorrowingSystem/student/borrow.php?qr=<?php echo urlencode($student_qr); ?>">Search Books</a>
+                <?php endif; ?>
                 <div class="dropdown-divider"></div>
                 <a href="/LibraryBorrowingSystem/student/portal.php">Logout</a>
             </div>

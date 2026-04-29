@@ -258,13 +258,11 @@ try {
     $qr_books = $conn->query("SELECT * FROM books");
     if ($qr_books) {
         while ($book = $qr_books->fetch_assoc()) {
-            if (file_exists($qr_dir . '/' . $book['qr_code'] . '.png')) {
-                $stats_with_qr['total_titles']++;
-                $stats_with_qr['total_copies']     += $book['total_copies'];
-                $stats_with_qr['available_copies'] += $book['available_copies'];
-                $stats_with_qr['borrowed_copies']  += $book['borrowed_copies'];
-                $stats_with_qr['lost_copies']      += $book['lost_copies'];
-            }
+            $stats_with_qr['total_titles']++;
+            $stats_with_qr['total_copies']     += $book['total_copies'];
+            $stats_with_qr['available_copies'] += $book['available_copies'];
+            $stats_with_qr['borrowed_copies']  += $book['borrowed_copies'];
+            $stats_with_qr['lost_copies']      += $book['lost_copies'];
         }
     }
     $stats = $stats_with_qr;
@@ -278,7 +276,7 @@ try {
     $low_stock_result = $conn->query("SELECT book_id, title, author, qr_code, available_copies, total_copies FROM books WHERE available_copies <= 2 ORDER BY available_copies ASC");
     if ($low_stock_result) {
         while ($row = $low_stock_result->fetch_assoc()) {
-            if (file_exists($qr_dir . '/' . $row['qr_code'] . '.png')) $low_stock_books[] = $row;
+            $low_stock_books[] = $row;
         }
     }
 } catch (Exception $e) {
@@ -291,7 +289,7 @@ try {
     $books_result = $conn->query("SELECT book_id, title, author, qr_code, total_copies, available_copies, borrowed_copies, lost_copies, book_status, created_at FROM books ORDER BY title ASC");
     if ($books_result) {
         while ($row = $books_result->fetch_assoc()) {
-            if (file_exists($qr_dir . '/' . $row['qr_code'] . '.png')) $all_books[] = $row;
+            $all_books[] = $row;
         }
     }
 } catch (Exception $e) {

@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         } else {
                             // Calculate dates
                             $date_borrowed = date('Y-m-d H:i:s');
-                            $due_date = date('Y-m-d H:i:s', strtotime('+14 days'));
+                            $due_date = date('Y-m-d H:i:s', strtotime('+7 days'));
                             $status = 'borrowed';
                             $book_status = 'borrowed';
                             
@@ -709,7 +709,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 
                 <div class="info-box">
                     <strong>Borrowing Terms:</strong><br>
-                    • Loan Period: 14 days<br>
+                    • Loan Period: 7 days<br>
                     • Status: Active borrowing<br>
                     • Auto-calculation of due date
                 </div>

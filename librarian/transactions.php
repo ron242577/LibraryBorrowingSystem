@@ -588,12 +588,12 @@ if ($generate_report) {
 
         <!-- ── Search & Filter ───────────────────────── -->
         <div class="filter-section">
-            <h3>🔍 Search &amp; Filter</h3>
+            <h3>Search</h3>
             <form method="GET" class="filter-controls">
                 <div class="search-box">
                     <input type="text"
                            name="search"
-                           placeholder="Search by student name, book title, or author..."
+                           placeholder="Search by student name, book title, or author..." autofocus
                            value="<?php echo htmlspecialchars($search_query); ?>">
                     <button type="submit" class="btn">Search</button>
                 </div>

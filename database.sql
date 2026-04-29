@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 28, 2026 at 06:41 PM
+-- Generation Time: Apr 29, 2026 at 06:20 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -46,11 +46,8 @@ CREATE TABLE `books` (
 --
 
 INSERT INTO `books` (`book_id`, `title`, `author`, `qr_code`, `book_status`, `total_copies`, `available_copies`, `borrowed_copies`, `lost_copies`, `created_at`, `updated_at`) VALUES
-(1, 'The Great Gatsby', 'F. Scott Fitzgerald', 'BOOK-QR-001', 'available', 3, 2, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
-(2, 'To Kill a Mockingbird', 'Harper Lee', 'BOOK-QR-002', 'available', 2, 2, 0, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
-(3, '1984', 'George Orwell', 'BOOK-QR-003', 'out_of_stock', 4, 0, 3, 1, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
-(4, 'Pride and Prejudice', 'Jane Austen', 'BOOK-QR-004', 'available', 5, 4, 1, 0, '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
-(5, 'asdas', 'sir jayr', 'BOOK-20260427-ZHAWV', 'available', 1, 1, 0, 0, '2026-04-27 03:53:14', '2026-04-27 03:53:14'),
+(3, '1984', 'George Orwell', 'BOOK-QR-003', 'available', 4, 0, 3, 1, '2026-04-24 08:51:11', '2026-04-29 02:57:40'),
+(5, 'asdas', 'sir jayr', 'BOOK-20260427-ZHAWV', 'available', 6, 5, 1, 0, '2026-04-27 03:53:14', '2026-04-29 02:35:35'),
 (6, 'asdas', 'sir jayr', 'BOOK-20260427-HIJCT', 'available', 1, 1, 0, 0, '2026-04-27 03:53:15', '2026-04-27 03:53:15');
 
 -- --------------------------------------------------------
@@ -106,7 +103,8 @@ CREATE TABLE `transactions` (
 --
 
 INSERT INTO `transactions` (`transaction_id`, `student_id`, `book_id`, `date_borrowed`, `due_date`, `return_date`, `penalty_amount`, `status`, `created_at`, `updated_at`) VALUES
-(1, 1, 3, '2026-04-24 16:51:11', '2026-05-08 16:51:11', NULL, 0.00, 'borrowed', '2026-04-24 08:51:11', '2026-04-24 08:51:11');
+(1, 1, 3, '2026-04-24 16:51:11', '2026-05-08 16:51:11', NULL, 0.00, 'borrowed', '2026-04-24 08:51:11', '2026-04-24 08:51:11'),
+(2, 4, 5, '2026-04-29 04:35:35', '2026-05-13 04:35:35', NULL, 0.00, 'borrowed', '2026-04-29 02:35:35', '2026-04-29 02:35:35');
 
 -- --------------------------------------------------------
 
@@ -197,7 +195,7 @@ ALTER TABLE `students`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `users`

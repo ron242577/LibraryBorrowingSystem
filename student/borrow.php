@@ -1101,10 +1101,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <span class="student-menu-caret">▼</span>
             </button>
             <div class="student-dropdown" id="studentDropdown">
-                <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="active">Dashboard</a>
                 <?php if ($student_qr): ?>
                     <a href="/LibraryBorrowingSystem/student/profile.php?qr=<?php echo urlencode($student_qr); ?>">Profile</a>
+                <?php else: ?>
                 <?php endif; ?>
+                <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="active">Search Books</a>
                 <div class="dropdown-divider"></div>
                 <a href="/LibraryBorrowingSystem/student/portal.php">Logout</a>
             </div>
