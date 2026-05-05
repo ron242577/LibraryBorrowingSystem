@@ -1,128 +1,277 @@
 <?php
 /**
- * QR Borrow Page - Librarian Panel
- * Allows librarians to process book borrowing using QR code scanner
+ * Unified Book Transactions Page - Librarian Panel
+ * Scans the book QR and automatically decides whether to borrow or return.
  */
 
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
 
-// Check if user is librarian
 if (!isLibrarian() && !isSuperAdmin()) {
     header('Location: /LibraryBorrowingSystem/login.php');
     exit();
 }
 
+function h($value) {
+    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+}
+
+function getStudentByQr($conn, $student_qr) {
+    $stmt = $conn->prepare('
+        SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, email, card_valid_until, qr_code, status
+        FROM students
+        WHERE qr_code = ? AND status = "active"
+        LIMIT 1
+    ');
+    $stmt->bind_param('s', $student_qr);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $student = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+    $stmt->close();
+    return $student;
+}
+
+function getBookStateByQr($conn, $book_qr) {
+    $stmt = $conn->prepare('
+        SELECT
+            b.book_id,
+            b.title,
+            b.author,
+            b.qr_code,
+            b.book_status,
+            b.total_copies,
+            b.available_copies,
+            b.borrowed_copies,
+            t.transaction_id,
+            t.student_id,
+            t.date_borrowed,
+            t.due_date,
+            s.full_name AS borrower_name,
+            s.student_no AS borrower_student_no
+        FROM books b
+        LEFT JOIN transactions t ON b.book_id = t.book_id AND t.status = "borrowed"
+        LEFT JOIN students s ON t.student_id = s.student_id
+        WHERE b.qr_code = ?
+        ORDER BY t.date_borrowed ASC
+        LIMIT 1
+    ');
+    $stmt->bind_param('s', $book_qr);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $book = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+    $stmt->close();
+    return $book;
+}
+
+function detectBookMode($book) {
+    if (!$book) {
+        return 'not_found';
+    }
+    if (!empty($book['transaction_id'])) {
+        return 'return';
+    }
+    if ((int)$book['available_copies'] > 0 && in_array($book['book_status'], ['available', 'out_of_stock'], true)) {
+        return 'borrow';
+    }
+    return 'unavailable';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api'])) {
+    header('Content-Type: application/json');
+
+    if ($_GET['api'] === 'lookup_student') {
+        $student_qr = trim($_GET['student_qr'] ?? '');
+        $student = $student_qr !== '' ? getStudentByQr($conn, $student_qr) : null;
+        echo json_encode([
+            'found' => $student !== null,
+            'student' => $student,
+            'message' => $student ? 'Student found.' : 'Student not found or inactive.'
+        ]);
+        exit();
+    }
+
+    if ($_GET['api'] === 'lookup_book') {
+        $book_qr = trim($_GET['book_qr'] ?? '');
+        $book = $book_qr !== '' ? getBookStateByQr($conn, $book_qr) : null;
+        $mode = detectBookMode($book);
+        echo json_encode([
+            'found' => $book !== null,
+            'mode' => $mode,
+            'book' => $book,
+            'message' => $mode === 'return'
+                ? 'This book has an active borrowing record and will be returned.'
+                : ($mode === 'borrow'
+                    ? 'This book is available and will be borrowed.'
+                    : ($mode === 'unavailable' ? 'This book is unavailable.' : 'Book not found.'))
+        ]);
+        exit();
+    }
+
+    echo json_encode(['found' => false, 'message' => 'Unknown API request.']);
+    exit();
+}
+
 $message = '';
 $message_type = '';
-$scanned_student = null;
-$scanned_book = null;
+$transaction_details = null;
 
-// Handle transaction creation
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action = $_POST['action'];
-    
-    if ($action === 'process_borrow') {
-        $student_qr = trim($_POST['student_qr'] ?? '');
-        $book_qr = trim($_POST['book_qr'] ?? '');
-        
-        if (empty($student_qr) || empty($book_qr)) {
-            $message = 'Both student and book QR codes are required.';
-            $message_type = 'error';
-        } else {
-            try {
-                // Get student by QR code
-                $student_stmt = $conn->prepare("SELECT student_id, full_name FROM students WHERE qr_code = ? AND status = 'active'");
-                $student_stmt->bind_param('s', $student_qr);
-                $student_stmt->execute();
-                $student_result = $student_stmt->get_result();
-                
-                if ($student_result->num_rows === 0) {
-                    $message = 'Student not found or account is inactive. Please scan a valid student QR code.';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'process_transaction') {
+    $student_qr = trim($_POST['student_qr'] ?? '');
+    $book_qr = trim($_POST['book_qr'] ?? '');
+
+    if ($book_qr === '') {
+        $message = 'Book QR code is required.';
+        $message_type = 'error';
+    } else {
+        try {
+            $book = getBookStateByQr($conn, $book_qr);
+            $mode = detectBookMode($book);
+
+            if ($mode === 'not_found') {
+                $message = 'Book not found. Please scan a valid book QR code.';
+                $message_type = 'error';
+            } elseif ($mode === 'unavailable') {
+                $message = 'This book is unavailable and cannot be borrowed or returned from this screen.';
+                $message_type = 'error';
+            } elseif ($mode === 'return') {
+                $transaction_id = (int)$book['transaction_id'];
+                $book_id = (int)$book['book_id'];
+                $due_date = $book['due_date'];
+                $today = date('Y-m-d');
+                $due_date_only = date('Y-m-d', strtotime($due_date));
+                $days_late = 0;
+                $penalty_amount = 0.00;
+
+                if (strtotime($today) > strtotime($due_date_only)) {
+                    $days_late = (int)floor((strtotime($today) - strtotime($due_date_only)) / 86400);
+                    $penalty_amount = $days_late * 5;
+                }
+
+                $conn->begin_transaction();
+                try {
+                    $return_date = date('Y-m-d H:i:s');
+                    $status = 'returned';
+
+                    $update_transaction = $conn->prepare('
+                        UPDATE transactions
+                        SET return_date = ?, status = ?, penalty_amount = ?
+                        WHERE transaction_id = ?
+                    ');
+                    $update_transaction->bind_param('ssdi', $return_date, $status, $penalty_amount, $transaction_id);
+                    if (!$update_transaction->execute()) {
+                        throw new Exception('Failed to update transaction: ' . $update_transaction->error);
+                    }
+
+                    $new_borrowed = max(0, (int)$book['borrowed_copies'] - 1);
+                    $new_available = (int)$book['available_copies'] + 1;
+                    $book_status = 'available';
+
+                    $update_book = $conn->prepare('
+                        UPDATE books
+                        SET borrowed_copies = ?, available_copies = ?, book_status = ?
+                        WHERE book_id = ?
+                    ');
+                    $update_book->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
+                    if (!$update_book->execute()) {
+                        throw new Exception('Failed to update book: ' . $update_book->error);
+                    }
+
+                    $conn->commit();
+                    $message = $penalty_amount > 0
+                        ? 'Book returned successfully. Penalty: PHP ' . number_format($penalty_amount, 2) . ' (' . $days_late . ' day/s late).'
+                        : 'Book returned successfully. No penalty.';
+                    $message_type = 'success';
+                    $transaction_details = [
+                        'mode' => 'Return',
+                        'transaction_id' => $transaction_id,
+                        'student_name' => $book['borrower_name'] ?? 'Unknown',
+                        'student_no' => $book['borrower_student_no'] ?? 'N/A',
+                        'book_title' => $book['title'],
+                        'book_author' => $book['author'],
+                        'date_borrowed' => $book['date_borrowed'],
+                        'due_date' => $due_date,
+                        'return_date' => $return_date,
+                        'penalty_amount' => $penalty_amount
+                    ];
+                    $update_transaction->close();
+                    $update_book->close();
+                } catch (Exception $e) {
+                    $conn->rollback();
+                    throw $e;
+                }
+            } elseif ($mode === 'borrow') {
+                if ($student_qr === '') {
+                    $message = 'Student QR code is required to borrow an available book.';
                     $message_type = 'error';
                 } else {
-                    $student = $student_result->fetch_assoc();
-                    $student_id = $student['student_id'];
-                    
-                    // Get book by QR code
-                    $book_stmt = $conn->prepare("SELECT book_id, title, available_copies, borrowed_copies, total_copies FROM books WHERE qr_code = ?");
-                    $book_stmt->bind_param('s', $book_qr);
-                    $book_stmt->execute();
-                    $book_result = $book_stmt->get_result();
-                    
-                    if ($book_result->num_rows === 0) {
-                        $message = 'Book not found. Please scan a valid book QR code.';
+                    $student = getStudentByQr($conn, $student_qr);
+                    if (!$student) {
+                        $message = 'Student not found or account is inactive. Please scan a valid student QR code.';
+                        $message_type = 'error';
+                    } elseif ((int)$book['available_copies'] <= 0) {
+                        $message = 'No available copies of this book. Please select another book.';
                         $message_type = 'error';
                     } else {
-                        $book = $book_result->fetch_assoc();
-                        $book_id = $book['book_id'];
-                        
-                        // Check if available copies > 0
-                        if ($book['available_copies'] <= 0) {
-                            $message = 'No available copies of this book. Please select another book.';
-                            $message_type = 'error';
-                        } else {
-                            // Calculate dates
+                        $conn->begin_transaction();
+                        try {
+                            $student_id = (int)$student['student_id'];
+                            $book_id = (int)$book['book_id'];
                             $date_borrowed = date('Y-m-d H:i:s');
                             $due_date = date('Y-m-d H:i:s', strtotime('+7 days'));
                             $status = 'borrowed';
-                            $book_status = 'borrowed';
-                            
-                            // Begin transaction
-                            $conn->begin_transaction();
-                            
-                            try {
-                                // Insert transaction
-                                $insert_stmt = $conn->prepare("INSERT INTO transactions (student_id, book_id, date_borrowed, due_date, status) VALUES (?, ?, ?, ?, ?)");
-                                $insert_stmt->bind_param('iisss', $student_id, $book_id, $date_borrowed, $due_date, $status);
-                                
-                                if (!$insert_stmt->execute()) {
-                                    throw new Exception('Failed to create transaction: ' . $insert_stmt->error);
-                                }
-                                
-                                $transaction_id = $conn->insert_id;
-                                
-                                // Update inventory: increment borrowed_copies, decrement available_copies
-                                $new_borrowed = $book['borrowed_copies'] + 1;
-                                $new_available = $book['available_copies'] - 1;
-                                
-                                // Set book_status to 'out_of_stock' if no copies available
-                                $book_status = ($new_available === 0) ? 'out_of_stock' : 'available';
-                                
-                                // Update book with new inventory counts
-                                $update_stmt = $conn->prepare("UPDATE books SET borrowed_copies = ?, available_copies = ?, book_status = ? WHERE book_id = ?");
-                                $update_stmt->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
-                                
-                                if (!$update_stmt->execute()) {
-                                    throw new Exception('Failed to update inventory: ' . $update_stmt->error);
-                                }
-                                
-                                // Commit transaction
-                                $conn->commit();
-                                
-                                $message = 'Book borrowed successfully! Transaction ID: ' . $transaction_id . ' | Student: ' . htmlspecialchars($student['full_name']) . ' | Book: ' . htmlspecialchars($book['title']) . ' | Due: ' . date('M d, Y', strtotime($due_date));
-                                $message_type = 'success';
-                                
-                                // Clear form for next borrow
-                                header("Refresh: 3; url=/LibraryBorrowingSystem/librarian/qr_borrow.php");
-                                
-                                $insert_stmt->close();
-                                $update_stmt->close();
-                            } catch (Exception $e) {
-                                $conn->rollback();
-                                $message = 'Error: ' . htmlspecialchars($e->getMessage());
-                                $message_type = 'error';
+
+                            $insert = $conn->prepare('
+                                INSERT INTO transactions (student_id, book_id, date_borrowed, due_date, status)
+                                VALUES (?, ?, ?, ?, ?)
+                            ');
+                            $insert->bind_param('iisss', $student_id, $book_id, $date_borrowed, $due_date, $status);
+                            if (!$insert->execute()) {
+                                throw new Exception('Failed to create transaction: ' . $insert->error);
                             }
+                            $transaction_id = $conn->insert_id;
+
+                            $new_borrowed = (int)$book['borrowed_copies'] + 1;
+                            $new_available = (int)$book['available_copies'] - 1;
+                            $book_status = $new_available <= 0 ? 'out_of_stock' : 'available';
+
+                            $update = $conn->prepare('
+                                UPDATE books
+                                SET borrowed_copies = ?, available_copies = ?, book_status = ?
+                                WHERE book_id = ?
+                            ');
+                            $update->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
+                            if (!$update->execute()) {
+                                throw new Exception('Failed to update inventory: ' . $update->error);
+                            }
+
+                            $conn->commit();
+                            $message = 'Book borrowed successfully. Transaction ID: ' . $transaction_id . '.';
+                            $message_type = 'success';
+                            $transaction_details = [
+                                'mode' => 'Borrow',
+                                'transaction_id' => $transaction_id,
+                                'student_name' => $student['full_name'],
+                                'student_no' => $student['student_no'] ?? 'N/A',
+                                'book_title' => $book['title'],
+                                'book_author' => $book['author'],
+                                'date_borrowed' => $date_borrowed,
+                                'due_date' => $due_date,
+                                'return_date' => null,
+                                'penalty_amount' => 0
+                            ];
+                            $insert->close();
+                            $update->close();
+                        } catch (Exception $e) {
+                            $conn->rollback();
+                            throw $e;
                         }
                     }
-                    $book_stmt->close();
                 }
-                $student_stmt->close();
-            } catch (Exception $e) {
-                $message = 'Error: ' . htmlspecialchars($e->getMessage());
-                $message_type = 'error';
-                logError('QR Borrow error: ' . $e->getMessage());
             }
+        } catch (Exception $e) {
+            $message = 'Error: ' . h($e->getMessage());
+            $message_type = 'error';
+            logError('Unified QR transaction error: ' . $e->getMessage());
         }
     }
 }
@@ -132,788 +281,473 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code Borrowing - Library Borrowing System</title>
+    <title>Transactions - Library Borrowing System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-        }
-        
-        .container {
-            max-width: 1000px;
-            margin: 30px auto;
-            padding: 0 20px;
-        }
-        
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .page-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .action-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 18px;
-            background: #8B0000;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-            white-space: nowrap;
-        }
-
-        .action-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4);
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #333; }
+        .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 25px; }
+        .page-header h2 { color: #333; font-size: 28px; margin-bottom: 8px; }
+        .page-header p { color: #666; font-size: 14px; line-height: 1.5; }
+        .alert { padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .section { background: #fff; padding: 25px; border-radius: 10px; margin-bottom: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); scroll-margin-top: 24px; }
+        .section h3 { color: #333; margin-bottom: 18px; font-size: 20px; padding-bottom: 10px; border-bottom: 2px solid #8B0000; }
+        .step-panel { position: sticky; top: 10px; z-index: 20; }
+        .step-indicator { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .step { padding: 18px; border-radius: 10px; text-align: center; background: #f9f9f9; border: 2px solid #ddd; transition: all 0.25s; cursor: pointer; }
+        .step:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+        .step.active { background: #f8f0f0; border-color: #8B0000; }
+        .step.completed { background: #d4edda; border-color: #4caf50; }
+        .step-number { display: inline-block; width: 38px; height: 38px; line-height: 38px; background: #ddd; border-radius: 50%; font-weight: 700; margin-bottom: 10px; font-size: 18px; }
+        .step.active .step-number { background: #8B0000; color: #fff; }
+        .step.completed .step-number { background: #4caf50; color: #fff; }
+        .step h4 { color: #333; margin-bottom: 5px; }
+        .step p { color: #666; font-size: 13px; }
+        .scanner-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .scanner-title { font-size: 18px; font-weight: 700; color: #333; }
+        .scanner-subtitle { font-size: 13px; color: #666; margin-top: 2px; }
+        .status-pill { display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #eee; color: #555; }
+        .status-pill.ready { background: #d4edda; color: #155724; }
+        .status-pill.pending { background: #fff3cd; color: #856404; }
+        .status-pill.error { background: #f8d7da; color: #721c24; }
+        .info-box { background: #f8f0f0; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #8B0000; font-size: 13px; color: #333; line-height: 1.6; }
+        .scanner-wrapper { text-align: center; background: #f0f0f0; padding: 18px; border-radius: 8px; margin: 18px 0; }
+        #qr-reader-student, #qr-reader-book { width: 100%; max-width: 500px; margin: 0 auto; border-radius: 8px; overflow: hidden; }
+        .scanner-controls, .controls-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 15px; }
+        button, .btn { padding: 12px 22px; background: #8B0000; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        button:hover:not(:disabled), .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(139,0,0,0.32); }
+        button:disabled { background: #999; cursor: not-allowed; opacity: 0.65; }
+        .btn-small { padding: 8px 16px; font-size: 12px; }
+        .btn-secondary { background: #666; }
+        .btn-danger { background: #c0392b; }
+        .form-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 7px; color: #333; font-weight: 600; font-size: 14px; }
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        input[type="text"]:focus { outline: none; border-color: #8B0000; box-shadow: 0 0 5px rgba(139,0,0,0.2); }
+        .summary-card { border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden; margin: 15px 0; display: none; }
+        .summary-card.show { display: block; }
+        .summary-card-header { padding: 14px 18px; background: #f8f9fa; border-bottom: 1px solid #e5e5e5; font-weight: 700; }
+        .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; }
+        .summary-item { padding: 14px 18px; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
+        .summary-label { font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700; letter-spacing: .4px; margin-bottom: 4px; }
+        .summary-value { font-size: 15px; font-weight: 700; color: #333; }
+        .mode-banner { padding: 16px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #8B0000; background: #f8f0f0; font-size: 14px; line-height: 1.5; }
+        .mode-banner.return { background: #fff3cd; border-left-color: #ffc107; color: #856404; }
+        .mode-banner.borrow { background: #d4edda; border-left-color: #28a745; color: #155724; }
+        .result-details { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 20px; border: 1px solid #e5e5e5; }
+        .result-details h3 { border-bottom: 2px solid #8B0000; margin-bottom: 14px; padding-bottom: 8px; }
         @media (max-width: 768px) {
-            .page-header {
-                flex-direction: column;
-            }
-        }
-        
-        .page-header h2 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .alert-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .alert-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        .section {
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        }
-        
-        .section h3 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #8B0000;
-        }
-        
-        .step-indicator {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .step {
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            background: #f9f9f9;
-            border: 2px solid #ddd;
-            transition: all 0.3s;
-        }
-        
-        .step.active {
-            background: #e8f5e9;
-            border-color: #4CAF50;
-        }
-        
-        .step.completed {
-            background: #d4edda;
-            border-color: #4caf50;
-        }
-        
-        .step-number {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            line-height: 40px;
-            background: #ddd;
-            border-radius: 50%;
-            font-weight: bold;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-        
-        .step.active .step-number {
-            background: #4CAF50;
-            color: white;
-        }
-        
-        .step.completed .step-number {
-            background: #4caf50;
-            color: white;
-        }
-        
-        .step h4 {
-            color: #333;
-            margin-bottom: 5px;
-        }
-        
-        .step p {
-            color: #666;
-            font-size: 13px;
-        }
-        
-        #qr-reader-student {
-            width: 100%;
-            max-width: 500px;
-            margin: 20px auto;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        #qr-reader-book {
-            width: 100%;
-            max-width: 500px;
-            margin: 20px auto;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .scanner-wrapper {
-            text-align: center;
-            background: #f0f0f0;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        
-        .scanner-section {
-            margin-bottom: 40px;
-        }
-        
-        .scanner-section.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        
-        .scanner-locked-notice {
-            background: #fff3cd;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            border-left: 4px solid #ffc107;
-            font-size: 13px;
-            color: #856404;
-        }
-        
-        .scanner-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .scanner-icon {
-            font-size: 24px;
-        }
-        
-        .scanner-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .scanner-subtitle {
-            font-size: 13px;
-            color: #666;
-            margin-top: 2px;
-        }
-        
-        .scanner-progress {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #e8f5e9;
-            border-radius: 4px;
-            border-left: 3px solid #4CAF50;
-            margin-bottom: 15px;
-            font-size: 13px;
-            color: #155724;
-        }
-        
-        .scanner-progress.pending {
-            background: #f0f0f0;
-            border-left-color: #ddd;
-            color: #666;
-        }
-        
-        .progress-indicator {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            line-height: 20px;
-            text-align: center;
-            background: #4CAF50;
-            color: white;
-            border-radius: 50%;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .progress-indicator.pending {
-            background: #ddd;
-            color: #666;
-        }
-        
-        .divider-section {
-            text-align: center;
-            padding: 20px 0;
-            margin: 20px 0;
-            position: relative;
-        }
-        
-        .divider-section::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: #ddd;
-        }
-        
-        .divider-label {
-            background: white;
-            padding: 0 15px;
-            position: relative;
-            z-index: 1;
-            color: #666;
-            font-size: 13px;
-            font-weight: 500;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        
-        input[type="text"],
-        input[type="hidden"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #8B0000;
-            box-shadow: 0 0 5px rgba(139, 0, 0, 0.2);
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        
-        button {
-            padding: 12px 24px;
-            background: #8B0000;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4);
-        }
-        
-        button:active {
-            transform: translateY(0);
-        }
-        
-        button:disabled {
-            background: #999;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        
-        button[type="reset"] {
-            background: #999;
-        }
-        
-        button[type="reset"]:hover {
-            box-shadow: 0 5px 15px rgba(150, 150, 150, 0.4);
-        }
-        
-        .scanner-controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .btn-small {
-            padding: 8px 16px;
-            font-size: 12px;
-            border-radius: 4px;
-        }
-        
-        .info-box {
-            background: #f8f0f0;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-            border-left: 4px solid #8B0000;
-            font-size: 13px;
-            color: #333;
-        }
-        
-        .info-box strong {
-            color: #155724;
-        }
-        
-        .scanned-info {
-            background: #f5e8e8;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-            border: 2px solid #8B0000;
-        }
-        
-        .scanned-info p {
-            margin: 5px 0;
-            font-size: 14px;
-        }
-        
-        .scanned-info strong {
-            color: #155724;
-        }
-        
-        .controls-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-        
-        @media (max-width: 768px) {
-            .step-indicator {
-                grid-template-columns: 1fr;
-            }
-            
-            #qr-reader {
-                max-width: 100%;
-            }
-            
-            .controls-row {
-                flex-direction: column;
-            }
-            
-            .controls-row button {
-                width: 100%;
-            }
+            .page-header { flex-direction: column; }
+            .step-indicator, .summary-grid { grid-template-columns: 1fr; }
+            .form-grid { grid-template-columns: 1fr; }
+            .controls-row button { width: 100%; }
         }
     </style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
     <?php include __DIR__ . '/../header.php'; ?>
-    
+
     <div class="container">
         <div class="page-header">
             <div>
-                <h2>QR Code Book Borrowing System</h2>
-                <p style="color: #666; margin-top: 10px;">Complete the student and book scanning process to process a book borrowing transaction</p>
+                <h2>Book Transactions</h2>
+                <p>Scan a book QR code and the system will automatically detect whether the transaction is for borrowing or returning.</p>
             </div>
         </div>
-        
-        <?php if (!empty($message)): ?>
-            <div class="alert alert-<?php echo $message_type; ?>">
-                <span><?php echo $message_type === 'success' ? '✓' : ($message_type === 'error' ? '✕' : 'ℹ'); ?></span>
-                <span><?php echo htmlspecialchars($message); ?></span>
+
+        <?php if ($message !== ''): ?>
+            <div class="alert alert-<?php echo h($message_type); ?>">
+                <span><?php echo $message_type === 'success' ? 'OK' : 'ERROR'; ?></span>
+                <span><?php echo h($message); ?></span>
             </div>
         <?php endif; ?>
-        
-        <!-- Step Indicator -->
-        <div class="section">
-            <div class="step-indicator">
-                <div class="step" id="step1">
-                    <div class="step-number">1</div>
-                    <h4>Scan Student QR</h4>
-                    <p>Identify the student</p>
+
+        <?php if ($transaction_details): ?>
+            <div class="result-details">
+                <h3><?php echo h($transaction_details['mode']); ?> Transaction Details</h3>
+                <div class="summary-grid">
+                    <div class="summary-item"><div class="summary-label">Transaction ID</div><div class="summary-value">#<?php echo h($transaction_details['transaction_id']); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Student</div><div class="summary-value"><?php echo h($transaction_details['student_name']); ?> (<?php echo h($transaction_details['student_no']); ?>)</div></div>
+                    <div class="summary-item"><div class="summary-label">Book</div><div class="summary-value"><?php echo h($transaction_details['book_title']); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Author</div><div class="summary-value"><?php echo h($transaction_details['book_author']); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Borrowed</div><div class="summary-value"><?php echo h(date('M d, Y', strtotime($transaction_details['date_borrowed']))); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Due Date</div><div class="summary-value"><?php echo h(date('M d, Y', strtotime($transaction_details['due_date']))); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Returned</div><div class="summary-value"><?php echo $transaction_details['return_date'] ? h(date('M d, Y', strtotime($transaction_details['return_date']))) : 'N/A'; ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Penalty</div><div class="summary-value">PHP <?php echo h(number_format((float)$transaction_details['penalty_amount'], 2)); ?></div></div>
                 </div>
-                <div class="step" id="step2">
+            </div>
+        <?php endif; ?>
+
+        <div class="section step-panel">
+            <div class="step-indicator">
+                <div class="step" id="step1" onclick="goToStep(1)">
+                    <div class="step-number">1</div>
+                    <h4>Student QR</h4>
+                    <p>Required only for borrowing</p>
+                </div>
+                <div class="step" id="step2" onclick="goToStep(2)">
                     <div class="step-number">2</div>
-                    <h4>Scan Book QR</h4>
-                    <p>Select the book to borrow</p>
+                    <h4>Book QR</h4>
+                    <p>System detects borrow or return</p>
+                </div>
+                <div class="step" id="step3" onclick="goToStep(3)">
+                    <div class="step-number">3</div>
+                    <h4>Process</h4>
+                    <p>Confirm the transaction</p>
                 </div>
             </div>
         </div>
-        
-        <form method="POST" id="borrowForm">
-            <input type="hidden" name="action" value="process_borrow">
-            
-            <!-- STEP 1: STUDENT QR SCANNER -->
-            <div class="section scanner-section" id="studentScannerSection">
+
+        <form method="POST" id="transactionForm">
+            <input type="hidden" name="action" value="process_transaction">
+
+            <div class="section" id="section1">
                 <div class="scanner-header">
                     <div>
                         <div class="scanner-title">Step 1: Scan Student QR Code</div>
-                        <div class="scanner-subtitle">Identify which student is borrowing the book</div>
+                        <div class="scanner-subtitle">Required when the book is available and will be borrowed. Optional for returns.</div>
                     </div>
+                    <span class="status-pill pending" id="studentStatus">Waiting</span>
                 </div>
-                
-                <div class="scanner-progress pending" id="studentProgress">
-                    <span class="progress-indicator pending">○</span>
-                    <span>Waiting for student QR scan...</span>
-                </div>
-                
+
                 <div class="info-box">
-                    <strong>Instructions:</strong><br>
-                    1. Click "Start Camera" button below<br>
-                    2. Point your camera at the student's QR code<br>
-                    3. The system will automatically detect and scan it<br>
-                    4. Once scanned, the student information will be confirmed
+                    For borrowing, scan or enter the student's QR code first. For returning a borrowed book, you may skip this step and scan the book QR code.
                 </div>
-                
+
                 <div class="scanner-wrapper">
                     <div id="qr-reader-student"></div>
                 </div>
-                
+
                 <div class="scanner-controls">
-                    <button type="button" class="btn-small" id="startBtnStudent" onclick="startScannerStudent()">Start Camera</button>
-                    <button type="button" class="btn-small" id="stopBtnStudent" onclick="stopScannerStudent()" style="display: none; background: #f44336;">Stop Camera</button>
+                    <button type="button" class="btn-small" id="startBtnStudent" onclick="startScannerStudent()">Start Student Camera</button>
+                    <button type="button" class="btn-small btn-danger" id="stopBtnStudent" onclick="stopScannerStudent()" style="display:none;">Stop Camera</button>
                 </div>
-                
-                <div class="form-group">
-                    <label for="student_qr">Student QR Code</label>
-                    <input type="text" id="student_qr" name="student_qr" readonly placeholder="Scanned student QR code will appear here">
-                </div>
-                
-                <?php if (!empty($_POST['student_qr'])): ?>
-                    <div class="scanned-info">
-                        <p><strong>✓ Student Confirmed:</strong></p>
-                        <p>Code: <?php echo htmlspecialchars($_POST['student_qr']); ?></p>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="student_qr">Student QR Code</label>
+                        <input type="text" id="student_qr" name="student_qr" placeholder="Scan or type student QR code">
                     </div>
-                <?php endif; ?>
-            </div>
-            
-            <!-- DIVIDER -->
-            <div class="divider-section">
-                <span class="divider-label">Then Proceed To Step 2</span>
-            </div>
-            
-            <!-- STEP 2: BOOK QR SCANNER -->
-            <div class="section scanner-section" id="bookScannerSection">
-                <div class="scanner-locked-notice" id="bookLockedNotice" style="display: none;">
-                    Please complete Step 1 (Student QR) first to enable this scanner
+                    <button type="button" onclick="confirmStudentManual()">Confirm Student</button>
                 </div>
-                
+
+                <div class="summary-card" id="studentSummary">
+                    <div class="summary-card-header">Student Details</div>
+                    <div class="summary-grid" id="studentSummaryGrid"></div>
+                </div>
+            </div>
+
+            <div class="section" id="section2">
                 <div class="scanner-header">
-                    
                     <div>
                         <div class="scanner-title">Step 2: Scan Book QR Code</div>
-                        <div class="scanner-subtitle">Select which book to borrow</div>
+                        <div class="scanner-subtitle">The system checks if this book should be borrowed or returned.</div>
                     </div>
+                    <span class="status-pill pending" id="bookStatus">Waiting</span>
                 </div>
-                
-                <div class="scanner-progress pending" id="bookProgress">
-                    <span class="progress-indicator pending">○</span>
-                    <span>Waiting for book QR scan...</span>
-                </div>
-                
+
                 <div class="info-box">
-                    <strong>Instructions:</strong><br>
-                    1. Click "Start Camera" button below<br>
-                    2. Point your camera at the book's QR code<br>
-                    3. The system will automatically detect and scan it<br>
-                    4. Once scanned, you can complete the borrowing transaction
+                    If the scanned book has an active borrowed transaction, the final action will be Return. If it has available copies and no active transaction, the final action will be Borrow.
                 </div>
-                
+
                 <div class="scanner-wrapper">
                     <div id="qr-reader-book"></div>
                 </div>
-                
+
                 <div class="scanner-controls">
-                    <button type="button" class="btn-small" id="startBtnBook" onclick="startScannerBook()">Start Camera</button>
-                    <button type="button" class="btn-small" id="stopBtnBook" onclick="stopScannerBook()" style="display: none; background: #f44336;">Stop Camera</button>
+                    <button type="button" class="btn-small" id="startBtnBook" onclick="startScannerBook()">Start Book Camera</button>
+                    <button type="button" class="btn-small btn-danger" id="stopBtnBook" onclick="stopScannerBook()" style="display:none;">Stop Camera</button>
                 </div>
-                
-                <div class="form-group">
-                    <label for="book_qr">Book QR Code</label>
-                    <input type="text" id="book_qr" name="book_qr" readonly placeholder="Scanned book QR code will appear here">
-                </div>
-                
-                <?php if (!empty($_POST['book_qr'])): ?>
-                    <div class="scanned-info">
-                        <p><strong>✓ Book Confirmed:</strong></p>
-                        <p>Code: <?php echo htmlspecialchars($_POST['book_qr']); ?></p>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="book_qr">Book QR Code</label>
+                        <input type="text" id="book_qr" name="book_qr" placeholder="Scan or type book QR code">
                     </div>
-                <?php endif; ?>
-                
-                <div class="info-box">
-                    <strong>Borrowing Terms:</strong><br>
-                    • Loan Period: 7 days<br>
-                    • Status: Active borrowing<br>
-                    • Auto-calculation of due date
+                    <button type="button" onclick="confirmBookManual()">Confirm Book</button>
+                </div>
+
+                <div class="summary-card" id="bookSummary">
+                    <div class="summary-card-header">Book Details</div>
+                    <div class="summary-grid" id="bookSummaryGrid"></div>
                 </div>
             </div>
-            
-            <!-- SUBMIT SECTION -->
-            <div class="section">
-                <h3>✓ Complete Transaction</h3>
-                
-                <div class="info-box">
-                    <strong>⚡ Ready to Process:</strong><br>
-                    Once both QR codes are scanned and confirmed above, click the button below to finalize the borrowing transaction.
+
+            <div class="section" id="section3">
+                <h3>Step 3: Complete Transaction</h3>
+                <div id="modeBanner" class="mode-banner">
+                    Scan a book QR code first. The system will automatically identify whether this transaction is a Borrow or Return.
                 </div>
-                
                 <div class="controls-row">
-                    <button type="submit" id="submitBtn" onclick="updateSteps()">✓ Process Book Borrowing</button>
-                    <button type="button" onclick="resetForm()" style="background: #999;">🔄 Reset All</button>
+                    <button type="submit" id="submitBtn" disabled>Process Transaction</button>
+                    <button type="button" class="btn-secondary" onclick="resetForm()">Reset All</button>
                 </div>
             </div>
         </form>
     </div>
-    
+
     <script>
-        let html5QrcodeScannerStudent;
-        let html5QrcodeScannerBook;
-        let currentStep = 1;
-        let studentScanned = false;
-        let bookScanned = false;
-        
-        // ============ STUDENT QR SCANNER ============
-        function startScannerStudent() {
-            document.getElementById('startBtnStudent').style.display = 'none';
-            document.getElementById('stopBtnStudent').style.display = 'inline-block';
-            
-            html5QrcodeScannerStudent = new Html5QrcodeScanner(
-                "qr-reader-student",
-                { facingMode: "environment", qrbox: 250 },
-                false
-            );
-            
-            html5QrcodeScannerStudent.render(onScanSuccessStudent, onScanError);
-        }
-        
-        function stopScannerStudent() {
-            if (html5QrcodeScannerStudent) {
-                html5QrcodeScannerStudent.clear();
-            }
-            document.getElementById('startBtnStudent').style.display = 'inline-block';
-            document.getElementById('stopBtnStudent').style.display = 'none';
-        }
-        
-        function onScanSuccessStudent(decodedText, decodedResult) {
-            const text = decodedText.trim();
-            
-            // Check if it's a student QR (starts with STU)
-            if (text.startsWith('STU')) {
-                if (!studentScanned) {
-                    document.getElementById('student_qr').value = text;
-                    studentScanned = true;
-                    stopScannerStudent();
-                    updateSteps();
-                    enableBookScanner();
-                    
-                    alert('✓ Student QR scanned successfully!\n\nStudent Code: ' + text + '\n\nNow proceed to Step 2 and scan the book QR code.');
-                }
-            } else {
-                alert('Invalid QR Code\n\nPlease scan a student QR code (starts with STU-)');
-            }
-        }
-        
-        // ============ BOOK QR SCANNER ============
-        function startScannerBook() {
-            if (!studentScanned) {
-                alert('Please complete Step 1 first!\n\nScan the student QR code before scanning the book.');
-                return;
-            }
-            
-            document.getElementById('startBtnBook').style.display = 'none';
-            document.getElementById('stopBtnBook').style.display = 'inline-block';
-            
-            html5QrcodeScannerBook = new Html5QrcodeScanner(
-                "qr-reader-book",
-                { facingMode: "environment", qrbox: 250 },
-                false
-            );
-            
-            html5QrcodeScannerBook.render(onScanSuccessBook, onScanError);
-        }
-        
-        function stopScannerBook() {
-            if (html5QrcodeScannerBook) {
-                html5QrcodeScannerBook.clear();
-            }
-            document.getElementById('startBtnBook').style.display = 'inline-block';
-            document.getElementById('stopBtnBook').style.display = 'none';
-        }
-        
-        function onScanSuccessBook(decodedText, decodedResult) {
-            const text = decodedText.trim();
-            
-            // Check if it's a book QR (starts with BOOK)
-            if (text.startsWith('BOOK')) {
-                if (studentScanned && !bookScanned) {
-                    document.getElementById('book_qr').value = text;
-                    bookScanned = true;
-                    stopScannerBook();
-                    updateSteps();
-                    
-                    alert('✓ Book QR scanned successfully!\n\nBook Code: ' + text + '\n\nClick "Process Book Borrowing" to complete the transaction.');
-                }
-            } else {
-                alert('Invalid QR Code\n\nPlease scan a book QR code (starts with BOOK-)');
-            }
-        }
-        
-        function onScanError(error) {
-            console.log('Scan error: ' + error);
-        }
-        
-        // ============ UI CONTROLS ============
-        function enableBookScanner() {
-            document.getElementById('bookScannerSection').classList.remove('disabled');
-            document.getElementById('bookLockedNotice').style.display = 'none';
-            
-            const bookProgress = document.getElementById('bookProgress');
-            bookProgress.classList.remove('pending');
-            bookProgress.innerHTML = '<span class="progress-indicator pending">→</span><span>Ready to scan book QR code</span>';
-        }
-        
-        function disableBookScanner() {
-            document.getElementById('bookScannerSection').classList.add('disabled');
-            document.getElementById('bookLockedNotice').style.display = 'block';
-            
-            const bookProgress = document.getElementById('bookProgress');
-            bookProgress.classList.add('pending');
-            bookProgress.innerHTML = '<span class="progress-indicator pending">○</span><span>Waiting for student QR scan...</span>';
-        }
-        
-        function updateSteps() {
-            const step1 = document.getElementById('step1');
-            const step2 = document.getElementById('step2');
-            const studentProgress = document.getElementById('studentProgress');
-            const bookProgress = document.getElementById('bookProgress');
-            
-            // Update student step
-            if (studentScanned) {
-                step1.classList.add('completed');
-                step1.classList.remove('active');
-                studentProgress.classList.remove('pending');
-                studentProgress.innerHTML = '<span class="progress-indicator">✓</span><span>Student QR confirmed</span>';
-            } else {
-                step1.classList.add('active');
-                step1.classList.remove('completed');
-                studentProgress.classList.add('pending');
-                studentProgress.innerHTML = '<span class="progress-indicator pending">○</span><span>Waiting for student QR scan...</span>';
-            }
-            
-            // Update book step
-            if (bookScanned) {
-                step2.classList.add('completed');
-                step2.classList.remove('active');
-                bookProgress.classList.remove('pending');
-                bookProgress.innerHTML = '<span class="progress-indicator">✓</span><span>Book QR confirmed</span>';
-            } else if (studentScanned) {
-                step2.classList.add('active');
-                step2.classList.remove('completed');
-                bookProgress.classList.remove('pending');
-                bookProgress.innerHTML = '<span class="progress-indicator pending">→</span><span>Ready to scan book QR code</span>';
-            } else {
-                step2.classList.remove('active', 'completed');
-                bookProgress.classList.add('pending');
-                bookProgress.innerHTML = '<span class="progress-indicator pending">○</span><span>Waiting for student QR scan...</span>';
-            }
-        }
-        
-        function resetForm() {
-            // Stop both scanners
-            stopScannerStudent();
-            stopScannerBook();
-            
-            // Clear form
-            document.getElementById('borrowForm').reset();
-            document.getElementById('student_qr').value = '';
-            document.getElementById('book_qr').value = '';
-            
-            // Reset state
-            studentScanned = false;
-            bookScanned = false;
-            
-            // Disable book scanner
-            disableBookScanner();
-            
-            // Update UI
-            updateSteps();
-            
-            // Scroll to top
-            window.scrollTo(0, 0);
-        }
-        
-        // Initialize on page load
+        let studentScanner = null;
+        let bookScanner = null;
+        let studentValid = false;
+        let bookValid = false;
+        let transactionMode = null;
+
         document.addEventListener('DOMContentLoaded', function() {
             updateSteps();
-            disableBookScanner();
         });
+
+        function goToStep(stepNumber) {
+            const section = document.getElementById('section' + stepNumber);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            setActiveStep(stepNumber);
+        }
+
+        function setActiveStep(stepNumber) {
+            [1,2,3].forEach(number => {
+                document.getElementById('step' + number).classList.remove('active');
+            });
+            document.getElementById('step' + stepNumber).classList.add('active');
+        }
+
+        function startScannerStudent() {
+            document.getElementById('startBtnStudent').style.display = 'none';
+            document.getElementById('stopBtnStudent').style.display = 'inline-flex';
+            studentScanner = new Html5QrcodeScanner('qr-reader-student', { facingMode: 'environment', qrbox: 250 }, false);
+            studentScanner.render(onScanSuccessStudent, onScanError);
+        }
+
+        function stopScannerStudent() {
+            if (studentScanner) {
+                studentScanner.clear();
+                studentScanner = null;
+            }
+            document.getElementById('startBtnStudent').style.display = 'inline-flex';
+            document.getElementById('stopBtnStudent').style.display = 'none';
+        }
+
+        function startScannerBook() {
+            document.getElementById('startBtnBook').style.display = 'none';
+            document.getElementById('stopBtnBook').style.display = 'inline-flex';
+            bookScanner = new Html5QrcodeScanner('qr-reader-book', { facingMode: 'environment', qrbox: 250 }, false);
+            bookScanner.render(onScanSuccessBook, onScanError);
+        }
+
+        function stopScannerBook() {
+            if (bookScanner) {
+                bookScanner.clear();
+                bookScanner = null;
+            }
+            document.getElementById('startBtnBook').style.display = 'inline-flex';
+            document.getElementById('stopBtnBook').style.display = 'none';
+        }
+
+        function onScanSuccessStudent(decodedText) {
+            const text = decodedText.trim();
+            if (!text.startsWith('STU')) {
+                setStatus('studentStatus', 'Invalid student QR', 'error');
+                return;
+            }
+            document.getElementById('student_qr').value = text;
+            stopScannerStudent();
+            lookupStudent(text, true);
+        }
+
+        function onScanSuccessBook(decodedText) {
+            const text = decodedText.trim();
+            if (!text.startsWith('BOOK')) {
+                setStatus('bookStatus', 'Invalid book QR', 'error');
+                return;
+            }
+            document.getElementById('book_qr').value = text;
+            stopScannerBook();
+            lookupBook(text, true);
+        }
+
+        function onScanError(error) {
+            console.log('Scan error:', error);
+        }
+
+        function confirmStudentManual() {
+            const code = document.getElementById('student_qr').value.trim();
+            if (!code) {
+                setStatus('studentStatus', 'Missing QR', 'error');
+                return;
+            }
+            lookupStudent(code, false);
+        }
+
+        function confirmBookManual() {
+            const code = document.getElementById('book_qr').value.trim();
+            if (!code) {
+                setStatus('bookStatus', 'Missing QR', 'error');
+                return;
+            }
+            lookupBook(code, false);
+        }
+
+        function lookupStudent(code, jumpNext) {
+            setStatus('studentStatus', 'Checking...', 'pending');
+            fetch('?api=lookup_student&student_qr=' + encodeURIComponent(code))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.found) {
+                        studentValid = true;
+                        setStatus('studentStatus', 'Confirmed', 'ready');
+                        renderStudentSummary(data.student);
+                        if (jumpNext) goToStep(2);
+                    } else {
+                        studentValid = false;
+                        setStatus('studentStatus', 'Not found', 'error');
+                        document.getElementById('studentSummary').classList.remove('show');
+                    }
+                    updateSteps();
+                })
+                .catch(() => {
+                    studentValid = false;
+                    setStatus('studentStatus', 'Lookup failed', 'error');
+                    updateSteps();
+                });
+        }
+
+        function lookupBook(code, jumpNext) {
+            setStatus('bookStatus', 'Checking...', 'pending');
+            fetch('?api=lookup_book&book_qr=' + encodeURIComponent(code))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.found && (data.mode === 'borrow' || data.mode === 'return')) {
+                        bookValid = true;
+                        transactionMode = data.mode;
+                        setStatus('bookStatus', data.mode === 'return' ? 'Return detected' : 'Borrow detected', 'ready');
+                        renderBookSummary(data.book, data.mode);
+                        if (jumpNext) goToStep(3);
+                    } else {
+                        bookValid = false;
+                        transactionMode = null;
+                        setStatus('bookStatus', data.message || 'Unavailable', 'error');
+                        document.getElementById('bookSummary').classList.remove('show');
+                    }
+                    updateSteps();
+                })
+                .catch(() => {
+                    bookValid = false;
+                    transactionMode = null;
+                    setStatus('bookStatus', 'Lookup failed', 'error');
+                    updateSteps();
+                });
+        }
+
+        function renderStudentSummary(student) {
+            document.getElementById('studentSummaryGrid').innerHTML =
+                summaryItem('Name', student.full_name) +
+                summaryItem('Student No', student.student_no || 'N/A') +
+                summaryItem('Group', student.student_group || 'N/A') +
+                summaryItem('Department', student.department || 'N/A') +
+                summaryItem('Year Level', student.year_level || 'N/A') +
+                summaryItem('Contact', student.contact_number || 'N/A') +
+                summaryItem('Email', student.email || 'N/A') +
+                summaryItem('Card Validity', formatDate(student.card_valid_until));
+            document.getElementById('studentSummary').classList.add('show');
+        }
+
+        function renderBookSummary(book, mode) {
+            let activeDetails = '';
+            if (mode === 'return') {
+                activeDetails = summaryItem('Borrower', (book.borrower_name || 'Unknown') + ' (' + (book.borrower_student_no || 'N/A') + ')') +
+                                summaryItem('Due Date', formatDate(book.due_date));
+            }
+
+            document.getElementById('bookSummaryGrid').innerHTML =
+                summaryItem('Action', mode === 'return' ? 'Return Book' : 'Borrow Book') +
+                summaryItem('Title', book.title) +
+                summaryItem('Author', book.author) +
+                summaryItem('Available Copies', book.available_copies) +
+                summaryItem('Borrowed Copies', book.borrowed_copies) +
+                summaryItem('Total Copies', book.total_copies) +
+                activeDetails;
+            document.getElementById('bookSummary').classList.add('show');
+        }
+
+        function summaryItem(label, value) {
+            return `<div class="summary-item"><div class="summary-label">${escapeHtml(label)}</div><div class="summary-value">${escapeHtml(value == null || value === '' ? 'N/A' : value)}</div></div>`;
+        }
+
+        function updateSteps() {
+            [1,2,3].forEach(number => {
+                document.getElementById('step' + number).classList.remove('completed');
+            });
+
+            if (studentValid) document.getElementById('step1').classList.add('completed');
+            if (bookValid) document.getElementById('step2').classList.add('completed');
+
+            const submitBtn = document.getElementById('submitBtn');
+            const modeBanner = document.getElementById('modeBanner');
+
+            if (!bookValid || !transactionMode) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Process Transaction';
+                modeBanner.className = 'mode-banner';
+                modeBanner.textContent = 'Scan a book QR code first. The system will automatically identify whether this transaction is a Borrow or Return.';
+            } else if (transactionMode === 'return') {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Process Book Return';
+                modeBanner.className = 'mode-banner return';
+                modeBanner.textContent = 'Return detected. This book has an active borrowed transaction, so the system will process it as a return. Student QR is not required.';
+                document.getElementById('step3').classList.add('completed');
+            } else if (transactionMode === 'borrow' && studentValid) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Process Book Borrowing';
+                modeBanner.className = 'mode-banner borrow';
+                modeBanner.textContent = 'Borrow detected. This book is available and the student is confirmed. You can now process the borrowing transaction.';
+                document.getElementById('step3').classList.add('completed');
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Process Book Borrowing';
+                modeBanner.className = 'mode-banner borrow';
+                modeBanner.textContent = 'Borrow detected. Please complete Step 1 by scanning or confirming the student QR code before processing.';
+            }
+        }
+
+        function resetForm() {
+            stopScannerStudent();
+            stopScannerBook();
+            document.getElementById('transactionForm').reset();
+            studentValid = false;
+            bookValid = false;
+            transactionMode = null;
+            document.getElementById('studentSummary').classList.remove('show');
+            document.getElementById('bookSummary').classList.remove('show');
+            setStatus('studentStatus', 'Waiting', 'pending');
+            setStatus('bookStatus', 'Waiting', 'pending');
+            updateSteps();
+            goToStep(1);
+        }
+
+        function setStatus(id, text, type) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = 'status-pill ' + type;
+        }
+
+        function formatDate(value) {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: '2-digit' });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>

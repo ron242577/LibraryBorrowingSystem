@@ -1,6 +1,6 @@
 <?php
 /**
- * Reports & Analytics Dashboard - Library Borrowing System
+ * Reports Dashboard - Library Borrowing System
  * SuperAdmin Only - Comprehensive reporting and statistics
  */
 
@@ -47,7 +47,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports & Analytics - Library System</title>
+    <title>Reports - Library System</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>

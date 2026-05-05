@@ -12,6 +12,26 @@ function isActiveNav($path) {
     $current_path = $_SERVER['REQUEST_URI'] ?? '';
     return strpos($current_path, $path) !== false ? 'active' : '';
 }
+
+function isActiveNavAny($paths) {
+    $current_path = $_SERVER['REQUEST_URI'] ?? '';
+    foreach ($paths as $path) {
+        if (strpos($current_path, $path) !== false) {
+            return 'active';
+        }
+    }
+    return '';
+}
+
+function isDropdownOpen($paths) {
+    return isActiveNavAny($paths) === 'active' ? 'open' : '';
+}
+
+$books_nav_paths = [
+    '/librarian/qr_borrow.php',
+    '/librarian/qr_return.php',
+    '/librarian/inventory.php'
+];
 ?>
 <style>
     :root {
@@ -21,6 +41,11 @@ function isActiveNav($path) {
         --secondary-color: #8B0000;
         --transition-speed: 0.3s;
         --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
     }
 
     .sidebar {
@@ -51,29 +76,22 @@ function isActiveNav($path) {
         font-size: 18px;
         font-weight: bold;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        transition: opacity var(--transition-speed);
         min-height: 64px;
         justify-content: center;
         background: var(--primary-color);
         box-sizing: border-box;
     }
 
-    .sidebar.collapsed .sidebar-brand {
-        padding: 15px;
-        font-size: 24px;
-    }
-
-    .sidebar-brand-icon {
-        font-size: 24px;
-        line-height: 1;
-        flex-shrink: 0;
-    }
-
     .sidebar-brand-text {
         transition: opacity var(--transition-speed);
     }
 
-    .sidebar.collapsed .sidebar-brand-text {
+    .sidebar.collapsed .sidebar-brand-text,
+    .sidebar.collapsed .sidebar-link-text,
+    .sidebar.collapsed .sidebar-user-name,
+    .sidebar.collapsed .sidebar-user-role,
+    .sidebar.collapsed .dropdown-icon,
+    .sidebar.collapsed .dropdown-menu {
         display: none;
     }
 
@@ -182,8 +200,71 @@ function isActiveNav($path) {
         white-space: nowrap;
     }
 
-    .sidebar.collapsed .sidebar-link-text {
+    .dropdown {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .dropdown-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    .dropdown.open > .dropdown-toggle,
+    .dropdown-toggle:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .dropdown-menu {
+        list-style: none;
+        margin: 0;
+        padding: 0;
         display: none;
+        width: 100%;
+    }
+
+    .dropdown.open .dropdown-menu {
+        display: block;
+    }
+
+    .dropdown-menu li {
+        width: 100%;
+    }
+
+    .dropdown-link {
+        display: block;
+        width: 100%;
+        padding: 10px 18px 10px 40px;
+        font-size: 13px;
+        color: #ddd;
+        text-decoration: none;
+        transition: 0.2s;
+        border-left: 2px solid transparent;
+        box-sizing: border-box;
+    }
+
+    .dropdown-link:hover,
+    .dropdown-link.active {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border-left: 2px solid #fff;
+        font-weight: 700;
+    }
+
+    .dropdown-icon {
+        font-size: 12px;
+        transition: transform 0.3s;
+    }
+
+    .dropdown.open .dropdown-icon {
+        transform: rotate(180deg);
     }
 
     .sidebar-user {
@@ -206,11 +287,6 @@ function isActiveNav($path) {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-    }
-
-    .sidebar.collapsed .sidebar-user-name,
-    .sidebar.collapsed .sidebar-user-role {
-        display: none;
     }
 
     .sidebar-user-role {
@@ -266,106 +342,10 @@ function isActiveNav($path) {
     .sidebar-overlay.active {
         display: block;
     }
-    /* DROPDOWN FIXED STRUCTURE */
-.dropdown {
-    flex-direction: column;
-    width: 100%;
-}
-
-/* Parent (Books) */
-.dropdown-toggle {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-/* Submenu container */
-.dropdown-menu {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: none;
-    width: 100%;
-}
-
-/* Show dropdown */
-.dropdown.open .dropdown-menu {
-    display: block;
-}
-
-/* Each submenu item */
-.dropdown-menu li {
-    width: 100%;
-}
-
-/* Submenu links */
-.dropdown-link {
-    display: block;
-    width: 100%;
-    padding: 10px 18px 10px 40px; /* INDENT HERE */
-    font-size: 13px;
-    color: #ddd;
-    text-decoration: none;
-    transition: 0.2s;
-}
-
-/* Hover */
-.dropdown-link:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-}
-
-/* Arrow rotation */
-.dropdown-icon {
-    font-size: 12px;
-    transition: transform 0.3s;
-}
-
-.dropdown.open .dropdown-icon {
-    transform: rotate(180deg);
-}
-.dropdown-link {
-    border-left: 2px solid transparent;
-}
-
-.dropdown-link:hover {
-    border-left: 2px solid #fff;
-}
-/* OPEN STATE */
-.dropdown.open .dropdown-menu {
-    max-height: 500px; /* enough for items */
-}
-
-/* rotate arrow */
-.dropdown.open .dropdown-icon {
-    transform: rotate(180deg);
-}
-
-/* submenu items */
-.dropdown-link {
-    display: block;
-    padding: 10px 18px 10px 40px;
-    font-size: 13px;
-    color: #ddd;
-    text-decoration: none;
-    transition: 0.2s;
-}
-
-.dropdown-link:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
-}
-
 
     @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
-    }
-
-    body {
-        margin: 0;
-        padding: 0;
     }
 
     body.sidebar-normal main,
@@ -396,10 +376,6 @@ function isActiveNav($path) {
         body.sidebar-mobile {
             margin-left: 0;
         }
-
-        .sidebar-toggle-mobile {
-            display: none;
-        }
     }
 
     @media (max-width: 768px) {
@@ -424,8 +400,8 @@ function isActiveNav($path) {
             display: none;
         }
 
-        main, .main-content, .content {
-            margin-left: 0;
+        main, .main-content, .content, .container {
+            margin-left: 0 !important;
         }
 
         .sidebar-overlay.active {
@@ -484,7 +460,7 @@ function isActiveNav($path) {
             </li>
             <li class="sidebar-item">
                 <a href="/LibraryBorrowingSystem/superadmin/reports.php" class="sidebar-link <?php echo isActiveNav('/superadmin/reports.php'); ?>">
-                    <span class="sidebar-link-text">Reports & Analytics</span>
+                    <span class="sidebar-link-text">Report &amp; Analytics</span>
                 </a>
             </li>
             <li class="sidebar-item">
@@ -492,40 +468,31 @@ function isActiveNav($path) {
                     <span class="sidebar-link-text">Student Records</span>
                 </a>
             </li>
-            <li class="sidebar-item dropdown">
-                <div class="sidebar-link dropdown-toggle">
+            <li class="sidebar-item dropdown <?php echo isDropdownOpen($books_nav_paths); ?>">
+                <button type="button" class="sidebar-link dropdown-toggle" aria-expanded="<?php echo isDropdownOpen($books_nav_paths) === 'open' ? 'true' : 'false'; ?>">
                     <span class="sidebar-link-text">Books</span>
                     <span class="dropdown-icon">▼</span>
-                </div>
-
+                </button>
                 <ul class="dropdown-menu">
-
                     <li>
-                        <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" 
-                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
-                            Borrow Book
+                        <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php"
+                           class="dropdown-link <?php echo isActiveNavAny(['/librarian/qr_borrow.php', '/librarian/qr_return.php']); ?>">
+                            Transactions
                         </a>
                     </li>
-
                     <li>
-                        <a href="/LibraryBorrowingSystem/librarian/qr_return.php" 
-                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
-                            Return Book
+                        <a href="/LibraryBorrowingSystem/librarian/inventory.php"
+                           class="dropdown-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
+                            Inventory
                         </a>
                     </li>
                 </ul>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="sidebar-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
-                    <span class="sidebar-link-text">Inventory</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
                 <a href="/LibraryBorrowingSystem/librarian/transactions.php" class="sidebar-link <?php echo isActiveNav('/librarian/transactions.php'); ?>">
-                    <span class="sidebar-link-text">Transactions</span>
+                    <span class="sidebar-link-text">Transaction Records</span>
                 </a>
             </li>
-
         <?php elseif ($role === 'librarian'): ?>
             <li class="sidebar-item">
                 <a href="/LibraryBorrowingSystem/librarian/dashboard.php" class="sidebar-link <?php echo isActiveNav('/librarian/dashboard.php'); ?>">
@@ -537,37 +504,29 @@ function isActiveNav($path) {
                     <span class="sidebar-link-text">Student Records</span>
                 </a>
             </li>
-            <li class="sidebar-item dropdown">
-                <div class="sidebar-link dropdown-toggle">
+            <li class="sidebar-item dropdown <?php echo isDropdownOpen($books_nav_paths); ?>">
+                <button type="button" class="sidebar-link dropdown-toggle" aria-expanded="<?php echo isDropdownOpen($books_nav_paths) === 'open' ? 'true' : 'false'; ?>">
                     <span class="sidebar-link-text">Books</span>
                     <span class="dropdown-icon">▼</span>
-                </div>
-
+                </button>
                 <ul class="dropdown-menu">
-
                     <li>
-                        <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php" 
-                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_borrow.php'); ?>">
-                            Borrow Book
+                        <a href="/LibraryBorrowingSystem/librarian/qr_borrow.php"
+                           class="dropdown-link <?php echo isActiveNavAny(['/librarian/qr_borrow.php', '/librarian/qr_return.php']); ?>">
+                            Transactions
                         </a>
                     </li>
-
                     <li>
-                        <a href="/LibraryBorrowingSystem/librarian/qr_return.php" 
-                        class="dropdown-link <?php echo isActiveNav('/librarian/qr_return.php'); ?>">
-                            Return Book
+                        <a href="/LibraryBorrowingSystem/librarian/inventory.php"
+                           class="dropdown-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
+                            Inventory
                         </a>
                     </li>
                 </ul>
             </li>
             <li class="sidebar-item">
-                <a href="/LibraryBorrowingSystem/librarian/inventory.php" class="sidebar-link <?php echo isActiveNav('/librarian/inventory.php'); ?>">
-                    <span class="sidebar-link-text">Inventory</span>
-                </a>
-            </li>
-            <li class="sidebar-item">
                 <a href="/LibraryBorrowingSystem/librarian/transactions.php" class="sidebar-link <?php echo isActiveNav('/librarian/transactions.php'); ?>">
-                    <span class="sidebar-link-text">Transactions</span>
+                    <span class="sidebar-link-text">Transaction Records</span>
                 </a>
             </li>
         <?php endif; ?>
@@ -575,8 +534,8 @@ function isActiveNav($path) {
 
     <div class="sidebar-user">
         <div class="sidebar-user-info">
-            <div class="sidebar-user-name" title="<?php echo htmlspecialchars($full_name); ?>">
-                <?php echo htmlspecialchars($full_name); ?>
+            <div class="sidebar-user-name" title="<?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>">
+                <?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>
             </div>
             <div class="sidebar-user-role">
                 <?php echo $role === 'super_admin' ? 'Admin' : 'Librarian'; ?>
@@ -599,18 +558,6 @@ function isActiveNav($path) {
         let isCollapsed = false;
         let isMobile = false;
 
-        function initializeBodyClass() {
-            checkMobile();
-            if (isMobile) {
-                body.classList.add('sidebar-mobile');
-                body.classList.remove('sidebar-normal', 'sidebar-collapsed');
-            } else {
-                body.classList.remove('sidebar-mobile');
-                body.classList.add('sidebar-normal');
-                body.classList.remove('sidebar-collapsed');
-            }
-        }
-
         function checkMobile() {
             isMobile = window.innerWidth <= 768;
         }
@@ -631,40 +578,47 @@ function isActiveNav($path) {
             }
         }
 
-        window.addEventListener('DOMContentLoaded', initializeBodyClass);
+        function initializeBodyClass() {
+            checkMobile();
+            updateBodyClass();
+        }
 
-        hamburgerBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (isMobile) {
-                sidebar.classList.toggle('active');
-                overlay.classList.toggle('active');
-                hamburgerBtn.classList.toggle('active');
-                document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-            } else {
-                sidebar.classList.toggle('collapsed');
-                isCollapsed = sidebar.classList.contains('collapsed');
-                hamburgerBtn.classList.toggle('active');
-                updateBodyClass();
-            }
-        });
-
-        overlay.addEventListener('click', function() {
+        function closeMobileSidebar() {
             if (isMobile) {
                 sidebar.classList.remove('active');
                 overlay.classList.remove('active');
                 hamburgerBtn.classList.remove('active');
                 document.body.style.overflow = '';
             }
-        });
+        }
+
+        window.addEventListener('DOMContentLoaded', initializeBodyClass);
+
+        if (hamburgerBtn && sidebar && overlay) {
+            hamburgerBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (isMobile) {
+                    sidebar.classList.toggle('active');
+                    overlay.classList.toggle('active');
+                    hamburgerBtn.classList.toggle('active');
+                    document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                    isCollapsed = sidebar.classList.contains('collapsed');
+                    hamburgerBtn.classList.toggle('active');
+                    updateBodyClass();
+                }
+            });
+
+            overlay.addEventListener('click', closeMobileSidebar);
+        }
 
         document.querySelectorAll('.sidebar-link').forEach(function(link) {
             link.addEventListener('click', function() {
-                if (isMobile) {
-                    sidebar.classList.remove('active');
-                    overlay.classList.remove('active');
-                    hamburgerBtn.classList.remove('active');
-                    document.body.style.overflow = '';
+                if (link.classList.contains('dropdown-toggle')) {
+                    return;
                 }
+                closeMobileSidebar();
             });
         });
 
@@ -672,11 +626,13 @@ function isActiveNav($path) {
             const wasMobile = isMobile;
             checkMobile();
             if (wasMobile !== isMobile) {
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-                hamburgerBtn.classList.remove('active');
+                if (sidebar && overlay && hamburgerBtn) {
+                    sidebar.classList.remove('active');
+                    overlay.classList.remove('active');
+                    hamburgerBtn.classList.remove('active');
+                }
                 document.body.style.overflow = '';
-                if (isMobile) {
+                if (isMobile && sidebar) {
                     sidebar.classList.remove('collapsed');
                     isCollapsed = false;
                 }
@@ -685,35 +641,45 @@ function isActiveNav($path) {
         });
 
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && isMobile && sidebar.classList.contains('active')) {
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-                hamburgerBtn.classList.remove('active');
-                document.body.style.overflow = '';
+            if (e.key === 'Escape' && isMobile && sidebar && sidebar.classList.contains('active')) {
+                closeMobileSidebar();
             }
         });
     })();
-</script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
 
-    document.querySelectorAll('.dropdown-toggle').forEach(function(toggle) {
-        toggle.addEventListener('click', function () {
-            const parent = this.closest('.dropdown');
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.dropdown-toggle').forEach(function(toggle) {
+            toggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
 
-            // optional: close others
-            document.querySelectorAll('.dropdown').forEach(d => {
-                if (d !== parent) d.classList.remove('open');
+                const parent = this.closest('.dropdown');
+                if (!parent) return;
+
+                document.querySelectorAll('.dropdown').forEach(function(dropdown) {
+                    if (dropdown !== parent) {
+                        dropdown.classList.remove('open');
+                        const otherToggle = dropdown.querySelector('.dropdown-toggle');
+                        if (otherToggle) {
+                            otherToggle.setAttribute('aria-expanded', 'false');
+                        }
+                    }
+                });
+
+                parent.classList.toggle('open');
+                this.setAttribute('aria-expanded', parent.classList.contains('open') ? 'true' : 'false');
             });
+        });
 
-            parent.classList.toggle('open');
+        document.querySelectorAll('.dropdown-link.active').forEach(function(activeLink) {
+            const dropdown = activeLink.closest('.dropdown');
+            if (dropdown) {
+                dropdown.classList.add('open');
+                const toggle = dropdown.querySelector('.dropdown-toggle');
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', 'true');
+                }
+            }
         });
     });
-
-    // AUTO OPEN ACTIVE
-    const activeLink = document.querySelector('.dropdown-link.active');
-    if (activeLink) {
-        activeLink.closest('.dropdown')?.classList.add('open');
-    }
-});
 </script>
