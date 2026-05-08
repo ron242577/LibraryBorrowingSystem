@@ -779,11 +779,20 @@ try {
         .close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; line-height: 1; padding: 0; }
         .close:hover { color: #333; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+        .section-title-row h2 { margin: 0; }
+        .book-modal-content { max-width: 980px; max-height: 90vh; overflow-y: auto; }
+        .book-modal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+        .book-modal-actions .btn-primary, .book-modal-actions .btn-secondary { padding: 10px 18px; }
+        .book-modal-panel { display: none; }
+        .book-modal-panel.active { display: block; }
+        .modal-note { background: #f8f9fa; border-left: 4px solid #003366; padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; color: #555; font-size: 13px; line-height: 1.5; }
         .btn-primary { padding: 11px 22px; background: #003366; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .btn-primary:hover { background: #002244; }
         .qr-modal-image { max-width: 260px; margin: 18px auto; border: 2px solid #ddd; border-radius: 8px; padding: 8px; background: white; display: block; }
 
         @media (max-width: 900px) {
+            .section-title-row { flex-direction: column; align-items: stretch; }
             .form-row, .form-row.three { grid-template-columns: 1fr; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
             th, td { padding: 10px; }
@@ -817,105 +826,6 @@ try {
             <div class="stat-card red"><div class="label">Lost/Damaged</div><div class="value"><?php echo (int)$stats['lost_copies']; ?></div></div>
         </div>
 
-        <div class="section">
-            <h3>Add New Book</h3>
-            <form method="POST">
-                <input type="hidden" name="action" value="add">
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="title">Title *</label>
-                        <input type="text" id="title" name="title" required placeholder="e.g. Noli Me Tangere">
-                    </div>
-                    <div class="form-group">
-                        <label for="author">Author *</label>
-                        <input type="text" id="author" name="author" required placeholder="e.g. Jose Rizal">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Co-Author(s) Optional</label>
-                        <div id="coAuthorList" class="co-author-list">
-                            <div class="co-author-row">
-                                <input type="text" name="co_authors[]" placeholder="Enter co-author name">
-                                <button type="button" class="btn-secondary btn-mini" onclick="removeCoAuthorField(this)">Remove</button>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-mini" style="margin-top:8px;" onclick="addCoAuthorField()">+ Add Co-Author</button>
-                        <div class="help-text">Add as many co-authors as needed.</div>
-                    </div>
-                    <div class="form-group">
-                        <label for="place_of_publication">Place of Publication *</label>
-                        <input type="text" id="place_of_publication" name="place_of_publication" required placeholder="e.g. Manila">
-                    </div>
-                </div>
-
-                <div class="form-row three">
-                    <div class="form-group">
-                        <label for="publication_date">Date *</label>
-                        <input type="date" id="publication_date" name="publication_date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="call_number">Call Number of Book *</label>
-                        <input type="text" id="call_number" name="call_number" required placeholder="e.g. FIL 899.211 RIZ 1887">
-                    </div>
-                    <div class="form-group">
-                        <label for="total_copies">Number of Copies *</label>
-                        <select id="total_copies" name="total_copies" required>
-                            <?php for ($i = 1; $i <= 100; $i++): ?>
-                                <option value="<?php echo $i; ?>"><?php echo $i; ?></option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row three">
-                    <div class="form-group">
-                        <label for="accession_barcode_number">Accession Number / Bar Code Number *</label>
-                        <input type="text" id="accession_barcode_number" name="accession_barcode_number" required placeholder="e.g. ACC-0001">
-                    </div>
-                    <div class="form-group">
-                        <label for="type_of_material">Type of Material *</label>
-                        <input type="text" id="type_of_material" name="type_of_material" required placeholder="e.g. Book, Thesis, Magazine">
-                    </div>
-                    <div class="form-group">
-                        <label for="location_collection">Location - Collection *</label>
-                        <input type="text" id="location_collection" name="location_collection" required placeholder="e.g. Filipiniana Section / Shelf A1">
-                    </div>
-                </div>
-
-                <div class="qr-info">
-                    <strong>QR Code &amp; Stock:</strong> A unique QR code will be automatically generated. The selected number of copies will be added as available stock.
-                </div>
-
-                <div class="button-group">
-                    <button type="submit">Add Book</button>
-                    <button type="reset">Clear</button>
-                </div>
-            </form>
-        </div>
-
-        <div class="section" id="import-books">
-            <h3>Import Books via CSV/XLSX</h3>
-            <div class="template-note">
-                Upload a CSV or XLSX file with these headers:<br>
-                <code>Title, Author, Co-Authors, Place of Publication, Date, Call Number of Book, Accession Number Bar Code Number, Type of Material, Location Collection, Total Copies</code><br>
-                Co-authors can be separated with semicolons or placed on separate lines. <code>Volume/Copy</code>, <code>Copies</code>, or <code>Total Copies</code> will be treated as the number of book copies.
-            </div>
-            <form method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="action" value="import_books">
-                <div class="form-group">
-                    <label for="books_file">Select CSV/XLSX File *</label>
-                    <input type="file" id="books_file" name="books_file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-                </div>
-                <div class="button-group">
-                    <button type="submit">Import Books</button>
-                    <button type="reset">Clear</button>
-                </div>
-            </form>
-        </div>
-
         <div class="alert-panel">
             <h3>Limited Copies Alert</h3>
             <div class="alert-panel-content">
@@ -939,7 +849,10 @@ try {
         </div>
 
         <div class="table-section">
-            <h2>All Books Inventory</h2>
+            <div class="section-title-row">
+                <h2>All Books Inventory</h2>
+                <button type="button" class="btn-primary" onclick="openBookModal()">Add Book</button>
+            </div>
 
             <?php if (empty($all_books)): ?>
                 <div class="empty-message">No books in inventory yet.</div>
@@ -1005,6 +918,120 @@ try {
                 </div>
             <?php endif; ?>
         </div>
+
+        
+    </div>
+
+    <div id="addBookModal" class="modal">
+        <div class="modal-content book-modal-content">
+            <div class="modal-header">
+                <h2>Add Book</h2>
+                <button class="close" type="button" onclick="closeBookModal()">&times;</button>
+            </div>
+
+            <div class="book-modal-actions">
+                <button type="button" id="soloBookBtn" class="btn-primary" onclick="showSoloBookPanel()">Solo Add Book</button>
+                <button type="button" id="bulkBookBtn" class="btn-secondary" onclick="showBulkBookPanel()">Bulk Add Books</button>
+            </div>
+
+            <div id="soloBookPanel" class="book-modal-panel active">
+                <div class="modal-note">Fill out the complete book details below. A unique QR code will be generated automatically after saving.</div>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="title">Title *</label>
+                            <input type="text" id="title" name="title" required placeholder="e.g. Noli Me Tangere">
+                        </div>
+                        <div class="form-group">
+                            <label for="author">Author *</label>
+                            <input type="text" id="author" name="author" required placeholder="e.g. Jose Rizal">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Co-Author(s) Optional</label>
+                            <div id="coAuthorList" class="co-author-list">
+                                <div class="co-author-row">
+                                    <input type="text" name="co_authors[]" placeholder="Enter co-author name">
+                                    <button type="button" class="btn-secondary btn-mini" onclick="removeCoAuthorField(this)">Remove</button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-mini" style="margin-top:8px;" onclick="addCoAuthorField()">+ Add Co-Author</button>
+                            <div class="help-text">Add as many co-authors as needed.</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="place_of_publication">Place of Publication *</label>
+                            <input type="text" id="place_of_publication" name="place_of_publication" required placeholder="e.g. Manila">
+                        </div>
+                    </div>
+
+                    <div class="form-row three">
+                        <div class="form-group">
+                            <label for="publication_date">Date Published *</label>
+                            <input type="date" id="publication_date" name="publication_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="call_number">Call Number of Book *</label>
+                            <input type="text" id="call_number" name="call_number" required placeholder="e.g. FIL 899.211 RIZ 1887">
+                        </div>
+                        <div class="form-group">
+                            <label for="total_copies">Number of Copies *</label>
+                            <select id="total_copies" name="total_copies" required>
+                                <?php for ($i = 1; $i <= 100; $i++): ?>
+                                    <option value="<?php echo $i; ?>"><?php echo $i; ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row three">
+                        <div class="form-group">
+                            <label for="accession_barcode_number">Accession Number *</label>
+                            <input type="text" id="accession_barcode_number" name="accession_barcode_number" required placeholder="e.g. ACC-0001">
+                        </div>
+                        <div class="form-group">
+                            <label for="type_of_material">Type of Material *</label>
+                            <input type="text" id="type_of_material" name="type_of_material" required placeholder="e.g. Book, Thesis, Magazine">
+                        </div>
+                        <div class="form-group">
+                            <label for="location_collection">Location - Collection *</label>
+                            <input type="text" id="location_collection" name="location_collection" required placeholder="e.g. Filipiniana Section / Shelf A1">
+                        </div>
+                    </div>
+
+                    <div class="qr-info">
+                        <strong>QR Code &amp; Stock:</strong> A unique QR code will be automatically generated. The selected number of copies will be added as available stock.
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit">Add Book</button>
+                        <button type="reset">Clear</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="bulkBookPanel" class="book-modal-panel">
+                <div class="template-note">
+                    Upload a CSV or XLSX file with these headers:<br>
+                    <code>Title, Author, Co-Authors, Place of Publication, Date, Call Number of Book, Accession Number Bar Code Number, Type of Material, Location Collection, Total Copies</code><br>
+                    Co-authors can be separated with semicolons or placed on separate lines. <code>Volume/Copy</code>, <code>Copies</code>, or <code>Total Copies</code> will be treated as the number of book copies.
+                </div>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="import_books">
+                    <div class="form-group">
+                        <label for="books_file">Select CSV/XLSX File *</label>
+                        <input type="file" id="books_file" name="books_file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                    </div>
+                    <div class="button-group">
+                        <button type="submit">Import Books</button>
+                        <button type="reset">Clear</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <div id="addCopiesModal" class="modal">
@@ -1045,6 +1072,35 @@ try {
     </div>
 
     <script>
+
+        function openBookModal() {
+            document.getElementById('addBookModal').classList.add('active');
+            showSoloBookPanel();
+            const titleInput = document.getElementById('title');
+            if (titleInput) setTimeout(() => titleInput.focus(), 50);
+        }
+
+        function closeBookModal() {
+            document.getElementById('addBookModal').classList.remove('active');
+        }
+
+        function showSoloBookPanel() {
+            document.getElementById('soloBookPanel').classList.add('active');
+            document.getElementById('bulkBookPanel').classList.remove('active');
+            document.getElementById('soloBookBtn').className = 'btn-primary';
+            document.getElementById('bulkBookBtn').className = 'btn-secondary';
+        }
+
+        function showBulkBookPanel() {
+            document.getElementById('bulkBookPanel').classList.add('active');
+            document.getElementById('soloBookPanel').classList.remove('active');
+            document.getElementById('bulkBookBtn').className = 'btn-primary';
+            document.getElementById('soloBookBtn').className = 'btn-secondary';
+        }
+
+        document.getElementById('addBookModal').addEventListener('click', function(e) {
+            if (e.target === this) closeBookModal();
+        });
 
         function addCoAuthorField() {
             const list = document.getElementById('coAuthorList');
