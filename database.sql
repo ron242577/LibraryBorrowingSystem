@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 08, 2026 at 09:04 PM
+-- Generation Time: May 11, 2026 at 06:08 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -53,7 +53,7 @@ CREATE TABLE `books` (
 --
 
 INSERT INTO `books` (`book_id`, `title`, `author`, `co_authors`, `place_of_publication`, `publication_date`, `call_number`, `accession_barcode_number`, `type_of_material`, `location_collection`, `qr_code`, `book_status`, `total_copies`, `available_copies`, `borrowed_copies`, `lost_copies`, `created_at`, `updated_at`) VALUES
-(1, 'Noli Me Tangere', 'Jose Rizal', '', 'Berlin', '1887-03-21', 'FIL 899.211 RIZ 1887', 'ACC-0001', 'Book', 'Filipiniana Section / Shelf A1', 'BOOK-20260505-P5ADS', 'available', 1, 1, 0, 0, '2026-05-05 15:25:48', '2026-05-05 15:28:15');
+(1, 'Noli Me Tangere', 'Jose Rizal', '', 'Berlin', '1887-03-21', 'FIL 899.211 RIZ 1887', 'ACC-0001', 'Book', 'Filipiniana Section / Shelf A1', 'BOOK-20260505-P5ADS', 'available', 1, 1, 0, 0, '2026-05-05 15:25:48', '2026-05-11 03:33:53');
 
 -- --------------------------------------------------------
 
@@ -82,7 +82,13 @@ CREATE TABLE `students` (
 --
 
 INSERT INTO `students` (`student_id`, `student_no`, `full_name`, `student_group`, `department`, `year_level`, `contact_number`, `card_valid_until`, `email`, `qr_code`, `status`, `created_at`, `updated_at`) VALUES
-(1, '23-01446', 'Marcus Dominique Muico', '3A', 'College of Computer Studies', '3rd Year', '09457352866', '2026-12-05', 'marcusmuico70@gmail.com', 'STU-20260505-Q1ESG', 'active', '2026-05-05 15:18:57', '2026-05-05 15:46:51');
+(1, '23-01446', 'Marcus Dominique Muico', 'BSIT', 'College of Computer Studies', '3rd Year', '09457352866', '2026-12-05', 'marcusmuico70@gmail.com', 'STU-20260505-Q1ESG', 'active', '2026-05-05 15:18:57', '2026-05-11 16:08:09'),
+(4, '23-01557', 'Tracy Caryll Alamo', 'BSIT', 'College of Computer Studies', '3rd Year', '09123456789', '2026-12-11', 'tracy@gmail.com', 'STU-20260511-LZN4R', 'active', '2026-05-11 01:12:07', '2026-05-11 01:12:07'),
+(5, '23-12345', 'Divine Abanador', 'BSIT', 'College of Computer Studies', '3rd Year', '09131231234', '2027-05-11', 'divine@gmail.com', 'STU-20260511-2E615', 'active', '2026-05-11 14:29:05', '2026-05-11 14:29:05'),
+(6, '23-04321', 'Ma. Dhanicka Daniela Arevalo', 'BSIT', 'College of Computer Studies', '3rd Year', '09211231234', '2027-05-11', 'makimuico@gmail.com', 'STU-20260511-08ED0', 'active', '2026-05-11 14:37:40', '2026-05-11 14:37:40'),
+(7, '23-57463', 'Ysabel Anika Muico', 'BSIT', 'College of Computer Studies', '3rd Year', '09123456781', '2027-05-11', 'anikamuico@gmail.com', 'STU-20260511-FBCE6', 'active', '2026-05-11 14:39:49', '2026-05-11 14:39:49'),
+(8, '23-63463', 'Lianne Grace Muico', 'BSIT', 'College of Computer Studies', '1st Year', '09876543211', '2027-05-11', 'lianneanikamuico@gmail.com', 'STU-20260511-6B428', 'active', '2026-05-11 14:42:41', '2026-05-11 14:42:41'),
+(9, '23-63421', 'Mico Borca', 'BSIT', 'College of Computer Studies', '4th Year', '09211231245', '2027-05-11', 'micoborca8@gmail.com', 'STU-20260511-E255F', 'active', '2026-05-11 14:43:36', '2026-05-11 14:43:36');
 
 -- --------------------------------------------------------
 
@@ -102,6 +108,14 @@ CREATE TABLE `transactions` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `transactions`
+--
+
+INSERT INTO `transactions` (`transaction_id`, `student_id`, `book_id`, `date_borrowed`, `due_date`, `return_date`, `penalty_amount`, `status`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, '2026-05-11 04:57:32', '2026-05-18 04:57:32', '2026-05-11 04:58:08', 0.00, 'returned', '2026-05-11 02:57:32', '2026-05-11 02:58:08'),
+(2, 1, 1, '2026-05-11 05:33:24', '2026-05-18 05:33:24', '2026-05-11 05:33:53', 0.00, 'returned', '2026-05-11 03:33:24', '2026-05-11 03:33:53');
 
 -- --------------------------------------------------------
 
@@ -196,13 +210,13 @@ ALTER TABLE `books`
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `transaction_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `users`
