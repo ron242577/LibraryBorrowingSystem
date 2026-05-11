@@ -779,8 +779,23 @@ try {
         .close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; line-height: 1; padding: 0; }
         .close:hover { color: #333; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        .section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+        .section-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
         .section-title-row h2 { margin: 0; }
+        .table-controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
         .book-modal-content { max-width: 980px; max-height: 90vh; overflow-y: auto; }
         .book-modal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
         .book-modal-actions .btn-primary, .book-modal-actions .btn-secondary { padding: 10px 18px; }
@@ -791,8 +806,149 @@ try {
         .btn-primary:hover { background: #002244; }
         .qr-modal-image { max-width: 260px; margin: 18px auto; border: 2px solid #ddd; border-radius: 8px; padding: 8px; background: white; display: block; }
 
+        /* ── Inline Add Book Section ── */
+        .add-book-section {
+            background: #f8fafc;
+            border: 1px solid #dbe4ee;
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin-bottom: 25px;
+            margin-top: 10px;
+        }
+        .add-book-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+        .add-book-toggle h2 {
+            font-size: 17px;
+            color: #003366;
+            margin: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .toggle-icon {
+            font-size: 20px;
+            color: #003366;
+            font-weight: 700;
+            transition: transform 0.2s;
+            line-height: 1;
+        }
+        .toggle-icon.open { transform: rotate(45deg); }
+        #addBookFormWrapper { margin-top: 18px; }
+
+        /* ── Table Actions Row (search + buttons) ── */
+        .table-actions-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .search-filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .search-input {
+            padding: 9px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+            width: 230px;
+            transition: border-color .2s;
+        }
+        .search-input:focus { outline: none; border-color: #003366; }
+        .filter-select {
+            padding: 9px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            width: auto;
+        }
+/* ── Inventory Toolbar ── */
+
+.inventory-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: nowrap;
+    margin-bottom: 20px;
+}
+
+.inventory-left {
+    flex-shrink: 0;
+}
+
+.inventory-left h2 {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.inventory-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    justify-content: center;
+}
+
+.inventory-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.search-input {
+    width: 260px;
+    height: 42px;
+}
+
+.filter-select {
+    width: 160px;
+    height: 42px;
+}
+
+.inventory-right .btn-primary,
+.inventory-right .btn-secondary {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 1100px) {
+
+    .inventory-toolbar {
+        flex-wrap: wrap;
+        align-items: stretch;
+    }
+
+    .inventory-center {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .inventory-right {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .search-input {
+        flex: 1;
+        min-width: 220px;
+    }
+}
         @media (max-width: 900px) {
-            .section-title-row { flex-direction: column; align-items: stretch; }
+            .section-title-row, .table-controls-row { flex-direction: column; align-items: stretch; }
             .form-row, .form-row.three { grid-template-columns: 1fr; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
             th, td { padding: 10px; }
@@ -848,10 +1004,48 @@ try {
             </div>
         </div>
 
+        
+
         <div class="table-section">
-            <div class="section-title-row">
-                <h2>All Books Inventory</h2>
-                <button type="button" class="btn-primary" onclick="openBookModal()">Add Book</button>
+            <div class="inventory-toolbar">
+                <div class="inventory-left">
+                    <h2>All Books Inventory</h2>
+                </div>
+                <div class="inventory-center">
+                    <input 
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search title, author, accession..."
+                        oninput="filterTable()"
+                        class="search-input"
+                    >
+                    <select 
+                        id="statusFilter"
+                        onchange="filterTable()"
+                        class="filter-select"
+                    >
+                        <option value="">All Status</option>
+                        <option value="Available">Available</option>
+                        <option value="Limited Copy">Limited Copy</option>
+                        <option value="Not Available">Not Available</option>
+                    </select>
+                </div>
+                <div class="inventory-right">
+                    <button 
+                        type="button"
+                        class="btn-primary"
+                        onclick="openAddBookForm()"
+                    >
+                        Add Book
+                    </button>
+                    <button 
+                        type="button"
+                        class="btn-secondary"
+                        onclick="openBulkModal()"
+                    >
+                        Bulk Add Books
+                    </button>
+                </div>
             </div>
 
             <?php if (empty($all_books)): ?>
@@ -918,24 +1112,13 @@ try {
                 </div>
             <?php endif; ?>
         </div>
-
-        
-    </div>
-
-    <div id="addBookModal" class="modal">
-        <div class="modal-content book-modal-content">
-            <div class="modal-header">
-                <h2>Add Book</h2>
-                <button class="close" type="button" onclick="closeBookModal()">&times;</button>
+        <div id="addBookSection" class="add-book-section" style="display:none;">
+            <div class="add-book-toggle" onclick="toggleAddBookForm()">
+                <h2>Add New Book</h2>
+                <span class="toggle-icon open" id="addBookToggleIcon">×</span>
             </div>
-
-            <div class="book-modal-actions">
-                <button type="button" id="soloBookBtn" class="btn-primary" onclick="showSoloBookPanel()">Solo Add Book</button>
-                <button type="button" id="bulkBookBtn" class="btn-secondary" onclick="showBulkBookPanel()">Bulk Add Books</button>
-            </div>
-
-            <div id="soloBookPanel" class="book-modal-panel active">
-                <div class="modal-note">Fill out the complete book details below. A unique QR code will be generated automatically after saving.</div>
+            <div id="addBookFormWrapper">
+                <div class="modal-note" style="margin-bottom:16px;">Fill out the complete book details below. A unique QR code will be generated automatically after saving.</div>
                 <form method="POST">
                     <input type="hidden" name="action" value="add">
 
@@ -1009,28 +1192,37 @@ try {
                     <div class="button-group">
                         <button type="submit">Add Book</button>
                         <button type="reset">Clear</button>
+                        <button type="button" class="btn-secondary" onclick="closeAddBookForm()">Cancel</button>
                     </div>
                 </form>
             </div>
+        </div>
+        
+    </div>
 
-            <div id="bulkBookPanel" class="book-modal-panel">
-                <div class="template-note">
-                    Upload a CSV or XLSX file with these headers:<br>
-                    <code>Title, Author, Co-Authors, Place of Publication, Date, Call Number of Book, Accession Number Bar Code Number, Type of Material, Location Collection, Total Copies</code><br>
-                    Co-authors can be separated with semicolons or placed on separate lines. <code>Volume/Copy</code>, <code>Copies</code>, or <code>Total Copies</code> will be treated as the number of book copies.
-                </div>
-                <form method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="import_books">
-                    <div class="form-group">
-                        <label for="books_file">Select CSV/XLSX File *</label>
-                        <input type="file" id="books_file" name="books_file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-                    </div>
-                    <div class="button-group">
-                        <button type="submit">Import Books</button>
-                        <button type="reset">Clear</button>
-                    </div>
-                </form>
+    <!-- Bulk Add Books Modal -->
+    <div id="bulkBooksModal" class="modal">
+        <div class="modal-content" style="max-width:520px;width:92%;">
+            <div class="modal-header">
+                <h2>Bulk Add Books</h2>
+                <button class="close" type="button" onclick="closeBulkModal()">&times;</button>
             </div>
+            <div class="template-note" style="margin-bottom:16px;">
+                Upload a CSV or XLSX file with these headers:<br>
+                <code>Title, Author, Co-Authors, Place of Publication, Date, Call Number of Book, Accession Number Bar Code Number, Type of Material, Location Collection, Total Copies</code><br>
+                Co-authors can be separated with semicolons or placed on separate lines. <code>Volume/Copy</code>, <code>Copies</code>, or <code>Total Copies</code> will be treated as the number of book copies.
+            </div>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="import_books">
+                <div class="form-group">
+                    <label for="books_file">Select CSV/XLSX File *</label>
+                    <input type="file" id="books_file" name="books_file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-primary">Import Books</button>
+                    <button type="button" class="btn-secondary" onclick="closeBulkModal()">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1073,35 +1265,50 @@ try {
 
     <script>
 
-        function openBookModal() {
-            document.getElementById('addBookModal').classList.add('active');
-            showSoloBookPanel();
-            const titleInput = document.getElementById('title');
-            if (titleInput) setTimeout(() => titleInput.focus(), 50);
+        /* ── Inline Add Book Form ── */
+        function openAddBookForm() {
+            const section = document.getElementById('addBookSection');
+            section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(function() {
+                const input = document.getElementById('title');
+                if (input) input.focus();
+            }, 400);
         }
 
-        function closeBookModal() {
-            document.getElementById('addBookModal').classList.remove('active');
+        function closeAddBookForm() {
+            document.getElementById('addBookSection').style.display = 'none';
         }
 
-        function showSoloBookPanel() {
-            document.getElementById('soloBookPanel').classList.add('active');
-            document.getElementById('bulkBookPanel').classList.remove('active');
-            document.getElementById('soloBookBtn').className = 'btn-primary';
-            document.getElementById('bulkBookBtn').className = 'btn-secondary';
+        function toggleAddBookForm() {
+            const body = document.getElementById('addBookFormWrapper');
+            const icon = document.getElementById('addBookToggleIcon');
+            const isVisible = body.style.display !== 'none';
+            body.style.display = isVisible ? 'none' : 'block';
+            icon.classList.toggle('open', !isVisible);
         }
 
-        function showBulkBookPanel() {
-            document.getElementById('bulkBookPanel').classList.add('active');
-            document.getElementById('soloBookPanel').classList.remove('active');
-            document.getElementById('bulkBookBtn').className = 'btn-primary';
-            document.getElementById('soloBookBtn').className = 'btn-secondary';
+        <?php if ($message_type === 'error' && isset($_POST['action']) && $_POST['action'] === 'add'): ?>
+        document.addEventListener('DOMContentLoaded', function() { openAddBookForm(); });
+        <?php endif; ?>
+        <?php if ($message_type === 'success' && isset($_POST['action']) && $_POST['action'] === 'add'): ?>
+        document.addEventListener('DOMContentLoaded', function() { closeAddBookForm(); });
+        <?php endif; ?>
+
+        /* ── Bulk Add Modal ── */
+        function openBulkModal() {
+            document.getElementById('bulkBooksModal').classList.add('active');
         }
 
-        document.getElementById('addBookModal').addEventListener('click', function(e) {
-            if (e.target === this) closeBookModal();
+        function closeBulkModal() {
+            document.getElementById('bulkBooksModal').classList.remove('active');
+        }
+
+        document.getElementById('bulkBooksModal').addEventListener('click', function(e) {
+            if (e.target === this) closeBulkModal();
         });
 
+        /* ── Co-Author Fields ── */
         function addCoAuthorField() {
             const list = document.getElementById('coAuthorList');
             const row = document.createElement('div');
@@ -1121,6 +1328,22 @@ try {
             button.closest('.co-author-row').remove();
         }
 
+        /* ── Search & Filter ── */
+        function filterTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const badge = row.querySelector('.badge');
+                const badgeText = badge ? badge.textContent.trim().toLowerCase() : '';
+                const matchSearch = !search || text.includes(search);
+                const matchStatus = !status || badgeText.includes(status.toLowerCase());
+                row.style.display = matchSearch && matchStatus ? '' : 'none';
+            });
+        }
+
+        /* ── Add Copies Modal ── */
         function openAddCopiesModal(bookId, bookTitle) {
             document.getElementById('bookId').value = bookId;
             document.getElementById('bookTitle').value = bookTitle;
@@ -1144,6 +1367,7 @@ try {
             }
         });
 
+        /* ── QR Modal ── */
         function openQRModal(qrCode, bookTitle) {
             const filePath = '/LibraryBorrowingSystem/qr_codes/' + qrCode + '.png';
             const safeTitle = (bookTitle || 'book').replace(/[^a-z0-9-_]+/gi, '_');

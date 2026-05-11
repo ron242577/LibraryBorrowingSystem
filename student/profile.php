@@ -16,14 +16,14 @@ if (!$student_qr) {
     $error = 'No student QR code provided. Please scan your student ID again.';
 } else {
     try {
-        $student_stmt = $conn->prepare("SELECT student_id, full_name, contact_number, qr_code, status, created_at FROM students WHERE qr_code = ? AND status = 'active'");
+        $student_stmt = $conn->prepare("SELECT student_no, full_name, contact_number, qr_code, status, created_at FROM students WHERE qr_code = ? AND status = 'active'");
         $student_stmt->bind_param('s', $student_qr);
         $student_stmt->execute();
         $student_result = $student_stmt->get_result();
 
         if ($student_result->num_rows > 0) {
             $student = $student_result->fetch_assoc();
-            $student_id = (int)$student['student_id'];
+            $student_id = (int)$student['student_no'];
 
             $books_stmt = $conn->prepare("\n                SELECT\n                    t.transaction_id,\n                    t.date_borrowed,\n                    t.due_date,\n                    t.return_date,\n                    t.penalty_amount,\n                    t.status,\n                    b.title,\n                    b.author\n                FROM transactions t\n                INNER JOIN books b ON t.book_id = b.book_id\n                WHERE t.student_id = ?\n                ORDER BY t.date_borrowed DESC\n            ");
             $books_stmt->bind_param('i', $student_id);
@@ -299,7 +299,7 @@ if (!$student_qr) {
                     <div class="info-grid">
                         <div class="info-item">
                             <div class="info-label">Student ID</div>
-                            <div class="info-value">STU-<?php echo str_pad($student['student_id'], 4, '0', STR_PAD_LEFT); ?></div>
+                            <div class="info-value"><?php echo str_pad($student['student_no'], 4, '0', STR_PAD_LEFT); ?></div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Full Name</div>

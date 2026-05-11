@@ -1026,10 +1026,72 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                         <a href="?" class="btn btn-reset">↺ Reset</a>
                     </div>
                     <div class="filter-action-right">
-                        <button type="button" class="btn btn-primary" onclick="openAddStudentModal()">Add Student</button>
+                        <button type="button" class="btn btn-primary" onclick="scrollToAddForm()">Add Student</button>
+                        <button type="button" class="btn btn-secondary" onclick="openBulkModal()">Bulk Add</button>
                     </div>
                 </div>
             </form>
+        </div>
+
+        <!-- ── Add Student Form (inline page section) ── -->
+        <div id="addStudentSection" class="add-student-section" style="display:none;">
+            <div class="add-student-toggle" onclick="toggleAddForm()">
+                <h3>Add New Student</h3>
+                <span class="toggle-icon open" id="addFormToggleIcon">×</span>
+            </div>
+            <div class="add-student-body" id="addStudentBody">
+                <form method="POST" id="addStudentForm">
+                    <input type="hidden" name="action" value="add">
+                    <div class="form-row" style="margin-top:6px;">
+                        <div class="form-group">
+                            <label for="inline_full_name">Name *</label>
+                            <input type="text" id="inline_full_name" name="full_name" required placeholder="e.g. John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label for="inline_student_no">Student No *</label>
+                            <input type="text" id="inline_student_no" name="student_no" required placeholder="e.g. 23-01234">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="inline_student_group">Group *</label>
+                            <input type="text" id="inline_student_group" name="student_group" required placeholder="e.g. BSIT">
+                        </div>
+                        <div class="form-group">
+                            <label for="inline_department">Department *</label>
+                            <input type="text" id="inline_department" name="department" required placeholder="e.g. College of Computer Studies">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="inline_year_level">Year Level *</label>
+                            <input type="text" id="inline_year_level" name="year_level" required placeholder="e.g. 1st Year">
+                        </div>
+                        <div class="form-group">
+                            <label for="inline_contact_number">Contact Number</label>
+                            <input type="tel" id="inline_contact_number" name="contact_number" placeholder="e.g. +63-912-345-6789">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="inline_card_valid_until">Validity of Library Access Card *</label>
+                            <input type="date" id="inline_card_valid_until" name="card_valid_until" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inline_email">Email</label>
+                            <input type="email" id="inline_email" name="email" placeholder="e.g. student@gmail.com">
+                        </div>
+                    </div>
+                    <div class="qr-info">
+                        A unique QR code will be automatically generated when you add the student.
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Student</button>
+                        <button type="reset" class="btn btn-secondary">Clear</button>
+                        <button type="button" class="btn btn-reset" onclick="closeAddForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- Records Table -->
@@ -1135,92 +1197,32 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
 
 
 
-    <!-- Add Student Modal -->
-    <div id="addStudentModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="addStudentModalTitle">
+    <!-- Bulk Add Students Modal -->
+    <div id="bulkAddModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulkAddModalTitle">
         <div class="modal-box modal-form-box">
             <div class="modal-top-bar">
-                <h2 id="addStudentModalTitle">Add Student</h2>
-                <button class="modal-close" onclick="closeAddStudentModal()" title="Close">&times;</button>
+                <h2 id="bulkAddModalTitle">Bulk Add Students</h2>
+                <button class="modal-close" onclick="closeBulkModal()" title="Close">&times;</button>
             </div>
             <div class="add-modal-body">
-                <div id="singleAddPanel" class="modal-panel">
-                    <div class="modal-mode-header">
-                        <h3>Solo Student Entry</h3>
-                        <button type="button" class="btn btn-secondary" onclick="showBulkAddPanel()">Bulk Add Students</button>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="import">
+                    <div class="form-row">
+                        <div class="form-group" style="grid-column:1/-1;">
+                            <label for="students_file">Upload CSV or XLSX File</label>
+                            <input type="file" id="students_file" name="students_file" accept=".csv,.xlsx" required
+                                   style="padding:8px;border:2px dashed #ddd;border-radius:6px;background:#fafafa;cursor:pointer;">
+                        </div>
                     </div>
-                    <form method="POST">
-                        <input type="hidden" name="action" value="add">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="modal_full_name">Name *</label>
-                                <input type="text" id="modal_full_name" name="full_name" required placeholder="e.g. John Doe">
-                            </div>
-                            <div class="form-group">
-                                <label for="modal_student_no">Student No *</label>
-                                <input type="text" id="modal_student_no" name="student_no" required placeholder="e.g. 23-01234">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="modal_student_group">Group *</label>
-                                <input type="text" id="modal_student_group" name="student_group" required placeholder="e.g. STEM 9-A">
-                            </div>
-                            <div class="form-group">
-                                <label for="modal_department">Department *</label>
-                                <input type="text" id="modal_department" name="department" required placeholder="e.g. College of Computer Studies">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="modal_year_level">Year Level *</label>
-                                <input type="text" id="modal_year_level" name="year_level" required placeholder="e.g. Grade 9">
-                            </div>
-                            <div class="form-group">
-                                <label for="modal_contact_number">Contact Number</label>
-                                <input type="tel" id="modal_contact_number" name="contact_number" placeholder="e.g. +63-912-345-6789">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="modal_card_valid_until">Validity of Library Access Card *</label>
-                                <input type="date" id="modal_card_valid_until" required name="card_valid_until">
-                            </div>
-                            <div class="form-group">
-                                <label for="modal_email">Email</label>
-                                <input type="email" id="modal_email" name="email" placeholder="e.g. student@gmail.com">
-                            </div>
-                        </div>
-                        <div class="bulk-note">
-                            A unique QR code will be automatically generated when you add the student.
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Save Student</button>
-                            <button type="reset" class="btn btn-secondary">Clear</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div id="bulkAddPanel" class="modal-panel hidden">
-                    <div class="modal-mode-header">
-                        <h3>Bulk Add Students</h3>
-                        <button type="button" class="btn btn-secondary" onclick="showSingleAddPanel()">Back to Solo Add</button>
+                    <div class="bulk-note" style="margin-top:14px;">
+                        <strong>Accepted column headers:</strong> Name, Student No, Group, Department, Yr Lvl, Contact Number, Validity of the Library Access Card, Email.<br>
+                        Supported file formats: <strong>.CSV</strong> and <strong>.XLSX</strong>
                     </div>
-                    <form method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="action" value="import">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="students_file">Upload CSV or XLSX File</label>
-                                <input type="file" id="students_file" name="students_file" accept=".csv,.xlsx" required>
-                            </div>
-                        </div>
-                        <div class="bulk-note">
-                            Accepted headers: Name, Student No, Group, Department, Yr Lvl, Contact Number, Validity of the Library Access Card, and Email. CSV and XLSX files are supported.
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Import Students</button>
-                        </div>
-                    </form>
-                </div>
+                    <div class="form-actions" style="margin-top:18px;">
+                        <button type="submit" class="btn btn-primary">Import Students</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1257,43 +1259,59 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     </div>
 
     <script>
-    /* ── Add Student Modal ── */
-    function openAddStudentModal(mode = 'single') {
-        document.getElementById('addStudentModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-        if (mode === 'bulk') {
-            showBulkAddPanel();
-        } else {
-            showSingleAddPanel();
-            setTimeout(function() {
-                const input = document.getElementById('modal_full_name');
-                if (input) input.focus();
-            }, 50);
-        }
+    /* ── Add Student Inline Form ── */
+    function scrollToAddForm() {
+        const section = document.getElementById('addStudentSection');
+        section.style.display = 'block';
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(function() {
+            const input = document.getElementById('inline_full_name');
+            if (input) input.focus();
+        }, 400);
     }
 
-    function closeAddStudentModal() {
-        document.getElementById('addStudentModal').classList.remove('show');
+    function closeAddForm() {
+        const section = document.getElementById('addStudentSection');
+        section.style.display = 'none';
+    }
+
+    function toggleAddForm() {
+        const section = document.getElementById('addStudentSection');
+        const body = document.getElementById('addStudentBody');
+        const icon = document.getElementById('addFormToggleIcon');
+        const isVisible = body.style.display !== 'none';
+        body.style.display = isVisible ? 'none' : 'block';
+        icon.classList.toggle('open', !isVisible);
+    }
+
+    /* ── Bulk Add Modal ── */
+    function openBulkModal() {
+        document.getElementById('bulkAddModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeBulkModal() {
+        document.getElementById('bulkAddModal').classList.remove('show');
         document.body.style.overflow = '';
     }
 
-    function showSingleAddPanel() {
-        document.getElementById('singleAddPanel').classList.remove('hidden');
-        document.getElementById('bulkAddPanel').classList.add('hidden');
-    }
-
-    function showBulkAddPanel() {
-        document.getElementById('singleAddPanel').classList.add('hidden');
-        document.getElementById('bulkAddPanel').classList.remove('hidden');
-    }
-
-    document.getElementById('addStudentModal').addEventListener('click', function(e) {
-        if (e.target === this) closeAddStudentModal();
+    document.getElementById('bulkAddModal').addEventListener('click', function(e) {
+        if (e.target === this) closeBulkModal();
     });
 
     <?php if ($message_type === 'error' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'): ?>
     document.addEventListener('DOMContentLoaded', function() {
-        openAddStudentModal('<?php echo ($_POST['action'] ?? '') === 'import' ? 'bulk' : 'single'; ?>');
+        <?php if (($_POST['action'] ?? '') === 'import'): ?>
+        openBulkModal();
+        <?php else: ?>
+        scrollToAddForm();
+        <?php endif; ?>
+    });
+    <?php endif; ?>
+    <?php if ($message_type === 'success' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'add'): ?>
+    document.addEventListener('DOMContentLoaded', function() {
+        const section = document.getElementById('addStudentSection');
+        if (section) section.style.display = 'none';
     });
     <?php endif; ?>
 
@@ -1326,7 +1344,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeStudentModal();
-            closeAddStudentModal();
+            closeBulkModal();
             closeQRModal();
         }
     });

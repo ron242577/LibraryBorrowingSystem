@@ -281,6 +281,14 @@ $books_nav_paths = [
         gap: 6px;
     }
 
+    .sidebar-user-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.7);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
     .sidebar-user-name {
         font-size: 13px;
         font-weight: 600;
@@ -534,6 +542,7 @@ $books_nav_paths = [
 
     <div class="sidebar-user">
         <div class="sidebar-user-info">
+            <div class="sidebar-user-label">Username:</div>
             <div class="sidebar-user-name" title="<?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>
             </div>

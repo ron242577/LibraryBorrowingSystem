@@ -291,7 +291,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     autocomplete="current-password"
                 >
             </div>
-            
+            <div class="form-group">
+                <a href="student/portal.php" for="password" style="font-size: 13px; color: #8B0000; text-decoration: none;">Login as Student</a>
+            </div>
             <button type="submit">Login</button>
         </form>
         

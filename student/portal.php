@@ -921,6 +921,12 @@ if ($student_qr) {
                         </div>
                         <button type="submit" class="btn-login">Access Account</button>
                     </form>
+                    
+                    <!-- Registration and Staff Login Links -->
+                    <div style="margin-top: 30px; padding-top: 24px; border-top: 1px solid #ecf0f1; display: flex; flex-direction: column; gap: 12px;">
+                        <a href="/LibraryBorrowingSystem/student/register.php" style="width: 100%; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Register for Student</a>
+                        <a href="/LibraryBorrowingSystem/login.php" style="width: 100%; padding: 12px 24px; background: #ecf0f1; color: #2c3e50; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Login as Staff</a>
+                    </div>
                 </div>
                 
                 

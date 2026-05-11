@@ -298,9 +298,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         .step-panel { position: sticky; top: 10px; z-index: 20; }
         .step-indicator { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .step { padding: 18px; border-radius: 10px; text-align: center; background: #f9f9f9; border: 2px solid #ddd; transition: all 0.25s; cursor: pointer; }
-        .step:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+        .step:hover:not(.disabled) { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
         .step.active { background: #f8f0f0; border-color: #8B0000; }
         .step.completed { background: #d4edda; border-color: #4caf50; }
+        .step.disabled { background: #f0f0f0; border-color: #bbb; color: #999; cursor: not-allowed; opacity: 0.6; }
+        .step.disabled .step-number { background: #bbb; color: #fff; }
+        .step.disabled h4 { color: #999; }
+        .step.disabled p { color: #bbb; }
         .step-number { display: inline-block; width: 38px; height: 38px; line-height: 38px; background: #ddd; border-radius: 50%; font-weight: 700; margin-bottom: 10px; font-size: 18px; }
         .step.active .step-number { background: #8B0000; color: #fff; }
         .step.completed .step-number { background: #4caf50; color: #fff; }
@@ -340,6 +344,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         .mode-banner.borrow { background: #d4edda; border-left-color: #28a745; color: #155724; }
         .result-details { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 20px; border: 1px solid #e5e5e5; }
         .result-details h3 { border-bottom: 2px solid #8B0000; margin-bottom: 14px; padding-bottom: 8px; }
+        .section.disabled { background: #f5f5f5; opacity: 0.5; pointer-events: none; }
+        .section.step-panel.disabled { background: #fff; opacity: 1; pointer-events: auto; }
         @media (max-width: 768px) {
             .page-header { flex-direction: column; }
             .step-indicator, .summary-grid { grid-template-columns: 1fr; }
@@ -503,6 +509,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         });
 
         function goToStep(stepNumber) {
+            const step = document.getElementById('step' + stepNumber);
+            if (step && step.classList.contains('disabled')) {
+                return; // Prevent navigation to disabled steps
+            }
             const section = document.getElementById('section' + stepNumber);
             if (section) {
                 section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -682,7 +692,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         function updateSteps() {
             [1,2,3].forEach(number => {
                 document.getElementById('step' + number).classList.remove('completed');
+                document.getElementById('section' + number).classList.remove('disabled');
             });
+
+            // Step 1 is always enabled
+            // Step 2 is enabled only when Step 1 is completed
+            if (!studentValid) {
+                document.getElementById('section2').classList.add('disabled');
+                document.getElementById('section3').classList.add('disabled');
+            } else {
+                // Step 3 is enabled only when Step 2 is completed
+                if (!bookValid) {
+                    document.getElementById('section3').classList.add('disabled');
+                }
+            }
 
             if (studentValid) document.getElementById('step1').classList.add('completed');
             if (bookValid) document.getElementById('step2').classList.add('completed');
