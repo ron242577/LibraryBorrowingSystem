@@ -62,8 +62,8 @@ if (!$student_qr) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: #f5f7fa;
-            color: #2c3e50;
+            background: #F3F7FC;
+            color: #202A44;
             padding-top: 70px;
             padding-bottom: 40px;
         }
@@ -80,6 +80,7 @@ if (!$student_qr) {
             align-items: center;
             justify-content: space-between;
             padding: 0 40px;
+            border-bottom: 3px solid #F4F916;
         }
         .header-brand {
             display: inline-flex;
@@ -88,7 +89,7 @@ if (!$student_qr) {
             gap: 12px;
         }
         .header-brand img { height: 50px; width: auto; object-fit: contain; }
-        .header-brand-text { font-size: 18px; font-weight: 700; color: #667eea; }
+        .header-brand-text { font-size: 18px; font-weight: 700; color: #141F52; }
         .student-menu {
             position: relative;
             display: flex;
@@ -99,7 +100,7 @@ if (!$student_qr) {
             align-items: center;
             gap: 10px;
             padding: 8px 12px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 8px;
@@ -107,7 +108,7 @@ if (!$student_qr) {
             font-size: 14px;
             cursor: pointer;
         }
-        .student-menu-toggle:hover { background: #00264d; }
+        .student-menu-toggle:hover { background: #0D153B; }
         .student-menu-name {
             max-width: 220px;
             overflow: hidden;
@@ -132,22 +133,27 @@ if (!$student_qr) {
         .student-dropdown a {
             display: block;
             padding: 12px 18px;
-            color: #2c3e50;
+            color: #202A44;
             text-decoration: none;
             font-size: 14px;
             font-weight: 600;
         }
         .student-dropdown a:hover,
-        .student-dropdown a.active { background: #f0f3f8; color: #003366; }
-        .student-dropdown .dropdown-divider { height: 1px; background: #e8edf2; margin: 6px 0; }
+        .student-dropdown a.active {
+            background: #EDF3FA;
+            color: #141F52;
+            border-left: 3px solid #F4F916;
+        }
+        .student-dropdown .dropdown-divider { height: 1px; background: #D2E2F6; margin: 6px 0; }
         .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
         .page-title { margin-bottom: 24px; }
-        .page-title h1 { font-size: 28px; color: #2c3e50; margin-bottom: 8px; }
-        .page-title p { color: #7f8c8d; font-size: 14px; }
+        .page-title h1 { font-size: 28px; color: #202A44; margin-bottom: 8px; }
+        .page-title p { color: #52618D; font-size: 14px; }
         .card {
             background: white;
             border-radius: 14px;
             box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            border: 1px solid #D2E2F6;
             margin-bottom: 24px;
             overflow: hidden;
         }
@@ -156,7 +162,7 @@ if (!$student_qr) {
             border-bottom: 1px solid #eef0f4;
             font-size: 18px;
             font-weight: 800;
-            color: #2c3e50;
+            color: #202A44;
         }
         .card-body { padding: 24px; }
         .profile-top {
@@ -169,7 +175,7 @@ if (!$student_qr) {
             width: 72px;
             height: 72px;
             border-radius: 50%;
-            background: #003366;
+            background: #141F52;
             color: white;
             display: flex;
             align-items: center;
@@ -177,50 +183,50 @@ if (!$student_qr) {
             font-size: 36px;
         }
         .profile-name h2 { font-size: 24px; margin-bottom: 6px; }
-        .profile-name p { color: #7f8c8d; font-size: 14px; }
+        .profile-name p { color: #52618D; font-size: 14px; }
         .info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 14px;
         }
         .info-item {
-            background: #f8f9fa;
+            background: #F7F9FC;
             padding: 16px;
             border-radius: 10px;
-            border-left: 4px solid #003366;
+            border-left: 4px solid #141F52;
         }
         .info-label {
             font-size: 11px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: .5px;
             font-weight: 700;
             margin-bottom: 6px;
         }
-        .info-value { font-size: 16px; font-weight: 800; color: #2c3e50; }
+        .info-value { font-size: 16px; font-weight: 800; color: #202A44; }
         .qr-box {
-            background: #f8f9fa;
-            border: 2px dashed #003366;
+            background: #F7F9FC;
+            border: 2px dashed #141F52;
             border-radius: 12px;
             padding: 20px;
             text-align: center;
             margin-top: 20px;
         }
         .qr-box img { width: 150px; height: 150px; background: white; padding: 8px; border-radius: 8px; }
-        .qr-text { margin-top: 10px; color: #003366; font: 700 12px 'Courier New', monospace; }
+        .qr-text { margin-top: 10px; color: #141F52; font: 700 12px 'Courier New', monospace; }
         .penalty-box {
-            background: #fff5e6;
-            border-left: 4px solid #d35400;
+            background: #FBE8DC;
+            border-left: 4px solid #BB5716;
             padding: 16px;
             border-radius: 10px;
             margin-top: 18px;
-            color: #8b5a00;
+            color: #7A3A0E;
             font-weight: 700;
         }
         .books-list { display: flex; flex-direction: column; gap: 12px; }
         .book-row {
-            background: #f8f9fa;
-            border: 1px solid #e8edf2;
+            background: #F7F9FC;
+            border: 1px solid #D2E2F6;
             border-radius: 10px;
             padding: 16px;
             display: grid;
@@ -229,7 +235,7 @@ if (!$student_qr) {
             align-items: center;
         }
         .book-title { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
-        .book-meta { color: #7f8c8d; font-size: 13px; line-height: 1.6; }
+        .book-meta { color: #52618D; font-size: 13px; line-height: 1.6; }
         .badge {
             padding: 6px 12px;
             border-radius: 999px;
@@ -238,10 +244,10 @@ if (!$student_qr) {
             text-transform: uppercase;
             white-space: nowrap;
         }
-        .badge.borrowed { background: #fff3cd; color: #856404; }
-        .badge.returned { background: #d4edda; color: #155724; }
+        .badge.borrowed { background: #FBFDCB; color: #5C5F05; }
+        .badge.returned { background: #EDF5DD; color: #344E15; }
         .badge.overdue { background: #f8d7da; color: #721c24; }
-        .empty, .error-box { text-align: center; padding: 40px 20px; color: #7f8c8d; }
+        .empty, .error-box { text-align: center; padding: 40px 20px; color: #52618D; }
         .error-box { color: #c62828; background: #ffebee; border: 2px solid #ef5350; border-radius: 10px; }
         @media (max-width: 700px) {
             body { padding-top: 60px; }
@@ -257,8 +263,8 @@ if (!$student_qr) {
 <body>
     <header class="page-header">
         <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="header-brand">
-            <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo">
-            <span class="header-brand-text">Arellano University Book Borrowing</span>
+            <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M. Recto High School Logo">
+            <span class="header-brand-text">Claro M. Recto Book Borrowing</span>
         </a>
         <div class="student-menu">
             <button type="button" class="student-menu-toggle" id="studentMenuToggle" aria-haspopup="true" aria-expanded="false">

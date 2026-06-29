@@ -169,8 +169,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: #F3F7FC;
+            color: #202A44;
         }
         
         .container {
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .page-header h2 {
-            color: #333;
+            color: #202A44;
             font-size: 28px;
         }
         
@@ -201,9 +201,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: #EDF5DD;
+            color: #344E15;
+            border: 1px solid #B5D27A;
         }
         
         .alert-error {
@@ -221,11 +221,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .section h3 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 20px;
             font-size: 20px;
             padding-bottom: 10px;
-            border-bottom: 2px solid #003366;
+            border-bottom: 2px solid #141F52;
         }
         
         .form-group {
@@ -235,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         label {
             display: block;
             margin-bottom: 8px;
-            color: #333;
+            color: #202A44;
             font-weight: 500;
             font-size: 14px;
         }
@@ -245,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         input[type="password"] {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ddd;
+            border: 1px solid #D2E2F6;
             border-radius: 5px;
             font-size: 14px;
             transition: border-color 0.3s;
@@ -255,8 +255,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         input[type="email"]:focus,
         input[type="password"]:focus {
             outline: none;
-            border-color: #003366;
-            box-shadow: 0 0 5px rgba(0, 51, 102, 0.2);
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
         }
         
         .button-group {
@@ -267,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         button {
             padding: 12px 24px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 5px;
@@ -278,8 +278,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         button:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 51, 102, 0.4);
+            box-shadow: 0 5px 15px rgba(20, 31, 82, 0.4);
         }
         
         button:active {
@@ -318,15 +319,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         thead {
-            background: #f9f9f9;
+            background: #F7F9FC;
         }
         
         th {
             padding: 15px;
             text-align: left;
             font-weight: 600;
-            color: #333;
-            border-bottom: 2px solid #ddd;
+            color: #202A44;
+            border-bottom: 2px solid #D2E2F6;
             font-size: 14px;
         }
         
@@ -337,7 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         tbody tr:hover {
-            background: #f9f9f9;
+            background: #F7F9FC;
         }
         
         .status-badge {
@@ -350,8 +351,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .status-active {
-            background: #d4edda;
-            color: #155724;
+            background: #EDF5DD;
+            color: #344E15;
         }
         
         .status-inactive {
@@ -376,12 +377,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .btn-reset {
-            background: #8B0000;
+            background: #141F52;
             color: white;
         }
         
         .btn-reset:hover {
-            background: #8B0000;
+            background: #141F52;
             transform: translateY(-1px);
         }
         
@@ -396,12 +397,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .btn-activate {
-            background: #2196F3;
+            background: #52618D;
             color: white;
         }
         
         .btn-activate:hover {
-            background: #0b7dda;
+            background: #141F52;
             transform: translateY(-1px);
         }
         
@@ -438,7 +439,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .modal-header h3 {
             margin: 0;
-            color: #333;
+            color: #202A44;
         }
         
         .modal-buttons {
@@ -464,7 +465,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .btn-submit {
-            background: #003366;
+            background: #141F52;
             padding: 10px 20px;
             font-size: 14px;
             font-weight: 600;
@@ -476,7 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .btn-submit:hover {
             transform: translateY(-1px);
-            box-shadow: 0 3px 10px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 3px 10px rgba(20, 31, 82, 0.3);
         }
         
         .no-data {

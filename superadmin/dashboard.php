@@ -119,8 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: #F3F7FC;
+            color: #202A44;
         }
         
         .container {
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .card h2 {
-            color: #003366;
+            color: #141F52;
             margin-bottom: 10px;
             font-size: 18px;
         }
@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .welcome-section h2 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 10px;
         }
         
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         .role-badge {
             display: inline-block;
-            background: #8B0000;
+            background: #141F52;
             color: white;
             padding: 5px 15px;
             border-radius: 20px;
@@ -197,14 +197,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .features-list {
-            background: #f9f9f9;
+            background: #F7F9FC;
             padding: 20px;
             border-radius: 5px;
             margin-top: 20px;
         }
         
         .features-list h3 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 15px;
             font-size: 16px;
         }
@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         .features-list li:before {
             content: "✓";
-            color: #8B0000;
+            color: #141F52;
             font-weight: bold;
             margin-right: 10px;
             font-size: 18px;
@@ -237,13 +237,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .stat-card {
-            background: #003366;
+            background: #141F52;
             color: white;
             padding: 30px;
             border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
             text-align: center;
             transition: transform 0.3s;
+            border-bottom: 4px solid #F4F916;
         }
         
         .stat-card:hover {
@@ -275,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .backup-section h3 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 15px;
             font-size: 18px;
             display: flex;
@@ -291,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .backup-btn {
-            background: #8B0000;
+            background: #141F52;
             color: white;
             padding: 12px 30px;
             border: none;
@@ -306,8 +307,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .backup-btn:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(82, 97, 141, 0.4);
         }
         
         .backup-btn:active {
@@ -315,13 +317,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         .backup-info {
-            background: #f0f4ff;
+            background: #EDF3FA;
             padding: 15px;
             border-radius: 5px;
             margin-top: 15px;
-            border-left: 4px solid #003366;
+            border-left: 4px solid #141F52;
             font-size: 13px;
-            color: #555;
+            color: #52618D;
         }
         
         .card-link {

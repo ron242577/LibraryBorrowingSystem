@@ -78,8 +78,8 @@ if ($student_qr) {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            background: #003366;
-            color: #2c3e50;
+            background: #141F52;
+            color: #202A44;
             min-height: 100vh;
             padding: 20px;
         }
@@ -128,7 +128,7 @@ if ($student_qr) {
         }
         
         .card-header {
-            background: #003366;
+            background: #141F52;
             color: white;
             padding: 24px 30px;
             font-size: 18px;
@@ -136,6 +136,7 @@ if ($student_qr) {
             display: flex;
             align-items: center;
             gap: 12px;
+            border-bottom: 4px solid #F4F916;
         }
         
         .card-body {
@@ -151,10 +152,10 @@ if ($student_qr) {
         }
         
         .info-item {
-            background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
+            background: #F3F7FC;
             padding: 20px;
             border-radius: 12px;
-            border-left: 4px solid #003366;
+            border-left: 4px solid #141F52;
             transition: all 0.3s ease;
         }
         
@@ -165,7 +166,7 @@ if ($student_qr) {
         
         .info-label {
             font-size: 11px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 8px;
@@ -174,7 +175,7 @@ if ($student_qr) {
         
         .info-value {
             font-size: 18px;
-            color: #2c3e50;
+            color: #202A44;
             font-weight: 700;
         }
         
@@ -189,7 +190,7 @@ if ($student_qr) {
         
         a, button {
             padding: 11px 26px;
-            background: #003366;
+            background: #141F52;
             color: white;
             text-decoration: none;
             border: none;
@@ -198,22 +199,23 @@ if ($student_qr) {
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 2px 8px rgba(20, 31, 82, 0.3);
         }
         
         a:hover, button:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 51, 102, 0.4);
+            box-shadow: 0 6px 20px rgba(20, 31, 82, 0.4);
         }
         
         .btn-secondary {
-            background: #ecf0f1;
-            color: #2c3e50;
+            background: #E7EEF7;
+            color: #202A44;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         
         .btn-secondary:hover {
-            background: #d5dbdb;
+            background: #D2E2F6;
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
         }
         
@@ -236,14 +238,14 @@ if ($student_qr) {
         }
         
         .empty-state p {
-            color: #7f8c8d;
+            color: #52618D;
             font-size: 16px;
             margin-bottom: 20px;
             font-weight: 500;
         }
         
         .empty-state a {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #141F52;
         }
         
         /* Book List */
@@ -255,7 +257,7 @@ if ($student_qr) {
         
         .book-item {
             background: white;
-            border: 1px solid #ecf0f1;
+            border: 1px solid #E7EEF7;
             border-radius: 12px;
             padding: 22px;
             transition: all 0.3s ease;
@@ -265,7 +267,7 @@ if ($student_qr) {
         .book-item:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-            border-color: #667eea;
+            border-color: #52618D;
         }
         
         .book-item-header {
@@ -277,7 +279,7 @@ if ($student_qr) {
         }
         
         .book-info h3 {
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 6px;
             font-size: 17px;
             font-weight: 700;
@@ -285,14 +287,14 @@ if ($student_qr) {
         }
         
         .book-info p {
-            color: #7f8c8d;
+            color: #52618D;
             font-size: 13px;
             margin: 6px 0;
             line-height: 1.5;
         }
         
         .book-info .author {
-            color: #003366;
+            color: #141F52;
             font-weight: 600;
             margin-bottom: 10px;
         }
@@ -309,8 +311,8 @@ if ($student_qr) {
         }
         
         .status-available {
-            background: #d4edda;
-            color: #155724;
+            background: #EDF5DD;
+            color: #344E15;
         }
         
         .status-overdue {
@@ -325,16 +327,16 @@ if ($student_qr) {
         }
         
         .status-borrowed {
-            background: #fff3cd;
-            color: #856404;
+            background: #FBFDCB;
+            color: #5C5F05;
         }
         
         .book-dates {
-            background: #f8f9fa;
+            background: #F7F9FC;
             padding: 12px;
             border-radius: 8px;
             margin: 12px 0;
-            border-left: 3px solid #003366;
+            border-left: 3px solid #141F52;
         }
         
         .date-row {
@@ -345,19 +347,19 @@ if ($student_qr) {
         }
         
         .date-label {
-            color: #7f8c8d;
+            color: #52618D;
             font-weight: 600;
         }
         
         .date-value {
-            color: #2c3e50;
+            color: #202A44;
             font-weight: 600;
         }
         
         .penalty-info {
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
-            border: 1px solid #ffd99d;
-            color: #8b5a00;
+            background: #FBE8DC;
+            border: 1px solid #E6A370;
+            color: #7A3A0E;
             padding: 16px 20px;
             border-radius: 10px;
             margin-bottom: 25px;
@@ -370,7 +372,7 @@ if ($student_qr) {
         
         .penalty-info strong {
             font-size: 18px;
-            color: #d35400;
+            color: #BB5716;
         }
         
         /* QR Display */
@@ -382,15 +384,15 @@ if ($student_qr) {
         }
         
         .qr-display {
-            background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
+            background: #F3F7FC;
             text-align: center;
             padding: 30px;
             border-radius: 12px;
-            border: 2px dashed #003366;
+            border: 2px dashed #141F52;
         }
         
         .qr-display h4 {
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 16px;
             font-size: 14px;
             font-weight: 600;
@@ -402,7 +404,7 @@ if ($student_qr) {
             max-width: 180px;
             height: auto;
             border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
+            box-shadow: 0 4px 12px rgba(20, 31, 82, 0.2);
             background: white;
             padding: 8px;
         }
@@ -410,7 +412,7 @@ if ($student_qr) {
         .qr-code-text {
             margin-top: 14px;
             font-size: 12px;
-            color: #003366;
+            color: #141F52;
             font-weight: 600;
             font-family: 'Courier New', monospace;
             letter-spacing: 0.5px;
@@ -496,9 +498,10 @@ if ($student_qr) {
         }
         
         .form-header {
-            background: #003366;
+            background: #141F52;
             padding: 24px;
             text-align: center;
+            border-bottom: 4px solid #F4F916;
         }
         
         .form-header h2 {
@@ -517,7 +520,7 @@ if ($student_qr) {
             display: flex;
             gap: 12px;
             margin-bottom: 30px;
-            background: #f5f7fa;
+            background: #F3F7FC;
             border-radius: 12px;
             padding: 6px;
         }
@@ -527,7 +530,7 @@ if ($student_qr) {
             padding: 12px 20px;
             border: none;
             background: transparent;
-            color: #7f8c8d;
+            color: #52618D;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
@@ -538,13 +541,13 @@ if ($student_qr) {
         }
         
         .toggle-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            background: #F4F916;
+            color: #141F52;
+            box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
         }
         
         .toggle-btn:hover:not(.active) {
-            color: #2c3e50;
+            color: #202A44;
         }
         
         /* Input Forms */
@@ -581,7 +584,7 @@ if ($student_qr) {
             display: block;
             font-size: 12px;
             font-weight: 700;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 10px;
@@ -590,29 +593,29 @@ if ($student_qr) {
         .form-group-custom input {
             width: 100%;
             padding: 14px 16px;
-            border: 2px solid #ecf0f1;
+            border: 2px solid #E7EEF7;
             border-radius: 10px;
             font-size: 15px;
             font-family: inherit;
-            color: #2c3e50;
-            background: #f8f9fa;
+            color: #202A44;
+            background: #F7F9FC;
             transition: all 0.3s ease;
         }
         
         .form-group-custom input::placeholder {
-            color: #bdc3c7;
+            color: #91B0E0;
         }
         
         .form-group-custom input:focus {
             outline: none;
-            border-color: #003366;
+            border-color: #141F52;
             background: white;
-            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
         }
         
         .helper-text {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
             margin-top: 8px;
             line-height: 1.5;
         }
@@ -621,7 +624,7 @@ if ($student_qr) {
         .btn-login {
             width: 100%;
             padding: 14px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 10px;
@@ -629,14 +632,15 @@ if ($student_qr) {
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         
         .btn-login:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 25px rgba(20, 31, 82, 0.4);
         }
         
         .btn-login:active {
@@ -645,8 +649,8 @@ if ($student_qr) {
         
         /* Info Box */
         .info-box {
-            background: linear-gradient(135deg, #f0f4ff 0%, #f5f0ff 100%);
-            border-left: 4px solid #667eea;
+            background: #F3F7FC;
+            border-left: 4px solid #52618D;
             padding: 16px;
             border-radius: 10px;
             margin-top: 24px;
@@ -656,7 +660,7 @@ if ($student_qr) {
         }
         
         .info-box strong {
-            color: #667eea;
+            color: #52618D;
             font-weight: 600;
         }
         
@@ -665,30 +669,30 @@ if ($student_qr) {
             text-align: center;
             margin-top: 30px;
             padding-top: 24px;
-            border-top: 1px solid #ecf0f1;
-            color: #7f8c8d;
+            border-top: 1px solid #E7EEF7;
+            color: #52618D;
             font-size: 13px;
         }
         
         .login-footer a {
-            color: #667eea;
+            color: #52618D;
             text-decoration: none;
             font-weight: 600;
             transition: color 0.3s ease;
         }
         
         .login-footer a:hover {
-            color: #764ba2;
+            color: #141F52;
         }
         
         /* Error Banner */
         .qr-error-banner {
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
-            border-left: 4px solid #d35400;
+            background: #FBE8DC;
+            border-left: 4px solid #BB5716;
             padding: 16px 20px;
             border-radius: 12px;
             margin-bottom: 30px;
-            color: #8b5a00;
+            color: #7A3A0E;
             display: flex;
             align-items: flex-start;
             gap: 16px;
@@ -732,9 +736,9 @@ if ($student_qr) {
         
         .scanner-btn {
             padding: 10px 18px;
-            border: 2px solid #667eea;
+            border: 2px solid #52618D;
             background: transparent;
-            color: #667eea;
+            color: #52618D;
             border-radius: 8px;
             font-size: 13px;
             font-weight: 600;
@@ -743,17 +747,17 @@ if ($student_qr) {
         }
         
         .scanner-btn:hover {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #141F52;
             color: white;
             border-color: transparent;
         }
         
         .scanner-result {
-            background: #d4edda;
-            border-left: 4px solid #28a745;
+            background: #EDF5DD;
+            border-left: 4px solid #567D1F;
             padding: 12px 16px;
             border-radius: 8px;
-            color: #155724;
+            color: #344E15;
             font-size: 13px;
             font-weight: 600;
             display: none;
@@ -879,7 +883,7 @@ if ($student_qr) {
         <?php if (!$student && !$qr_validated): ?>
     <div class="login-page">
         <div class="welcome-section">
-            <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo" class="welcome-icon">
+            <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M. Recto High School Logo" class="welcome-icon">
             <h1>Welcome to the Student Portal</h1>
             <p>Search books and view your profile separately</p>
             <span class="subtitle">Search books from the library catalog</span>
@@ -923,9 +927,9 @@ if ($student_qr) {
                     </form>
                     
                     <!-- Registration and Staff Login Links -->
-                    <div style="margin-top: 30px; padding-top: 24px; border-top: 1px solid #ecf0f1; display: flex; flex-direction: column; gap: 12px;">
-                        <a href="/LibraryBorrowingSystem/student/register.php" style="width: 100%; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Register for Student</a>
-                        <a href="/LibraryBorrowingSystem/login.php" style="width: 100%; padding: 12px 24px; background: #ecf0f1; color: #2c3e50; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Login as Staff</a>
+                    <div style="margin-top: 30px; padding-top: 24px; border-top: 1px solid #E7EEF7; display: flex; flex-direction: column; gap: 12px;">
+                        <a href="/LibraryBorrowingSystem/student/register.php" style="width: 100%; padding: 12px 24px; background: #141F52; color: white; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3); text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Register for Student</a>
+                        <a href="/LibraryBorrowingSystem/login.php" style="width: 100%; padding: 12px 24px; background: #E7EEF7; color: #202A44; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">Login as Staff</a>
                     </div>
                 </div>
                 
@@ -1131,13 +1135,13 @@ if ($student_qr) {
                                         </div>
                                     </div>
                                     
-                                    <div style="padding-top: 12px; border-top: 1px solid #ecf0f1; margin-top: 12px; text-align: right;">
+                                    <div style="padding-top: 12px; border-top: 1px solid #E7EEF7; margin-top: 12px; text-align: right;">
                                         <?php if ($is_overdue): ?>
-                                            <div style="color: #d35400; font-weight: 700; font-size: 16px;">â±<?php echo number_format($penalty, 2); ?> penalty</div>
-                                            <div style="color: #7f8c8d; font-size: 12px; margin-top: 4px;"><?php echo $days_late; ?> <?php echo $days_late === 1 ? 'day' : 'days'; ?> late</div>
+                                            <div style="color: #BB5716; font-weight: 700; font-size: 16px;">â±<?php echo number_format($penalty, 2); ?> penalty</div>
+                                            <div style="color: #52618D; font-size: 12px; margin-top: 4px;"><?php echo $days_late; ?> <?php echo $days_late === 1 ? 'day' : 'days'; ?> late</div>
                                         <?php else: ?>
                                             <div style="color: #27ae60; font-weight: 700; font-size: 16px;">⏰ <?php echo $days_left; ?> <?php echo $days_left === 1 ? 'day' : 'days'; ?> left</div>
-                                            <div style="color: #7f8c8d; font-size: 12px; margin-top: 4px;">Due on <?php echo date('M d', strtotime($book['due_date'])); ?></div>
+                                            <div style="color: #52618D; font-size: 12px; margin-top: 4px;">Due on <?php echo date('M d', strtotime($book['due_date'])); ?></div>
                                         <?php endif; ?>
                                     </div>
                                 </div>

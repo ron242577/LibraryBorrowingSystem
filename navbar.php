@@ -37,10 +37,15 @@ $books_nav_paths = [
     :root {
         --sidebar-width: 260px;
         --sidebar-width-collapsed: 80px;
-        --primary-color: #003366;
-        --secondary-color: #8B0000;
+        --primary-color: #141F52;
+        --secondary-color: #52618D;
+        --accent-color: #F4F916;
+        --sky-color: #91B0E0;
+        --light-blue-color: #D2E2F6;
+        --success-color: #B5D27A;
+        --off-white-color: #FEFEF9;
         --transition-speed: 0.3s;
-        --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        --shadow: 0 4px 14px rgba(20, 31, 82, 0.22);
     }
 
     body {
@@ -55,7 +60,7 @@ $books_nav_paths = [
         width: var(--sidebar-width);
         height: 100vh;
         background: var(--primary-color);
-        color: white;
+        color: var(--off-white-color);
         display: flex;
         flex-direction: column;
         box-shadow: var(--shadow);
@@ -75,11 +80,22 @@ $books_nav_paths = [
         gap: 12px;
         font-size: 18px;
         font-weight: bold;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 3px solid var(--accent-color);
         min-height: 64px;
         justify-content: center;
         background: var(--primary-color);
         box-sizing: border-box;
+    }
+
+    .sidebar-brand-logo {
+        width: 42px;
+        height: 42px;
+        padding: 2px;
+        object-fit: contain;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: var(--off-white-color);
+        border: 2px solid var(--sky-color);
     }
 
     .sidebar-brand-text {
@@ -95,13 +111,17 @@ $books_nav_paths = [
         display: none;
     }
 
+    .sidebar.collapsed .sidebar-brand {
+        padding-inline: 10px;
+    }
+
     .hamburger-btn {
         position: fixed;
         top: 20px;
         left: 20px;
         width: 45px;
         height: 45px;
-        background: white;
+        background: var(--off-white-color);
         border: none;
         border-radius: 8px;
         cursor: pointer;
@@ -116,14 +136,14 @@ $books_nav_paths = [
     }
 
     .hamburger-btn:hover {
-        background: #f0f0f0;
+        background: var(--light-blue-color);
         transform: scale(1.05);
     }
 
     .hamburger-line {
         width: 25px;
         height: 3px;
-        background: #333;
+        background: var(--primary-color);
         border-radius: 2px;
         transition: all var(--transition-speed);
     }
@@ -155,7 +175,7 @@ $books_nav_paths = [
 
     .sidebar-link {
         flex: 1;
-        color: white;
+        color: var(--off-white-color);
         text-decoration: none;
         padding: 13px 18px;
         display: flex;
@@ -175,13 +195,13 @@ $books_nav_paths = [
         top: 0;
         height: 100%;
         width: 4px;
-        background: white;
+        background: var(--accent-color);
         transform: scaleY(0);
         transition: transform var(--transition-speed);
     }
 
     .sidebar-link:hover {
-        background-color: rgba(255, 255, 255, 0.15);
+        background-color: rgba(145, 176, 224, 0.18);
         padding-left: 22px;
     }
 
@@ -191,7 +211,7 @@ $books_nav_paths = [
     }
 
     .sidebar-link.active {
-        background-color: rgba(255, 255, 255, 0.22);
+        background-color: var(--secondary-color);
         font-weight: 700;
     }
 
@@ -219,7 +239,7 @@ $books_nav_paths = [
 
     .dropdown.open > .dropdown-toggle,
     .dropdown-toggle:hover {
-        background-color: rgba(255, 255, 255, 0.15);
+        background-color: rgba(145, 176, 224, 0.18);
     }
 
     .dropdown-menu {
@@ -243,7 +263,7 @@ $books_nav_paths = [
         width: 100%;
         padding: 10px 18px 10px 40px;
         font-size: 13px;
-        color: #ddd;
+        color: var(--light-blue-color);
         text-decoration: none;
         transition: 0.2s;
         border-left: 2px solid transparent;
@@ -252,9 +272,9 @@ $books_nav_paths = [
 
     .dropdown-link:hover,
     .dropdown-link.active {
-        background: rgba(255, 255, 255, 0.1);
-        color: #fff;
-        border-left: 2px solid #fff;
+        background: rgba(145, 176, 224, 0.18);
+        color: var(--off-white-color);
+        border-left: 2px solid var(--accent-color);
         font-weight: 700;
     }
 
@@ -284,7 +304,7 @@ $books_nav_paths = [
     .sidebar-user-label {
         font-size: 10px;
         font-weight: 700;
-        color: rgba(255, 255, 255, 0.7);
+        color: var(--light-blue-color);
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
@@ -299,22 +319,23 @@ $books_nav_paths = [
 
     .sidebar-user-role {
         font-size: 11px;
-        background: rgba(255, 255, 255, 0.2);
+        background: var(--accent-color);
+        color: var(--primary-color);
         padding: 4px 8px;
         border-radius: 12px;
         font-weight: 500;
     }
 
     .sidebar-logout {
-        color: white;
+        color: var(--off-white-color);
         text-decoration: none;
         padding: 8px 10px;
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: transparent;
         border-radius: 5px;
         font-size: 12px;
         font-weight: 600;
         transition: background-color var(--transition-speed);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        border: 1px solid var(--sky-color);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -323,8 +344,8 @@ $books_nav_paths = [
     }
 
     .sidebar-logout:hover {
-        background-color: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.5);
+        background-color: var(--secondary-color);
+        border-color: var(--accent-color);
     }
 
     .sidebar.collapsed .sidebar-logout {
@@ -451,7 +472,7 @@ $books_nav_paths = [
 
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-        <span class="sidebar-brand-text">Arellano University Library</span>
+        <span class="sidebar-brand-text">Claro M. Recto High School</span>
     </div>
 
     <ul class="sidebar-menu">

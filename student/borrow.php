@@ -339,8 +339,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: #f5f7fa;
-            color: #2c3e50;
+            background: #F3F7FC;
+            color: #202A44;
             padding-bottom: 40px;
         }
         
@@ -356,12 +356,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .header h1 {
             font-size: 28px;
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 8px;
         }
         
         .header p {
-            color: #7f8c8d;
+            color: #52618D;
             font-size: 14px;
         }
         
@@ -391,26 +391,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .search-form input:focus {
             outline: none;
-            border-color: #003366;
-            box-shadow: 0 0 8px rgba(0, 51, 102, 0.2);
-            background: #f8f9ff;
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
+            background: #F7FAFE;
         }
         
         .search-form button {
             padding: 12px 28px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 2px 8px rgba(20, 31, 82, 0.3);
         }
         
         .search-form button:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 5px 16px rgba(0, 51, 102, 0.4);
+            box-shadow: 0 5px 16px rgba(20, 31, 82, 0.4);
         }
         
         .grid {
@@ -432,7 +433,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .student-info-section h2 {
             font-size: 18px;
             margin-bottom: 20px;
-            color: #2c3e50;
+            color: #202A44;
             padding-bottom: 15px;
             border-bottom: 2px solid #f0f0f0;
         }
@@ -450,7 +451,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             font-size: 48px;
             width: 70px;
             height: 70px;
-            background: #003366;
+            background: #141F52;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -459,12 +460,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .student-details h3 {
             font-size: 20px;
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 5px;
         }
         
         .student-details p {
-            color: #7f8c8d;
+            color: #52618D;
             font-size: 13px;
         }
         
@@ -476,15 +477,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .info-item {
-            background: #f8f9fa;
+            background: #F7F9FC;
             padding: 15px;
             border-radius: 8px;
-            border-left: 3px solid #003366;
+            border-left: 3px solid #141F52;
         }
         
         .info-label {
             font-size: 11px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 6px;
@@ -493,13 +494,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .info-value {
             font-size: 15px;
-            color: #2c3e50;
+            color: #202A44;
             font-weight: 600;
         }
         
         .qr-section {
-            background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
-            border: 2px dashed #003366;
+            background: #F3F7FC;
+            border: 2px dashed #141F52;
             padding: 20px;
             border-radius: 8px;
             text-align: center;
@@ -508,7 +509,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .qr-section h4 {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 12px;
@@ -525,7 +526,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .qr-text {
             font-size: 11px;
-            color: #003366;
+            color: #141F52;
             font-family: 'Courier New', monospace;
             margin-top: 10px;
             font-weight: 600;
@@ -570,7 +571,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .results-section h2 {
             font-size: 18px;
             margin-bottom: 20px;
-            color: #2c3e50;
+            color: #202A44;
             padding-bottom: 15px;
             border-bottom: 2px solid #f0f0f0;
         }
@@ -585,7 +586,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .book-item {
             padding: 15px;
-            background: #f8f9fa;
+            background: #F7F9FC;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             cursor: pointer;
@@ -596,8 +597,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .book-item:hover, .book-item.active {
-            background: linear-gradient(135deg, #00336615 0%, #00336215 100%);
-            border-color: #667eea;
+            background: rgba(20, 31, 82, 0.08);
+            border-color: #52618D;
             transform: translateX(4px);
         }
         
@@ -607,7 +608,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .book-item.unavailable:hover {
-            background: #f8f9fa;
+            background: #F7F9FC;
             border-color: #e0e0e0;
             transform: none;
         }
@@ -623,13 +624,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .book-title {
             font-weight: 600;
-            color: #2c3e50;
+            color: #202A44;
             font-size: 14px;
         }
         
         .book-author {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
         }
         
         .book-availability {
@@ -641,8 +642,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .book-availability.available {
-            background: #d4edda;
-            color: #155724;
+            background: #EDF5DD;
+            color: #344E15;
         }
         
         .book-availability.unavailable {
@@ -671,7 +672,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .book-details h3 {
             font-size: 20px;
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 20px;
             padding-bottom: 15px;
             border-bottom: 2px solid #f0f0f0;
@@ -685,15 +686,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .detail-item {
-            background: #f8f9fa;
+            background: #F7F9FC;
             padding: 15px;
             border-radius: 8px;
-            border-left: 3px solid #667eea;
+            border-left: 3px solid #52618D;
         }
         
         .detail-label {
             font-size: 11px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 6px;
@@ -702,13 +703,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .detail-value {
             font-size: 15px;
-            color: #2c3e50;
+            color: #202A44;
             font-weight: 600;
         }
         
         .book-qr {
-            background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
-            border: 2px dashed #667eea;
+            background: #F3F7FC;
+            border: 2px dashed #52618D;
             padding: 20px;
             border-radius: 8px;
             text-align: center;
@@ -717,7 +718,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         .book-qr h4 {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 12px;
@@ -735,7 +736,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .borrow-btn {
             width: 100%;
             padding: 14px 28px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 8px;
@@ -743,12 +744,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
         }
         
         .borrow-btn:hover:not(:disabled) {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 51, 102, 0.4);
+            box-shadow: 0 6px 20px rgba(20, 31, 82, 0.4);
         }
         
         .borrow-btn:disabled {
@@ -846,11 +848,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .transaction-details {
-            background: #f8fafb;
+            background: #F7F9FC;
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 24px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #52618D;
         }
         
         .detail-row {
@@ -892,24 +894,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         .modal-btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #141F52;
             color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
         }
         
         .modal-btn-primary:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(20, 31, 82, 0.4);
         }
         
         .modal-btn-secondary {
-            background: #f0f2f8;
-            color: #667eea;
+            background: #EDF3FA;
+            color: #52618D;
             font-weight: 600;
         }
         
         .modal-btn-secondary:hover {
-            background: #e8eaf6;
+            background: #D2E2F6;
         }
         
         /* Header Styles */
@@ -926,6 +929,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             align-items: center;
             justify-content: space-between;
             padding: 0 40px;
+            border-bottom: 3px solid #F4F916;
         }
         
         .header-brand {
@@ -944,11 +948,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .header-brand-text {
             font-size: 18px;
             font-weight: 700;
-            color: #667eea;
+            color: #141F52;
         }
         
         .header-brand:hover .header-brand-text {
-            color: #764ba2;
+            color: #52618D;
         }
         
         .student-menu {
@@ -962,7 +966,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             align-items: center;
             gap: 10px;
             padding: 8px 12px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 8px;
@@ -973,7 +977,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         .student-menu-toggle:hover {
-            background: #00264d;
+            background: #0D153B;
             transform: none;
             box-shadow: none;
         }
@@ -1011,7 +1015,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .student-dropdown a {
             display: block;
             padding: 12px 18px;
-            color: #2c3e50;
+            color: #202A44;
             text-decoration: none;
             font-size: 14px;
             font-weight: 600;
@@ -1022,15 +1026,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         .student-dropdown a:hover,
         .student-dropdown a.active {
-            background: #f0f3f8;
-            color: #003366;
+            background: #EDF3FA;
+            color: #141F52;
             transform: none;
             box-shadow: none;
         }
 
         .student-dropdown .dropdown-divider {
             height: 1px;
-            background: #e8edf2;
+            background: #D2E2F6;
             margin: 6px 0;
         }
         
@@ -1092,8 +1096,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <!-- Header -->
     <header class="page-header">
         <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="header-brand">
-            <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo">
-            <span class="header-brand-text">Arellano University Book Borrowing</span>
+            <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M. Recto High School Logo">
+            <span class="header-brand-text">Claro M. Recto Book Borrowing</span>
         </a>
         <div class="student-menu">
             <button type="button" class="student-menu-toggle" id="studentMenuToggle" aria-haspopup="true" aria-expanded="false">

@@ -121,25 +121,25 @@ if ($generate_report) {
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 12px; color: #222; padding: 30px; }
-        .report-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #003366; padding-bottom: 16px; }
-        .report-header h1 { font-size: 20px; color: #003366; }
-        .report-header p  { color: #555; font-size: 12px; margin-top: 4px; }
+        .report-header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #141F52; padding-bottom: 16px; }
+        .report-header h1 { font-size: 20px; color: #141F52; }
+        .report-header p  { color: #52618D; font-size: 12px; margin-top: 4px; }
         .summary-row { display: flex; gap: 20px; margin-bottom: 20px; }
-        .summary-box { flex: 1; border: 1px solid #ddd; border-radius: 6px; padding: 12px; text-align: center; }
+        .summary-box { flex: 1; border: 1px solid #D2E2F6; border-radius: 6px; padding: 12px; text-align: center; }
         .summary-box .val { font-size: 22px; font-weight: 700; }
         .summary-box .lbl { font-size: 11px; color: #777; text-transform: uppercase; margin-top: 4px; }
         .overdue-val { color: #e74c3c; }
-        .penalty-val { color: #f39c12; }
+        .penalty-val { color: #BB5716; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        thead { background: #003366; color: white; }
+        thead { background: #141F52; color: white; }
         th { padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
         td { padding: 7px 10px; border-bottom: 1px solid #eee; font-size: 11px; }
-        tbody tr:nth-child(even) { background: #f9f9f9; }
+        tbody tr:nth-child(even) { background: #F7F9FC; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-        .badge-borrowed  { background: #fff3cd; color: #856404; }
-        .badge-returned  { background: #d4edda; color: #155724; }
+        .badge-borrowed  { background: #FBFDCB; color: #5C5F05; }
+        .badge-returned  { background: #EDF5DD; color: #344E15; }
         .badge-overdue   { background: #f8d7da; color: #721c24; }
-        .penalty-col { color: #e67e22; font-weight: 700; }
+        .penalty-col { color: #BB5716; font-weight: 700; }
         .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #aaa; }
         @media print {
             .no-print { display: none !important; }
@@ -148,7 +148,7 @@ if ($generate_report) {
             display: block;
             margin: 0 auto 20px;
             padding: 10px 28px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 6px;
@@ -205,7 +205,7 @@ if ($generate_report) {
                     if ($t['status'] === 'borrowed' && $t['days_overdue'] > 0) $badge = 'overdue';
                 ?>
                 <tr>
-                    <td style="color:#003366;font-family:monospace;font-weight:700;">
+                    <td style="color:#141F52;font-family:monospace;font-weight:700;">
                         #<?php echo str_pad($t['transaction_id'], 4, '0', STR_PAD_LEFT); ?>
                     </td>
                     <td><?php echo htmlspecialchars($t['student_name']); ?></td>
@@ -253,8 +253,8 @@ if ($generate_report) {
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f7fa;
-            color: #2c3e50;
+            background: #F3F7FC;
+            color: #202A44;
             padding-bottom: 40px;
         }
 
@@ -279,11 +279,11 @@ if ($generate_report) {
 
         .page-header h1 {
             font-size: 28px;
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 6px;
         }
 
-        .page-header p { color: #7f8c8d; font-size: 14px; }
+        .page-header p { color: #52618D; font-size: 14px; }
 
         /* ── Generate Report button ──────────────────── */
         .btn-report {
@@ -291,7 +291,7 @@ if ($generate_report) {
             align-items: center;
             gap: 8px;
             padding: 12px 22px;
-            background: #27ae60;
+            background: #567D1F;
             color: white;
             border: none;
             border-radius: 8px;
@@ -302,7 +302,7 @@ if ($generate_report) {
             white-space: nowrap;
         }
 
-        .btn-report:hover { background: #219a52; transform: translateY(-2px); }
+        .btn-report:hover { background: #3F5F16; transform: translateY(-2px); }
 
         /* ── Stat cards ──────────────────────────────── */
         .stats-grid {
@@ -317,31 +317,32 @@ if ($generate_report) {
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,.08);
-            border-left: 5px solid #003366;
+            border-left: 5px solid #141F52;
             cursor: pointer;
             transition: all .3s;
             display: block;
         }
 
         .stat-card:hover             { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
-        .stat-card.active            { background: #eef2ff; }
-        .stat-card-all               { border-left-color: #003366; }
-        .stat-card-borrowed          { border-left-color: #f39c12; }
-        .stat-card-returned          { border-left-color: #27ae60; }
+        .stat-card.active            { background: #EDF3FA; }
+        .stat-card.active            { box-shadow: 0 0 0 3px rgba(244,249,22,.35); }
+        .stat-card-all               { border-left-color: #141F52; }
+        .stat-card-borrowed          { border-left-color: #BB5716; }
+        .stat-card-returned          { border-left-color: #567D1F; }
         .stat-card-overdue           { border-left-color: #e74c3c; }
 
         .stat-label {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: .5px;
             font-weight: 600;
             margin-bottom: 8px;
         }
 
-        .stat-value { font-size: 32px; font-weight: 700; color: #2c3e50; }
-        .stat-card-borrowed .stat-value { color: #f39c12; }
-        .stat-card-returned .stat-value { color: #27ae60; }
+        .stat-value { font-size: 32px; font-weight: 700; color: #202A44; }
+        .stat-card-borrowed .stat-value { color: #BB5716; }
+        .stat-card-returned .stat-value { color: #567D1F; }
         .stat-card-overdue  .stat-value { color: #e74c3c; }
 
         /* ── Overdue + Penalty summary ───────────────── */
@@ -363,11 +364,11 @@ if ($generate_report) {
 
         .summary-card:hover          { transform: translateY(-3px); }
         .summary-card-overdue        { border-left-color: #e74c3c; }
-        .summary-card-penalty        { border-left-color: #f39c12; }
+        .summary-card-penalty        { border-left-color: #BB5716; }
 
         .summary-label {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             font-weight: 600;
             letter-spacing: .5px;
@@ -376,7 +377,7 @@ if ($generate_report) {
 
         .summary-value { font-size: 30px; font-weight: 700; }
         .summary-card-overdue .summary-value { color: #e74c3c; }
-        .summary-card-penalty .summary-value { color: #f39c12; }
+        .summary-card-penalty .summary-value { color: #BB5716; }
         .summary-subtext { font-size: 11px; color: #95a5a6; margin-top: 6px; }
 
         /* ── Filter section ──────────────────────────── */
@@ -390,10 +391,10 @@ if ($generate_report) {
 
         .filter-section h3 {
             font-size: 15px;
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 18px;
             padding-bottom: 14px;
-            border-bottom: 2px solid #f0f0f0;
+            border-bottom: 2px solid #E7EEF7;
         }
 
         .filter-controls {
@@ -413,7 +414,7 @@ if ($generate_report) {
         .search-box input {
             flex: 1;
             padding: 11px 15px;
-            border: 2px solid #e0e0e0;
+            border: 2px solid #D2E2F6;
             border-radius: 8px;
             font-size: 14px;
             transition: all .3s;
@@ -421,13 +422,13 @@ if ($generate_report) {
 
         .search-box input:focus {
             outline: none;
-            border-color: #003366;
-            box-shadow: 0 0 8px rgba(0,51,102,.15);
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244,249,22,.35);
         }
 
         .btn {
             padding: 11px 22px;
-            background: #003366;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 8px;
@@ -438,8 +439,8 @@ if ($generate_report) {
             white-space: nowrap;
         }
 
-        .btn:hover      { background: #00254d; }
-        .btn-reset      { background: #e0e0e0; color: #2c3e50; }
+        .btn:hover      { background: #52618D; }
+        .btn-reset      { background: #D2E2F6; color: #202A44; }
         .btn-reset:hover{ background: #c8c8c8; }
 
         /* ── Table section ───────────────────────────── */
@@ -456,39 +457,39 @@ if ($generate_report) {
             align-items: center;
             margin-bottom: 18px;
             padding-bottom: 14px;
-            border-bottom: 2px solid #f0f0f0;
+            border-bottom: 2px solid #E7EEF7;
             flex-wrap: wrap;
             gap: 10px;
         }
 
-        .table-top h2 { font-size: 18px; color: #2c3e50; }
-        .result-count { font-size: 13px; color: #7f8c8d; font-weight: 500; }
+        .table-top h2 { font-size: 18px; color: #202A44; }
+        .result-count { font-size: 13px; color: #52618D; font-weight: 500; }
 
         .table-wrapper { overflow-x: auto; }
 
         table { width: 100%; border-collapse: collapse; }
 
-        thead { background: #f8f9fa; border-bottom: 2px solid #e0e0e0; }
+        thead { background: #F7F9FC; border-bottom: 2px solid #D2E2F6; }
 
         th {
             padding: 12px;
             text-align: left;
             font-weight: 600;
-            color: #555;
+            color: #52618D;
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: .5px;
         }
 
-        td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
-        tbody tr:hover { background: #f8f9fa; }
+        td { padding: 12px; border-bottom: 1px solid #E7EEF7; font-size: 13px; }
+        tbody tr:hover { background: #F7F9FC; }
 
-        .student-cell    { font-weight: 600; color: #2c3e50; }
-        .student-contact { font-size: 11px; color: #7f8c8d; }
+        .student-cell    { font-weight: 600; color: #202A44; }
+        .student-contact { font-size: 11px; color: #52618D; }
 
         .book-cell  { max-width: 180px; }
-        .book-title { font-weight: 600; color: #2c3e50; margin-bottom: 3px; }
-        .book-author{ font-size: 11px; color: #7f8c8d; }
+        .book-title { font-weight: 600; color: #202A44; margin-bottom: 3px; }
+        .book-author{ font-size: 11px; color: #52618D; }
 
         .status-badge {
             display: inline-block;
@@ -499,8 +500,8 @@ if ($generate_report) {
             text-transform: uppercase;
         }
 
-        .status-borrowed { background: #fff3cd; color: #856404; }
-        .status-returned { background: #d4edda; color: #155724; }
+        .status-borrowed { background: #FBFDCB; color: #5C5F05; }
+        .status-returned { background: #EDF5DD; color: #344E15; }
         .status-overdue  { background: #f8d7da; color: #721c24; }
 
         .days-overdue {
@@ -513,7 +514,7 @@ if ($generate_report) {
             font-weight: 700;
         }
 
-        .penalty-amount { font-weight: 700; color: #f39c12; font-size: 13px; }
+        .penalty-amount { font-weight: 700; color: #BB5716; font-size: 13px; }
 
         .empty-state { text-align: center; padding: 60px 20px; }
         .empty-state-text { color: #95a5a6; font-size: 14px; }
@@ -638,7 +639,7 @@ if ($generate_report) {
                                 ?>
                                 <tr>
                                     <td>
-                                        <small style="color:#003366;font-family:monospace;font-weight:700;">
+                                        <small style="color:#141F52;font-family:monospace;font-weight:700;">
                                             #<?php echo str_pad($t['transaction_id'], 4, '0', STR_PAD_LEFT); ?>
                                         </small>
                                     </td>

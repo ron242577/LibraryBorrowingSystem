@@ -130,8 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            background: #003366;
-            color: #2c3e50;
+            background: #141F52;
+            color: #202A44;
             min-height: 100vh;
             padding: 20px;
         }
@@ -167,11 +167,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: white;
             border-radius: 16px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border: 1px solid #91B0E0;
             overflow: hidden;
         }
 
         .card-header {
-            background: #003366;
+            background: #141F52;
             color: white;
             padding: 24px 30px;
             font-size: 18px;
@@ -179,6 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             align-items: center;
             gap: 12px;
+            border-bottom: 4px solid #F4F916;
         }
 
         .card-body {
@@ -208,15 +210,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .alert-error {
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
-            border-left: 4px solid #d35400;
-            color: #8b5a00;
+            background: #FBE8DC;
+            border-left: 4px solid #BB5716;
+            color: #7A3A0E;
         }
 
         .alert-success {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            border-left: 4px solid #28a745;
-            color: #155724;
+            background: #EDF5DD;
+            border-left: 4px solid #567D1F;
+            color: #344E15;
         }
 
         .alert ul {
@@ -240,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .success-content h3 {
-            color: #155724;
+            color: #344E15;
             margin-bottom: 16px;
             font-size: 20px;
         }
@@ -251,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .success-qr {
-            background: #f8f9fa;
+            background: #F7F9FC;
             padding: 20px;
             border-radius: 12px;
             margin: 20px 0;
@@ -259,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .success-qr h4 {
-            color: #2c3e50;
+            color: #202A44;
             margin-bottom: 12px;
             font-size: 14px;
             font-weight: 600;
@@ -271,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max-width: 180px;
             height: auto;
             border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
+            box-shadow: 0 4px 12px rgba(20, 31, 82, 0.2);
             background: white;
             padding: 8px;
         }
@@ -279,7 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .success-qr-code {
             margin-top: 12px;
             font-size: 12px;
-            color: #003366;
+            color: #141F52;
             font-weight: 600;
             font-family: 'Courier New', monospace;
             letter-spacing: 0.5px;
@@ -295,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .success-actions a {
             padding: 12px 24px;
-            background: #003366;
+            background: #141F52;
             color: white;
             text-decoration: none;
             border: none;
@@ -304,12 +306,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 2px 8px rgba(20, 31, 82, 0.3);
         }
 
         .success-actions a:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 51, 102, 0.4);
+            box-shadow: 0 6px 20px rgba(20, 31, 82, 0.4);
         }
 
         /* Form Grid */
@@ -333,14 +335,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: block;
             font-size: 12px;
             font-weight: 700;
-            color: #7f8c8d;
+            color: #52618D;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 10px;
         }
 
         .required {
-            color: #d35400;
+            color: #BB5716;
             margin-left: 4px;
         }
 
@@ -348,27 +350,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-group select,
         .form-group textarea {
             padding: 14px 16px;
-            border: 2px solid #ecf0f1;
+            border: 2px solid #E7EEF7;
             border-radius: 10px;
             font-size: 15px;
             font-family: inherit;
-            color: #2c3e50;
-            background: #f8f9fa;
+            color: #202A44;
+            background: #F7F9FC;
             transition: all 0.3s ease;
         }
 
         .form-group input::placeholder,
         .form-group textarea::placeholder {
-            color: #bdc3c7;
+            color: #91B0E0;
         }
 
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #003366;
+            border-color: #141F52;
             background: white;
-            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
         }
 
         .form-group textarea {
@@ -378,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .helper-text {
             font-size: 12px;
-            color: #7f8c8d;
+            color: #52618D;
             margin-top: 8px;
             line-height: 1.5;
         }
@@ -394,7 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .btn-submit {
             padding: 14px 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 10px;
@@ -402,14 +404,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .btn-submit:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 25px rgba(20, 31, 82, 0.4);
         }
 
         .btn-submit:active {
@@ -418,8 +421,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .btn-back {
             padding: 14px 40px;
-            background: #ecf0f1;
-            color: #2c3e50;
+            background: #E7EEF7;
+            color: #202A44;
             border: none;
             border-radius: 10px;
             font-size: 15px;
@@ -435,7 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .btn-back:hover {
             transform: translateY(-2px);
-            background: #d5dbdb;
+            background: #D2E2F6;
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
         }
 
@@ -444,20 +447,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
             margin-top: 30px;
             padding-top: 24px;
-            border-top: 1px solid #ecf0f1;
-            color: #7f8c8d;
+            border-top: 1px solid #E7EEF7;
+            color: #52618D;
             font-size: 14px;
         }
 
         .form-footer a {
-            color: #667eea;
+            color: #52618D;
             text-decoration: none;
             font-weight: 600;
             transition: color 0.3s ease;
         }
 
         .form-footer a:hover {
-            color: #764ba2;
+            color: #141F52;
         }
 
         /* Responsive */
@@ -536,7 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="success-content">
                             <h3>Registration Successful!</h3>
                             <p>Your student account has been created. You can now access the student portal.</p>
-                            <p><strong>Student ID:</strong> <?php echo htmlspecialchars($student_no); ?></p>
+                            <p><strong>Student ID:</strong> <?php echo str_pad($new_student_no, 4, '0', STR_PAD_LEFT); ?></p>
                             
                             <div class="success-qr">
                                 <h4>Your Student QR Code</h4>
@@ -545,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <div class="success-qr-code"><?php echo htmlspecialchars($generated_qr); ?></div>
                             </div>
 
-                            <p style="color: #7f8c8d; font-size: 13px; margin-top: 16px;">
+                            <p style="color: #52618D; font-size: 13px; margin-top: 16px;">
                                 Save your QR code or remember it. You'll use it to access your library account.
                             </p>
 
@@ -574,7 +577,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <!-- Registration Form -->
                     <form method="POST" novalidate>
                         <!-- Personal Information Section -->
-                        <h3 style="color: #2c3e50; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #ecf0f1; padding-bottom: 12px;">
+                        <h3 style="color: #202A44; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #E7EEF7; padding-bottom: 12px;">
                             Personal Information
                         </h3>
 
@@ -622,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <!-- Contact Information Section -->
-                        <h3 style="color: #2c3e50; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #ecf0f1; padding-bottom: 12px;">
+                        <h3 style="color: #202A44; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #E7EEF7; padding-bottom: 12px;">
                             Contact Information
                         </h3>
 

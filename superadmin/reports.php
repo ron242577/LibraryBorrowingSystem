@@ -59,9 +59,9 @@ try {
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
+            background: #F3F7FC;
             min-height: 100vh;
-            color: #333;
+            color: #202A44;
         }
 
         /* Adjust main content for sidebar */
@@ -88,7 +88,7 @@ try {
         }
 
         .breadcrumb a {
-            color: #667eea;
+            color: #52618D;
             text-decoration: none;
             font-weight: 600;
         }
@@ -112,7 +112,7 @@ try {
         }
 
         .page-header h1 {
-            color: #003366;
+            color: #141F52;
             margin-bottom: 10px;
             font-size: 28px;
             font-weight: 600;
@@ -134,7 +134,7 @@ try {
         }
 
         .filter-section h2 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 20px;
             font-size: 16px;
             font-weight: 600;
@@ -154,7 +154,7 @@ try {
 
         .filter-group label {
             font-weight: 600;
-            color: #333;
+            color: #202A44;
             margin-bottom: 8px;
             font-size: 13px;
         }
@@ -162,7 +162,7 @@ try {
         .filter-group input,
         .filter-group select {
             padding: 10px 12px;
-            border: 1px solid #ddd;
+            border: 1px solid #D2E2F6;
             border-radius: 5px;
             font-size: 14px;
             background: white;
@@ -173,8 +173,8 @@ try {
         .filter-group input:focus,
         .filter-group select:focus {
             outline: none;
-            border-color: #003366;
-            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
         }
 
         .filter-actions {
@@ -198,44 +198,45 @@ try {
         }
 
         .btn-primary {
-            background: #003366;
+            background: #141F52;
             color: white;
         }
 
         .btn-primary:hover {
+            background: #52618D;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3);
+            box-shadow: 0 4px 12px rgba(20, 31, 82, 0.3);
         }
 
         .btn-secondary {
             background: white;
-            color: #003366;
-            border: 1px solid #ddd;
+            color: #141F52;
+            border: 1px solid #D2E2F6;
         }
 
         .btn-secondary:hover {
-            background: #f8f9fa;
-            border-color: #003366;
+            background: #F7F9FC;
+            border-color: #141F52;
         }
 
         .btn-success {
-            background: #28a745;
+            background: #567D1F;
             color: white;
         }
 
         .btn-success:hover {
-            background: #218838;
+            background: #3F5F16;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
         }
 
         .btn-warning {
-            background: #ffc107;
-            color: #333;
+            background: #F4F916;
+            color: #202A44;
         }
 
         .btn-warning:hover {
-            background: #e0a800;
+            background: #C7CB0F;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
         }
@@ -251,7 +252,7 @@ try {
         .report-tabs a {
             padding: 12px 24px;
             background: white;
-            color: #003366;
+            color: #141F52;
             text-decoration: none;
             border-radius: 5px;
             font-weight: 600;
@@ -261,9 +262,9 @@ try {
 
         .report-tabs a:hover,
         .report-tabs a.active {
-            background: #003366;
+            background: #141F52;
             color: white;
-            border-color: #003366;
+            border-color: #F4F916;
         }
 
         /* Metrics Cards */
@@ -279,7 +280,7 @@ try {
             padding: 25px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            border-left: 4px solid #003366;
+            border-left: 4px solid #141F52;
             transition: all 0.3s;
         }
 
@@ -300,15 +301,15 @@ try {
         .metric-card .value {
             font-size: 32px;
             font-weight: bold;
-            color: #003366;
+            color: #141F52;
         }
 
         .metric-card.warning {
-            border-left-color: #ffc107;
+            border-left-color: #F4F916;
         }
 
         .metric-card.warning .value {
-            color: #ffc107;
+            color: #F4F916;
         }
 
         .metric-card.danger {
@@ -320,11 +321,11 @@ try {
         }
 
         .metric-card.success {
-            border-left-color: #28a745;
+            border-left-color: #567D1F;
         }
 
         .metric-card.success .value {
-            color: #28a745;
+            color: #567D1F;
         }
 
         /* Chart Containers */
@@ -344,7 +345,7 @@ try {
         }
 
         .chart-container h3 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 20px;
             font-size: 16px;
             font-weight: 600;
@@ -366,7 +367,7 @@ try {
         }
 
         .table-container h3 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 20px;
             font-size: 16px;
             font-weight: 600;
@@ -378,21 +379,21 @@ try {
         }
 
         table thead {
-            background: #f8f9fa;
+            background: #F7F9FC;
         }
 
         table th {
             padding: 12px 15px;
             text-align: left;
             font-weight: 600;
-            color: #333;
-            border-bottom: 1px solid #e0e0e0;
+            color: #202A44;
+            border-bottom: 1px solid #D2E2F6;
             font-size: 13px;
         }
 
         table td {
             padding: 12px 15px;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #D2E2F6;
             font-size: 14px;
         }
 
@@ -405,7 +406,7 @@ try {
         }
 
         table tbody tr:hover {
-            background: #f8f9fa;
+            background: #F7F9FC;
         }
 
         /* Badges */
@@ -419,13 +420,13 @@ try {
         }
 
         .badge-success {
-            background: #d4edda;
-            color: #155724;
+            background: #EDF5DD;
+            color: #344E15;
         }
 
         .badge-warning {
-            background: #fff3cd;
-            color: #856404;
+            background: #FBFDCB;
+            color: #5C5F05;
         }
 
         .badge-danger {
@@ -448,11 +449,11 @@ try {
         .export-section {
             margin-top: 20px;
             padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
+            border-top: 1px solid #D2E2F6;
         }
 
         .export-section h3 {
-            color: #333;
+            color: #202A44;
             margin-bottom: 15px;
             font-size: 14px;
             font-weight: 600;
@@ -938,12 +939,12 @@ try {
                 datasets: [{
                     label: 'Number of Borrows',
                     data: [<?php echo implode(',', array_map(function($m) { return $m['count']; }, $borrowing_trends['borrowing_by_month'])); ?>],
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(0, 51, 102, 0.1)',
+                    borderColor: '#52618D',
+                    backgroundColor: 'rgba(20, 31, 82, 0.1)',
                     tension: 0.4,
                     fill: true,
                     pointRadius: 5,
-                    pointBackgroundColor: '#667eea'
+                    pointBackgroundColor: '#52618D'
                 }]
             },
             options: {
@@ -958,7 +959,7 @@ try {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: '#e0e0e0' }
+                        grid: { color: '#D2E2F6' }
                     },
                     x: {
                         grid: { display: false }
@@ -980,8 +981,8 @@ try {
                 datasets: [{
                     label: 'Number of Borrows',
                     data: [<?php echo implode(',', array_map(function($d) { return $d['count']; }, $borrowing_trends['borrowing_by_day'])); ?>],
-                    backgroundColor: 'rgba(0, 51, 102, 0.7)',
-                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(20, 31, 82, 0.7)',
+                    borderColor: '#52618D',
                     borderWidth: 2
                 }]
             },
@@ -994,7 +995,7 @@ try {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: '#e0e0e0' }
+                        grid: { color: '#D2E2F6' }
                     },
                     x: {
                         grid: { display: false }
@@ -1016,8 +1017,8 @@ try {
                 datasets: [{
                     data: [<?php echo implode(',', array_map(function($i) { return $i['total_copies'] ?? 0; }, $inventory_status)); ?>],
                     backgroundColor: [
-                        '#28a745',
-                        '#ffc107',
+                        '#567D1F',
+                        '#F4F916',
                         '#dc3545',
                         '#6c757d'
                     ],

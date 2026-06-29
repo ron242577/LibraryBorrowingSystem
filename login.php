@@ -102,6 +102,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Library Borrowing System</title>
     <style>
+        :root {
+            --cmrhs-navy: #141F52;
+            --cmrhs-blue: #52618D;
+            --cmrhs-sky: #91B0E0;
+            --cmrhs-light-blue: #D2E2F6;
+            --cmrhs-yellow: #F4F916;
+            --cmrhs-green: #B5D27A;
+            --cmrhs-orange: #BB5716;
+            --cmrhs-white: #FEFEF9;
+            --cmrhs-text: #202A44;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -110,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #003366;
+            background: var(--cmrhs-light-blue);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -119,10 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         .login-container {
-            background: white;
+            background: var(--cmrhs-white);
             padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--cmrhs-sky);
+            border-top: 6px solid var(--cmrhs-navy);
+            border-radius: 8px;
+            box-shadow: 0 12px 30px rgba(20, 31, 82, 0.18);
             width: 100%;
             max-width: 400px;
         }
@@ -133,13 +147,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         .login-header h1 {
-            color: #333;
+            color: var(--cmrhs-navy);
             margin-bottom: 10px;
             font-size: 28px;
         }
         
         .login-header p {
-            color: #666;
+            color: var(--cmrhs-blue);
             font-size: 14px;
         }
         
@@ -151,15 +165,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         .alert-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background-color: #FBE8DC;
+            color: #7A3107;
+            border: 1px solid var(--cmrhs-orange);
         }
         
         .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: #EDF5DD;
+            color: #344E15;
+            border: 1px solid var(--cmrhs-green);
         }
         
         .form-group {
@@ -169,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         label {
             display: block;
             margin-bottom: 8px;
-            color: #333;
+            color: var(--cmrhs-text);
             font-weight: 500;
             font-size: 14px;
         }
@@ -178,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         input[type="password"] {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--cmrhs-sky);
             border-radius: 5px;
             font-size: 14px;
             transition: border-color 0.3s;
@@ -187,26 +201,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         input[type="text"]:focus,
         input[type="password"]:focus {
             outline: none;
-            border-color: #8B0000;
-            box-shadow: 0 0 5px rgba(139, 0, 0, 0.1);
+            border-color: var(--cmrhs-navy);
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
         }
         
         button {
             width: 100%;
             padding: 12px;
-            background: #8B0000;
-            color: white;
+            background: var(--cmrhs-navy);
+            color: var(--cmrhs-white);
             border: none;
             border-radius: 5px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
         }
         
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(139, 0, 0, 0.4);
+            background: var(--cmrhs-blue);
+            box-shadow: 0 5px 15px rgba(20, 31, 82, 0.3);
         }
         
         button:active {
@@ -245,15 +260,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         .logo-container img {
-            height: 80px;
+            height: 96px;
             width: auto;
+        }
+
+        .student-login-link {
+            color: var(--cmrhs-navy);
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .student-login-link:hover,
+        .student-login-link:focus {
+            color: var(--cmrhs-blue);
+            text-decoration: underline;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 24px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="logo-container">
-            <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo">
+            <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M. Recto High School Logo">
         </div>
         <div class="login-header">
             <h1>Library Borrowing System</h1>
@@ -292,7 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 >
             </div>
             <div class="form-group">
-                <a href="student/portal.php" for="password" style="font-size: 13px; color: #8B0000; text-decoration: none;">Login as Student</a>
+                <a href="student/portal.php" class="student-login-link">Login as Student</a>
             </div>
             <button type="submit">Login</button>
         </form>

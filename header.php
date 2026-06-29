@@ -1,10 +1,20 @@
 <?php
 /**
- * Shared Header - Arellano University Book Borrowing
+ * Shared Header - Claro M. Recto High School Book Borrowing
  * Include immediately after navbar.php in pages that use the sidebar.
  */
 ?>
 <style>
+    :root {
+        --cmrhs-navy: #141F52;
+        --cmrhs-blue: #52618D;
+        --cmrhs-sky: #91B0E0;
+        --cmrhs-light-blue: #D2E2F6;
+        --cmrhs-yellow: #F4F916;
+        --cmrhs-green: #B5D27A;
+        --cmrhs-white: #FEFEF9;
+    }
+
     .au-system-header {
         position: sticky;
         top: 0;
@@ -12,8 +22,8 @@
         width: 100%;
         min-height: 64px;
         margin: 0 0 24px 0;
-        background: #8B0000;
-        color: #ffffff;
+        background: var(--cmrhs-navy);
+        color: var(--cmrhs-white);
         display: flex;
         align-items: center;
         justify-content: flex-start;
@@ -21,8 +31,8 @@
         padding: 10px 18px;
         box-sizing: border-box;
         border-radius: 0;
-        border-bottom: none;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        border-bottom: 4px solid var(--cmrhs-yellow);
+        box-shadow: 0 3px 10px rgba(20, 31, 82, 0.22);
         transition: none !important;
         animation: none !important;
         transform: none !important;
@@ -32,7 +42,8 @@
         width: 38px;
         height: 38px;
         object-fit: contain;
-        background: #ffffff;
+        background: var(--cmrhs-white);
+        border: 2px solid var(--cmrhs-sky);
         border-radius: 50%;
         padding: 3px;
         box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
@@ -75,6 +86,6 @@
 </style>
 
 <header class="au-system-header">
-    <img src="/LibraryBorrowingSystem/Img/Arellano_University_logo.png" alt="Arellano University Logo">
-    <h1 class="au-system-header-title">Arellano University Book Borrowing</h1>
+    <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M Recto Logo">
+    <h1 class="au-system-header-title">Claro M. Recto Book Borrowing</h1>
 </header>

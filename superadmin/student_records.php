@@ -516,8 +516,8 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
-            color: #333;
+            background: #F3F7FC;
+            color: #202A44;
             padding-bottom: 50px;
             margin-left: 260px;
         }
@@ -534,7 +534,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             flex-wrap: wrap;
             gap: 15px;
         }
-        .page-header h1 { font-size: 28px; color: #333; }
+        .page-header h1 { font-size: 28px; color: #202A44; }
 
         /* ── Alert ── */
         .alert {
@@ -546,7 +546,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             gap: 10px;
             font-size: 14px;
         }
-        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-success { background: #EDF5DD; color: #344E15; border: 1px solid #B5D27A; }
         .alert-error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
         /* ── Stats grid ── */
@@ -561,10 +561,10 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             padding: 18px 20px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border-left: 4px solid #8B0000;
+            border-left: 4px solid #141F52;
         }
         .stat-card h4 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-        .stat-card .value { font-size: 26px; font-weight: 700; color: #333; }
+        .stat-card .value { font-size: 26px; font-weight: 700; color: #202A44; }
 
         /* ── Filter section ── */
         .filter-section {
@@ -574,7 +574,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.07);
         }
-        .filter-section h3 { font-size: 15px; color: #333; margin-bottom: 14px; }
+        .filter-section h3 { font-size: 15px; color: #202A44; margin-bottom: 14px; }
         .filter-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -582,19 +582,19 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             align-items: end;
         }
         .filter-group { display: flex; flex-direction: column; }
-        .filter-group label { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #555; }
+        .filter-group label { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #52618D; }
         .filter-group input,
         .filter-group select {
             padding: 9px 10px;
-            border: 1px solid #ddd;
+            border: 1px solid #D2E2F6;
             border-radius: 4px;
             font-size: 13px;
         }
         .filter-group input:focus,
         .filter-group select:focus {
             outline: none;
-            border-color: #8B0000;
-            box-shadow: 0 0 3px rgba(139,0,0,0.2);
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244,249,22,.35);
         }
         .filter-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
         .filter-action-left { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -611,10 +611,10 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         }
         .add-student-section h3 {
             font-size: 15px;
-            color: #333;
+            color: #202A44;
             margin-bottom: 14px;
             padding-bottom: 10px;
-            border-bottom: 2px solid #8B0000;
+            border-bottom: 2px solid #141F52;
         }
         .add-student-toggle {
             display: flex;
@@ -626,7 +626,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         .add-student-toggle h3 { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
         .toggle-icon {
             font-size: 18px;
-            color: #8B0000;
+            color: #141F52;
             transition: transform 0.2s;
         }
         .toggle-icon.open { transform: rotate(45deg); }
@@ -638,35 +638,35 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         }
         @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
         .form-group { display: flex; flex-direction: column; }
-        .form-group label { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #555; }
+        .form-group label { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #52618D; }
         .form-group input {
             padding: 9px 10px;
-            border: 1px solid #ddd;
+            border: 1px solid #D2E2F6;
             border-radius: 4px;
             font-size: 13px;
         }
         .form-group input:focus {
             outline: none;
-            border-color: #8B0000;
-            box-shadow: 0 0 3px rgba(139,0,0,0.2);
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244,249,22,.35);
         }
         .qr-info {
-            background: #f8f0f0;
+            background: #EDF3FA;
             padding: 12px 15px;
             border-radius: 5px;
             margin-top: 14px;
-            border-left: 4px solid #8B0000;
+            border-left: 4px solid #141F52;
             font-size: 12px;
-            color: #555;
+            color: #52618D;
         }
         .form-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
         .add-modal-body { padding: 22px 24px 24px; }
         .modal-form-box { max-width: 760px; }
         .modal-mode-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-        .modal-mode-header h3 { font-size: 16px; color: #333; }
+        .modal-mode-header h3 { font-size: 16px; color: #202A44; }
         .modal-panel { display: block; }
         .modal-panel.hidden { display: none; }
-        .bulk-note { background: #f8f0f0; border-left: 4px solid #8B0000; padding: 12px 15px; border-radius: 5px; margin: 14px 0; font-size: 12px; color: #555; line-height: 1.5; }
+        .bulk-note { background: #EDF3FA; border-left: 4px solid #141F52; padding: 12px 15px; border-radius: 5px; margin: 14px 0; font-size: 12px; color: #52618D; line-height: 1.5; }
 
 
         /* ── Buttons ── */
@@ -683,15 +683,15 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             gap: 5px;
             transition: all 0.2s;
         }
-        .btn-primary   { background: #8B0000; color: white; }
-        .btn-primary:hover { background: #6b0000; }
-        .btn-secondary { background: #e0e0e0; color: #333; }
+        .btn-primary   { background: #141F52; color: white; }
+        .btn-primary:hover { background: #52618D; }
+        .btn-secondary { background: #D2E2F6; color: #202A44; }
         .btn-secondary:hover { background: #ccc; }
         .btn-reset     { background: #6c757d; color: white; }
         .btn-reset:hover { background: #5a6268; }
         .btn-view {
             padding: 6px 14px;
-            background: #8B0000;
+            background: #141F52;
             color: white;
             border: none;
             border-radius: 5px;
@@ -701,7 +701,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             transition: background 0.2s;
             white-space: nowrap;
         }
-        .btn-view:hover { background: #6b0000; }
+        .btn-view:hover { background: #52618D; }
 
         /* ── Table ── */
         .table-section {
@@ -720,21 +720,21 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             flex-wrap: wrap;
             gap: 10px;
         }
-        .table-header h3 { font-size: 16px; color: #333; }
+        .table-header h3 { font-size: 16px; color: #202A44; }
         .table-header span { font-size: 13px; color: #888; }
 
         .table-responsive { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         thead th {
-            background: #8B0000;
+            background: #141F52;
             color: white;
             padding: 12px 14px;
             text-align: left;
             font-weight: 600;
             white-space: nowrap;
         }
-        tbody td { padding: 11px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-        tbody tr:hover { background: #fafafa; }
+        tbody td { padding: 11px 14px; border-bottom: 1px solid #E7EEF7; vertical-align: middle; }
+        tbody tr:hover { background: #F7F9FC; }
 
         /* ── Badges ── */
         .badge {
@@ -745,7 +745,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             text-transform: uppercase;
             display: inline-block;
         }
-        .badge-active   { background: #d4edda; color: #155724; }
+        .badge-active   { background: #EDF5DD; color: #344E15; }
         .badge-inactive { background: #f8d7da; color: #721c24; }
 
         /* ── Pagination ── */
@@ -759,14 +759,14 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         .pagination a,
         .pagination span {
             padding: 7px 13px;
-            border: 1px solid #ddd;
+            border: 1px solid #D2E2F6;
             border-radius: 4px;
             text-decoration: none;
             font-size: 13px;
-            color: #8B0000;
+            color: #141F52;
         }
-        .pagination a:hover { background: #8B0000; color: white; border-color: #8B0000; }
-        .pagination .active { background: #8B0000; color: white; border-color: #8B0000; }
+        .pagination a:hover { background: #141F52; color: white; border-color: #141F52; }
+        .pagination .active { background: #141F52; color: white; border-color: #F4F916; }
 
         .no-data { text-align: center; padding: 40px; color: #aaa; }
 
@@ -806,13 +806,13 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             justify-content: space-between;
             align-items: center;
             padding: 18px 24px;
-            border-bottom: 2px solid #8B0000;
+            border-bottom: 2px solid #141F52;
             position: sticky;
             top: 0;
             background: white;
             z-index: 10;
         }
-        .modal-top-bar h2 { font-size: 20px; color: #333; }
+        .modal-top-bar h2 { font-size: 20px; color: #202A44; }
         .modal-close {
             background: none;
             border: none;
@@ -822,7 +822,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             line-height: 1;
             transition: color 0.2s;
         }
-        .modal-close:hover { color: #8B0000; }
+        .modal-close:hover { color: #141F52; }
 
         /* Loading spinner */
         .modal-loading {
@@ -837,7 +837,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         .spinner {
             width: 40px; height: 40px;
             border: 4px solid #eee;
-            border-top-color: #8B0000;
+            border-top-color: #141F52;
             border-radius: 50%;
             animation: spin 0.75s linear infinite;
         }
@@ -856,11 +856,11 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         }
         .stu-info-item {
             padding: 14px 24px;
-            border-right: 1px solid #f0f0f0;
-            border-bottom: 1px solid #f0f0f0;
+            border-right: 1px solid #E7EEF7;
+            border-bottom: 1px solid #E7EEF7;
         }
         .stu-info-label { font-size: 11px; text-transform: uppercase; color: #999; letter-spacing: .5px; margin-bottom: 4px; }
-        .stu-info-value { font-size: 15px; font-weight: 600; color: #333; }
+        .stu-info-value { font-size: 15px; font-weight: 600; color: #202A44; }
 
         /* QR section */
         .stu-qr {
@@ -871,13 +871,13 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             gap: 20px;
             flex-wrap: wrap;
         }
-        .stu-qr img { border: 1px solid #ddd; border-radius: 6px; padding: 6px; width: 110px; height: 110px; }
+        .stu-qr img { border: 1px solid #D2E2F6; border-radius: 6px; padding: 6px; width: 110px; height: 110px; }
         .stu-qr-info h4 { font-size: 13px; text-transform: uppercase; color: #999; letter-spacing: .5px; margin-bottom: 6px; }
-        .stu-qr-code { font-family: monospace; font-size: 13px; color: #555; }
+        .stu-qr-code { font-family: monospace; font-size: 13px; color: #52618D; }
 
         /* Transactions table inside modal */
         .stu-tx { padding: 20px 24px; }
-        .stu-tx h3 { font-size: 16px; color: #333; margin-bottom: 14px; border-bottom: 2px solid #8B0000; padding-bottom: 8px; }
+        .stu-tx h3 { font-size: 16px; color: #202A44; margin-bottom: 14px; border-bottom: 2px solid #141F52; padding-bottom: 8px; }
         .stu-tx-table { overflow-x: auto; }
         .stu-tx-table table { font-size: 12px; }
         .stu-tx-table thead th { padding: 10px 12px; }
@@ -891,8 +891,8 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             text-transform: uppercase;
             display: inline-block;
         }
-        .status-borrowed { background: #fff3cd; color: #856404; }
-        .status-returned { background: #d4edda; color: #155724; }
+        .status-borrowed { background: #FBFDCB; color: #5C5F05; }
+        .status-returned { background: #EDF5DD; color: #344E15; }
         .status-overdue  { background: #f8d7da; color: #721c24; }
 
         .empty-tx { text-align: center; padding: 30px; color: #bbb; font-size: 14px; }
@@ -916,12 +916,12 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             text-align: center;
             min-width: 260px;
         }
-        .qr-modal-content h3 { font-size: 18px; color: #333; margin-bottom: 4px; }
+        .qr-modal-content h3 { font-size: 18px; color: #202A44; margin-bottom: 4px; }
         .qr-modal-img { width: 200px; height: 200px; margin: 16px auto; display: block; border: 1px solid #eee; border-radius: 6px; }
         .qr-modal-close-btn {
             margin-top: 12px;
             padding: 10px 28px;
-            background: #555;
+            background: #52618D;
             color: white;
             border: none;
             border-radius: 6px;
@@ -929,7 +929,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             font-size: 14px;
             font-weight: 600;
         }
-        .qr-modal-close-btn:hover { background: #333; }
+        .qr-modal-close-btn:hover { background: #202A44; }
 
         @media (max-width: 768px) {
             .stu-info-grid { grid-template-columns: 1fr; }
@@ -1139,7 +1139,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                                     <td><?php echo !empty($student['card_valid_until']) ? date('M d, Y', strtotime($student['card_valid_until'])) : 'N/A'; ?></td>
                                     <td><?php echo htmlspecialchars($student['email'] ?: 'N/A'); ?></td>
                                     <td>
-                                        <code style="background:#f0f0f0;padding:3px 7px;border-radius:3px;">
+                                        <code style="background:#E7EEF7;padding:3px 7px;border-radius:3px;">
                                             <?php echo htmlspecialchars($student['qr_code']); ?>
                                         </code>
                                     </td>
@@ -1150,7 +1150,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                                     </td>
                                     <td><?php echo $student['total_borrows'] ?? 0; ?></td>
                                     <td>
-                                        <strong style="color:<?php echo ($student['currently_borrowed'] ?? 0) > 0 ? '#c0392b' : '#27ae60'; ?>">
+                                        <strong style="color:<?php echo ($student['currently_borrowed'] ?? 0) > 0 ? '#c0392b' : '#567D1F'; ?>">
                                             <?php echo $student['currently_borrowed'] ?? 0; ?>
                                         </strong>
                                     </td>
@@ -1211,7 +1211,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                         <div class="form-group" style="grid-column:1/-1;">
                             <label for="students_file">Upload CSV or XLSX File</label>
                             <input type="file" id="students_file" name="students_file" accept=".csv,.xlsx" required
-                                   style="padding:8px;border:2px dashed #ddd;border-radius:6px;background:#fafafa;cursor:pointer;">
+                                   style="padding:8px;border:2px dashed #D2E2F6;border-radius:6px;background:#F7F9FC;cursor:pointer;">
                         </div>
                     </div>
                     <div class="bulk-note" style="margin-top:14px;">
@@ -1368,8 +1368,8 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         };
 
         const txBadge = (status) => {
-            const map = { borrowed: '#fff3cd|#856404', returned: '#d4edda|#155724', overdue: '#f8d7da|#721c24' };
-            const [bg, color] = (map[status] || '#eee|#555').split('|');
+            const map = { borrowed: '#FBFDCB|#5C5F05', returned: '#EDF5DD|#344E15', overdue: '#f8d7da|#721c24' };
+            const [bg, color] = (map[status] || '#eee|#52618D').split('|');
             return `<span class="status-badge" style="background:${bg};color:${color};">${status.charAt(0).toUpperCase()+status.slice(1)}</span>`;
         };
 
@@ -1450,7 +1450,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 </div>
                 <div class="stu-info-item">
                     <div class="stu-info-label">Status</div>
-                    <div class="stu-info-value" style="color:${s.status==='active'?'#27ae60':'#c0392b'};">
+                    <div class="stu-info-value" style="color:${s.status==='active'?'#567D1F':'#c0392b'};">
                         ${s.status === 'active' ? '✓ Active' : '✕ Inactive'}
                     </div>
                 </div>
