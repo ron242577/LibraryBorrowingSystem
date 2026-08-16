@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/includes/security.php';
+require_once __DIR__ . '/includes/audit_logger.php';
+startSecureSession();
+
 /**
  * Database Connection File - MySQLi with Error Handling
  * Library QR Borrowing System
@@ -12,7 +16,7 @@ define('DB_NAME', 'library_borrowing_system');
 define('DB_PORT', 3306);
 
 // Error handling configuration
-define('SHOW_ERRORS', true); // Set to false in production
+define('SHOW_ERRORS', false); // Keep database details hidden from users
 define('LOG_ERRORS', true);
 define('ERROR_LOG_FILE', __DIR__ . '/logs/error.log');
 
@@ -35,6 +39,24 @@ try {
     if (!$conn->set_charset('utf8mb4')) {
         throw new Exception('Error loading character set utf8mb4: ' . $conn->error);
     }
+
+    // Security table used for login throttling. This does not change any password.
+    $conn->query("CREATE TABLE IF NOT EXISTS login_security (
+        login_security_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        context VARCHAR(30) NOT NULL,
+        identifier_hash CHAR(64) NOT NULL,
+        ip_address VARCHAR(45) NOT NULL,
+        failed_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+        first_failed_at DATETIME NOT NULL,
+        last_failed_at DATETIME NOT NULL,
+        locked_until DATETIME NULL,
+        PRIMARY KEY (login_security_id),
+        UNIQUE KEY uq_login_security (context, identifier_hash, ip_address),
+        KEY idx_login_locked_until (locked_until)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    
+    // Register one sanitized database audit entry for every application request/process.
+    registerAuditRequestLogger($conn);
     
 } catch (Exception $e) {
     // Log error

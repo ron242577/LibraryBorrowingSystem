@@ -1,31 +1,26 @@
 <?php
 /**
- * Logout Page - Library Borrowing System
- * Destroys user session and redirects to login page
+ * Secure admin logout.
  */
+require_once __DIR__ . '/db.php';
+startSecureSession();
 
-session_start();
-
-// Destroy all session data
-$_SESSION = [];
-
-// If there's a session cookie, delete it
-if (ini_get('session.use_cookies') === '1') {
-    $params = session_get_cookie_params();
-    setcookie(
-        session_name(),
-        '',
-        time() - 42000,
-        $params['path'],
-        $params['domain'],
-        $params['secure'],
-        $params['httponly']
-    );
+if (!empty($_SESSION['user_id'])) {
+    auditLogEvent($conn, 'admin_logout', 'logout', 'Admin logged out of the system.', 'success');
 }
 
-// Destroy the session
+$_SESSION = [];
+if (ini_get('session.use_cookies')) {
+    $params = session_get_cookie_params();
+    setcookie(session_name(), '', [
+        'expires' => time() - 42000,
+        'path' => $params['path'] ?: '/',
+        'domain' => $params['domain'] ?: '',
+        'secure' => (bool)$params['secure'],
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
 session_destroy();
-
-// Redirect to login page with logout message
 header('Location: /LibraryBorrowingSystem/login.php?logout=1');
 exit();

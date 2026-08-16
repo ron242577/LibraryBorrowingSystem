@@ -1,18 +1,18 @@
 <?php
 /**
- * Shared Header - Claro M. Recto High School Book Borrowing
+ * Shared Header - Jose Abad Santos High School Book Borrowing
  * Include immediately after navbar.php in pages that use the sidebar.
  */
 ?>
 <style>
     :root {
-        --cmrhs-navy: #141F52;
-        --cmrhs-blue: #52618D;
-        --cmrhs-sky: #91B0E0;
-        --cmrhs-light-blue: #D2E2F6;
-        --cmrhs-yellow: #F4F916;
-        --cmrhs-green: #B5D27A;
-        --cmrhs-white: #FEFEF9;
+        --jashs-navy: #141F52;
+        --jashs-blue: #52618D;
+        --jashs-sky: #91B0E0;
+        --jashs-light-blue: #D2E2F6;
+        --jashs-yellow: #F4F916;
+        --jashs-green: #B5D27A;
+        --jashs-white: #FEFEF9;
     }
 
     .au-system-header {
@@ -22,8 +22,8 @@
         width: 100%;
         min-height: 64px;
         margin: 0 0 24px 0;
-        background: var(--cmrhs-navy);
-        color: var(--cmrhs-white);
+        background: var(--jashs-navy);
+        color: var(--jashs-white);
         display: flex;
         align-items: center;
         justify-content: flex-start;
@@ -31,7 +31,7 @@
         padding: 10px 18px;
         box-sizing: border-box;
         border-radius: 0;
-        border-bottom: 4px solid var(--cmrhs-yellow);
+        border-bottom: 4px solid var(--jashs-yellow);
         box-shadow: 0 3px 10px rgba(20, 31, 82, 0.22);
         transition: none !important;
         animation: none !important;
@@ -42,8 +42,8 @@
         width: 38px;
         height: 38px;
         object-fit: contain;
-        background: var(--cmrhs-white);
-        border: 2px solid var(--cmrhs-sky);
+        background: var(--jashs-white);
+        border: 2px solid var(--jashs-sky);
         border-radius: 50%;
         padding: 3px;
         box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
@@ -85,7 +85,11 @@
     }
 </style>
 
+<?php require_once __DIR__ . '/includes/responsive.php'; ?>
+
 <header class="au-system-header">
-    <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M Recto Logo">
-    <h1 class="au-system-header-title">Claro M. Recto Book Borrowing</h1>
+    <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
+    <h1 class="au-system-header-title">Jose Abad Santos High School Book Borrowing</h1>
 </header>
+
+<?php require_once __DIR__ . '/includes/ui_feedback.php'; ?>

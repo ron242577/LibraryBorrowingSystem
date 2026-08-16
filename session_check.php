@@ -1,88 +1,50 @@
 <?php
 /**
- * Session Check Helper - Library Borrowing System
- * Include this file at the top of protected pages to verify user authentication
- * 
- * Usage: require_once __DIR__ . '/../session_check.php';
+ * Protected admin session helper - Jose Abad Santos High School Library Borrowing System.
  */
+require_once __DIR__ . '/db.php';
+startSecureSession();
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    // Redirect to login page if not authenticated
     header('Location: /LibraryBorrowingSystem/login.php');
     exit();
 }
 
-// Optional: Check if session has expired (30 minutes timeout)
-$timeout_duration = 30 * 60; // 30 minutes in seconds
-$current_time = time();
+$now = time();
+$idleTimeout = 30 * 60;      // 30 minutes of inactivity
+$absoluteTimeout = 8 * 60 * 60; // 8 hours maximum session lifetime
 
-if (isset($_SESSION['login_time']) && ($current_time - $_SESSION['login_time']) > $timeout_duration) {
-    // Session expired
+$fingerprint = createSessionFingerprint();
+if (!empty($_SESSION['session_fingerprint']) && !hash_equals($_SESSION['session_fingerprint'], $fingerprint)) {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
     session_destroy();
     header('Location: /LibraryBorrowingSystem/login.php?expired=1');
     exit();
 }
 
-// Update session activity time
-$_SESSION['login_time'] = $current_time;
+$idleExpired = isset($_SESSION['login_time']) && ($now - (int)$_SESSION['login_time']) > $idleTimeout;
+$absoluteExpired = isset($_SESSION['login_started_at']) && ($now - (int)$_SESSION['login_started_at']) > $absoluteTimeout;
+if ($idleExpired || $absoluteExpired) {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    session_destroy();
+    header('Location: /LibraryBorrowingSystem/login.php?expired=1');
+    exit();
+}
 
-/**
- * Check if user has a specific role
- * 
- * @param string $role The role to check ('super_admin' or 'librarian')
- * @return bool True if user has the role, false otherwise
- */
+$_SESSION['login_time'] = $now;
+
 function hasRole($role) {
     return isset($_SESSION['role']) && $_SESSION['role'] === $role;
 }
-
-/**
- * Check if user is super admin
- * 
- * @return bool True if user is super admin, false otherwise
- */
-function isSuperAdmin() {
-    return hasRole('super_admin');
-}
-
-/**
- * Check if user is librarian
- * 
- * @return bool True if user is librarian, false otherwise
- */
-function isLibrarian() {
-    return hasRole('librarian');
-}
-
-/**
- * Get current user's full name
- * 
- * @return string User's full name
- */
-function getUserFullName() {
-    return isset($_SESSION['full_name']) ? $_SESSION['full_name'] : 'User';
-}
-
-/**
- * Get current user's username
- * 
- * @return string User's username
- */
-function getUsername() {
-    return isset($_SESSION['username']) ? $_SESSION['username'] : '';
-}
-
-/**
- * Get current user's role
- * 
- * @return string User's role
- */
-function getUserRole() {
-    return isset($_SESSION['role']) ? $_SESSION['role'] : '';
-}
+function isAdmin() { return hasRole('admin'); }
+function getUserFullName() { return $_SESSION['full_name'] ?? 'User'; }
+function getUsername() { return $_SESSION['username'] ?? ''; }
+function getUserRole() { return $_SESSION['role'] ?? ''; }

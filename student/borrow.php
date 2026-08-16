@@ -1,10 +1,10 @@
 <?php
 /**
- * Student QR Book Borrowing Page - Redesigned
- * Allows students to borrow books with an improved UI based on librarian search.php
- * Features: Student info display, book search, dynamic filtering, QR code display
+ * Student Book Borrowing Page - Jose Abad Santos High School
+ * Requires a verified student portal session.
  */
 
+require_once __DIR__ . '/../includes/student_session.php';
 require_once __DIR__ . '/../db.php';
 
 $student = null;
@@ -13,54 +13,33 @@ $books = [];
 $modal_data = null;
 $modal_type = '';
 $borrowed_books = [];
+$student_id = (int)$_SESSION['student_id'];
+$student_qr = $_SESSION['student_qr'] ?? '';
 
-// Get student from QR parameter
-$student_qr = isset($_GET['qr']) ? trim($_GET['qr']) : null;
+try {
+    $student_stmt = $conn->prepare("\n        SELECT student_id, student_no, full_name, contact_number, qr_code, status, created_at\n        FROM students\n        WHERE student_id = ? AND status = 'active'\n        LIMIT 1\n    ");
+    $student_stmt->bind_param('i', $student_id);
+    $student_stmt->execute();
+    $student = $student_stmt->get_result()->fetch_assoc();
+    $student_stmt->close();
 
-if ($student_qr) {
-    try {
-        $student_stmt = $conn->prepare("
-            SELECT 
-                student_id,
-                full_name,
-                contact_number,
-                qr_code,
-                status,
-                created_at
-            FROM students
-            WHERE qr_code = ? AND status = 'active'
-        ");
-        $student_stmt->bind_param('s', $student_qr);
-        $student_stmt->execute();
-        $student_result = $student_stmt->get_result();
-        
-        if ($student_result->num_rows > 0) {
-            $student = $student_result->fetch_assoc();
-            $student_id = $student['student_id'];
-            
-            // Get student's currently borrowed books
-            $borrowed_stmt = $conn->prepare("
-                SELECT book_id FROM transactions 
-                WHERE student_id = ? AND status = 'borrowed'
-            ");
-            $borrowed_stmt->bind_param('i', $student_id);
-            $borrowed_stmt->execute();
-            $borrowed_result = $borrowed_stmt->get_result();
-            
-            while ($row = $borrowed_result->fetch_assoc()) {
-                $borrowed_books[] = $row['book_id'];
-            }
-            $borrowed_stmt->close();
-        } else {
-            $student_error = 'Student not found or inactive. Please try scanning your QR code again.';
-        }
-        $student_stmt->close();
-    } catch (Exception $e) {
-        $student_error = 'An error occurred while fetching student information.';
-        logError('Student fetch error: ' . $e->getMessage());
+    if (!$student) {
+        unset($_SESSION['student_id'], $_SESSION['student_no'], $_SESSION['student_name'], $_SESSION['student_qr']);
+        header('Location: /LibraryBorrowingSystem/student/portal.php');
+        exit();
     }
-} else {
-    $student_error = 'No student QR code provided. Please scan your student ID to begin.';
+
+    $borrowed_stmt = $conn->prepare("SELECT book_id FROM transactions WHERE student_id = ? AND status = 'borrowed'");
+    $borrowed_stmt->bind_param('i', $student_id);
+    $borrowed_stmt->execute();
+    $borrowed_result = $borrowed_stmt->get_result();
+    while ($row = $borrowed_result->fetch_assoc()) {
+        $borrowed_books[] = (int)$row['book_id'];
+    }
+    $borrowed_stmt->close();
+} catch (Exception $e) {
+    $student_error = 'Unable to load your student account right now.';
+    logError('Student borrow page error: ' . $e->getMessage());
 }
 
 // Fetch all available books with QR codes, removing duplicates
@@ -71,6 +50,12 @@ if ($student) {
                 book_id,
                 title,
                 author,
+                book_number,
+                book_pages,
+                publisher,
+                edition,
+                volumes,
+                class,
                 qr_code,
                 book_status,
                 total_copies,
@@ -109,9 +94,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                     book_id,
                     title,
                     author,
+                    book_number,
+                    book_pages,
+                    publisher,
+                    edition,
+                    volumes,
+                    class,
                     qr_code,
                     book_status,
-                    available_copies
+                    total_copies,
+                    available_copies,
+                    borrowed_copies
                 FROM books
                 WHERE (title LIKE ? OR author LIKE ?) 
                 AND book_status IN ('available', 'out_of_stock')
@@ -141,9 +134,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                         'book_id' => $book['book_id'],
                         'title' => $book['title'],
                         'author' => $book['author'],
+                        'book_number' => $book['book_number'],
+                        'book_pages' => $book['book_pages'],
+                        'publisher' => $book['publisher'],
+                        'edition' => $book['edition'],
+                        'volumes' => $book['volumes'],
+                        'class' => $book['class'],
                         'qr_code' => $book['qr_code'],
                         'book_status' => $book['book_status'],
-                        'available_copies' => $book['available_copies']
+                        'total_copies' => $book['total_copies'],
+                        'available_copies' => $book['available_copies'],
+                        'borrowed_copies' => $book['borrowed_copies']
                     ];
                     $seen[$book['book_id']] = true;
                 }
@@ -171,6 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                     book_id,
                     title,
                     author,
+                    book_number,
+                    book_pages,
+                    publisher,
+                    edition,
+                    volumes,
+                    class,
                     qr_code,
                     book_status,
                     available_copies,
@@ -198,7 +205,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
 
 // Handle transaction creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $action = $_POST['action'];
+    try { requireValidCsrf($_POST['csrf_token'] ?? ''); } catch (Throwable $e) { $modal_type = 'error'; $modal_data = ['title' => 'Security Check Failed', 'message' => $e->getMessage(), 'icon' => 'error']; }
+    $action = $modal_type === 'error' ? '' : $_POST['action'];
     
     if ($action === 'process_borrow' && $student) {
         $book_id = isset($_POST['book_id']) ? intval($_POST['book_id']) : 0;
@@ -243,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     } else {
                         // Calculate dates
                         $date_borrowed = date('Y-m-d H:i:s');
-                        $due_date = date('Y-m-d H:i:s', strtotime('+7 days'));
+                        $due_date = date('Y-m-d') . ' 23:59:59';
                         $status = 'borrowed';
                         $book_status = 'available';
                         $student_id = $student['student_id'];
@@ -531,6 +539,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             margin-top: 10px;
             font-weight: 600;
         }
+
+        .qr-download-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 9px 16px;
+            background: #141F52;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .qr-download-btn:hover { background: #52618D; }
         
         .error-box {
             background: #ffebee;
@@ -1091,13 +1113,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
     </style>
+    <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
-<body>
+<body class="student-app student-borrow-page">
+    <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
     <!-- Header -->
     <header class="page-header">
-        <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="header-brand">
-            <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M. Recto High School Logo">
-            <span class="header-brand-text">Claro M. Recto Book Borrowing</span>
+        <a href="/LibraryBorrowingSystem/student/borrow.php" class="header-brand">
+            <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
+            <span class="header-brand-text">Jose Abad Santos High School Book Borrowing</span>
         </a>
         <div class="student-menu">
             <button type="button" class="student-menu-toggle" id="studentMenuToggle" aria-haspopup="true" aria-expanded="false">
@@ -1106,12 +1130,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             </button>
             <div class="student-dropdown" id="studentDropdown">
                 <?php if ($student_qr): ?>
-                    <a href="/LibraryBorrowingSystem/student/profile.php?qr=<?php echo urlencode($student_qr); ?>">Profile</a>
+                    <a href="/LibraryBorrowingSystem/student/profile.php">Profile</a>
                 <?php else: ?>
                 <?php endif; ?>
-                <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="active">Search Books</a>
+                <a href="/LibraryBorrowingSystem/student/borrow.php" class="active">Search Books</a>
                 <div class="dropdown-divider"></div>
-                <a href="/LibraryBorrowingSystem/student/portal.php">Logout</a>
+                <a href="/LibraryBorrowingSystem/student/portal.php?logout=1">Logout</a>
             </div>
         </div>
     </header>
@@ -1172,6 +1196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($student['qr_code']); ?>" 
                              alt="Student QR Code">
                         <div class="qr-text"><?php echo htmlspecialchars($student['qr_code']); ?></div>
+                        <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($student['qr_code']); ?>">Download Student QR</a>
                     </div>
                 <?php else: ?>
                     <div class="no-selection">
@@ -1222,6 +1247,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <div class="detail-value" id="selectedBookAuthor">—</div>
                 </div>
                 <div class="detail-item">
+                    <div class="detail-label">Book Number</div>
+                    <div class="detail-value" id="selectedBookNumber">—</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Book Pages</div>
+                    <div class="detail-value" id="selectedBookPages">—</div>
+                </div>
+                <div class="detail-item" id="publisherDetail" style="display:none;">
+                    <div class="detail-label">Publisher</div>
+                    <div class="detail-value" id="selectedBookPublisher">—</div>
+                </div>
+                <div class="detail-item" id="editionDetail" style="display:none;">
+                    <div class="detail-label">Edition</div>
+                    <div class="detail-value" id="selectedBookEdition">—</div>
+                </div>
+                <div class="detail-item" id="volumesDetail" style="display:none;">
+                    <div class="detail-label">Volumes</div>
+                    <div class="detail-value" id="selectedBookVolumes">—</div>
+                </div>
+                <div class="detail-item" id="classDetail" style="display:none;">
+                    <div class="detail-label">Class</div>
+                    <div class="detail-value" id="selectedBookClass">—</div>
+                </div>
+                <div class="detail-item">
                     <div class="detail-label">Available Copies</div>
                     <div class="detail-value" id="selectedBookAvailable">—</div>
                 </div>
@@ -1240,10 +1289,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <h4>Book QR Code</h4>
                 <img id="selectedBookQR" src="" alt="Book QR Code">
                 <div class="qr-text" id="selectedBookQRText"></div>
+                <a id="selectedBookQRDownload" class="qr-download-btn" href="#">Download Book QR</a>
             </div>
             
             <!-- Borrow Button -->
             <form method="POST" id="borrowForm" style="margin-top: 20px;">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="process_borrow">
                 <input type="hidden" name="book_id" id="borrowBookId" value="">
             </form>
@@ -1354,6 +1405,14 @@ function displayBooks(books) {
     bookCount.textContent = booksWithQR.length;
 }
 
+function setOptionalBookDetail(containerId, valueId, value) {
+    const container = document.getElementById(containerId);
+    const valueElement = document.getElementById(valueId);
+    const hasValue = value !== null && value !== undefined && String(value).trim() !== '';
+    container.style.display = hasValue ? '' : 'none';
+    valueElement.textContent = hasValue ? String(value) : '—';
+}
+
 function selectBook(bookId, title, availableCopies) {
     if (availableCopies <= 0) return; // Don't allow selecting unavailable books
     
@@ -1364,8 +1423,16 @@ function selectBook(bookId, title, availableCopies) {
     if (!book) return;
     
     // Update book details section
-    document.getElementById('selectedBookTitle').textContent = escapeHtml(book.title);
-    document.getElementById('selectedBookAuthor').textContent = escapeHtml(book.author);
+    document.getElementById('selectedBookTitle').textContent = book.title;
+    document.getElementById('selectedBookAuthor').textContent = book.author;
+    document.getElementById('selectedBookNumber').textContent = book.book_number || '—';
+    document.getElementById('selectedBookPages').textContent = book.book_pages || '—';
+
+    setOptionalBookDetail('publisherDetail', 'selectedBookPublisher', book.publisher);
+    setOptionalBookDetail('editionDetail', 'selectedBookEdition', book.edition);
+    setOptionalBookDetail('volumesDetail', 'selectedBookVolumes', book.volumes);
+    setOptionalBookDetail('classDetail', 'selectedBookClass', book.class);
+
     document.getElementById('selectedBookAvailable').textContent = book.available_copies;
     document.getElementById('selectedBookTotal').textContent = book.total_copies;
     document.getElementById('selectedBookStatus').textContent = book.available_copies > 0 ? '✓ Available' : 'Out of Stock';
@@ -1374,6 +1441,7 @@ function selectBook(bookId, title, availableCopies) {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(book.qr_code)}`;
     document.getElementById('selectedBookQR').src = qrUrl;
     document.getElementById('selectedBookQRText').textContent = book.qr_code;
+    document.getElementById('selectedBookQRDownload').href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(book.qr_code);
     
     // Set hidden form field
     document.getElementById('borrowBookId').value = bookId;
@@ -1422,61 +1490,27 @@ function submitBorrow() {
 }
 
 function showModal(type, data) {
-    const modal = document.getElementById('transactionModal');
-    const icon = document.getElementById('modalIcon');
-    const title = document.getElementById('modalTitle');
-    const message = document.getElementById('modalMessage');
-    const bodyContent = document.getElementById('modalBodyContent');
-    const footer = document.getElementById('modalFooter');
-    
+    const toastType = type === 'success' ? 'success' : 'error';
+    const title = data && data.title ? data.title : (type === 'success' ? 'Success' : 'Error');
+    let message = data && data.message ? data.message : '';
+
+    if (type === 'success' && data && data.book_title) {
+        message += (message ? ' ' : '') + 'Book: ' + data.book_title + '.';
+        if (data.due_date) {
+            message += ' Return by: ' + data.due_date + '.';
+        }
+    }
+
+    showToast(message || title, toastType, 4400, title);
+
     if (type === 'success') {
-        icon.className = 'modal-icon success';
-        icon.innerHTML = '✓';
-    } else {
-        icon.className = 'modal-icon error';
-        icon.innerHTML = '✕';
+        selectedBookId = null;
+        const detailsSection = document.getElementById('bookDetailsSection');
+        const searchInput = document.getElementById('searchInput');
+        if (detailsSection) detailsSection.style.display = 'none';
+        if (searchInput) searchInput.value = '';
+        performSearch();
     }
-    
-    title.textContent = data.title;
-    message.textContent = data.message;
-    
-    if (type === 'success' && data.transaction_id) {
-        bodyContent.innerHTML = `
-            <div class="transaction-details">
-                <div class="detail-row">
-                    <span class="detail-label">Transaction ID</span>
-                    <span class="detail-value">#${data.transaction_id}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Book Title</span>
-                    <span class="detail-value">${escapeHtml(data.book_title)}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Borrowed Date</span>
-                    <span class="detail-value">${data.date_borrowed}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Due Date</span>
-                    <span class="detail-value">${data.due_date}</span>
-                </div>
-            </div>
-        `;
-    } else {
-        bodyContent.innerHTML = '';
-    }
-    
-    if (type === 'success') {
-        footer.innerHTML = `
-            <button class="modal-btn modal-btn-primary" onclick="closeModalAndContinue()">✓ Continue Borrowing</button>
-            <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Back to Books</button>
-        `;
-    } else {
-        footer.innerHTML = `
-            <button class="modal-btn modal-btn-primary" onclick="closeModal()">Try Again</button>
-        `;
-    }
-    
-    modal.classList.add('show');
 }
 
 function closeModal() {

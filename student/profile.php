@@ -1,55 +1,43 @@
 <?php
 /**
- * Student Profile Page
- * Shows student information and borrowed book records separate from the search dashboard.
+ * Student Profile Page - Jose Abad Santos High School
+ * Requires a verified student portal session.
  */
 
+require_once __DIR__ . '/../includes/student_session.php';
 require_once __DIR__ . '/../db.php';
 
 $student = null;
 $borrowed_books = [];
-$total_penalty = 0;
 $error = null;
-$student_qr = isset($_GET['qr']) ? trim($_GET['qr']) : null;
+$student_id = (int)$_SESSION['student_id'];
+$student_qr = $_SESSION['student_qr'] ?? '';
 
-if (!$student_qr) {
-    $error = 'No student QR code provided. Please scan your student ID again.';
-} else {
-    try {
-        $student_stmt = $conn->prepare("SELECT student_no, full_name, contact_number, qr_code, status, created_at FROM students WHERE qr_code = ? AND status = 'active'");
-        $student_stmt->bind_param('s', $student_qr);
-        $student_stmt->execute();
-        $student_result = $student_stmt->get_result();
+try {
+    $student_stmt = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, qr_code, status, created_at FROM students WHERE student_id = ? AND status = 'active' LIMIT 1");
+    $student_stmt->bind_param('i', $student_id);
+    $student_stmt->execute();
+    $student = $student_stmt->get_result()->fetch_assoc();
+    $student_stmt->close();
 
-        if ($student_result->num_rows > 0) {
-            $student = $student_result->fetch_assoc();
-            $student_id = (int)$student['student_no'];
-
-            $books_stmt = $conn->prepare("\n                SELECT\n                    t.transaction_id,\n                    t.date_borrowed,\n                    t.due_date,\n                    t.return_date,\n                    t.penalty_amount,\n                    t.status,\n                    b.title,\n                    b.author\n                FROM transactions t\n                INNER JOIN books b ON t.book_id = b.book_id\n                WHERE t.student_id = ?\n                ORDER BY t.date_borrowed DESC\n            ");
-            $books_stmt->bind_param('i', $student_id);
-            $books_stmt->execute();
-            $books_result = $books_stmt->get_result();
-
-            while ($row = $books_result->fetch_assoc()) {
-                if ($row['status'] === 'borrowed' && strtotime($row['due_date']) < time()) {
-                    $days_late = max(1, floor((time() - strtotime($row['due_date'])) / 86400));
-                    $row['computed_penalty'] = $days_late * 5;
-                    $total_penalty += $row['computed_penalty'];
-                } else {
-                    $row['computed_penalty'] = (float)($row['penalty_amount'] ?? 0);
-                    $total_penalty += $row['computed_penalty'];
-                }
-                $borrowed_books[] = $row;
-            }
-            $books_stmt->close();
-        } else {
-            $error = 'Student not found or inactive. Please scan your student ID again.';
-        }
-        $student_stmt->close();
-    } catch (Exception $e) {
-        logError('Student profile error: ' . $e->getMessage());
-        $error = 'Unable to load your profile right now. Please try again.';
+    if (!$student) {
+        unset($_SESSION['student_id'], $_SESSION['student_no'], $_SESSION['student_name'], $_SESSION['student_qr']);
+        header('Location: /LibraryBorrowingSystem/student/portal.php');
+        exit();
     }
+
+    $books_stmt = $conn->prepare("\n        SELECT\n            t.transaction_id,\n            t.date_borrowed,\n            t.due_date,\n            t.return_date,\n            t.status,\n            b.title,\n            b.author\n        FROM transactions t\n        INNER JOIN books b ON t.book_id = b.book_id\n        WHERE t.student_id = ?\n        ORDER BY t.date_borrowed DESC\n    ");
+    $books_stmt->bind_param('i', $student_id);
+    $books_stmt->execute();
+    $books_result = $books_stmt->get_result();
+
+    while ($row = $books_result->fetch_assoc()) {
+        $borrowed_books[] = $row;
+    }
+    $books_stmt->close();
+} catch (Exception $e) {
+    logError('Student profile error: ' . $e->getMessage());
+    $error = 'Unable to load your profile right now. Please try again.';
 }
 ?>
 <!DOCTYPE html>
@@ -214,15 +202,18 @@ if (!$student_qr) {
         }
         .qr-box img { width: 150px; height: 150px; background: white; padding: 8px; border-radius: 8px; }
         .qr-text { margin-top: 10px; color: #141F52; font: 700 12px 'Courier New', monospace; }
-        .penalty-box {
-            background: #FBE8DC;
-            border-left: 4px solid #BB5716;
-            padding: 16px;
-            border-radius: 10px;
-            margin-top: 18px;
-            color: #7A3A0E;
+        .qr-download-btn {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 10px 18px;
+            background: #141F52;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
             font-weight: 700;
         }
+        .qr-download-btn:hover { background: #52618D; }
         .books-list { display: flex; flex-direction: column; gap: 12px; }
         .book-row {
             background: #F7F9FC;
@@ -246,7 +237,6 @@ if (!$student_qr) {
         }
         .badge.borrowed { background: #FBFDCB; color: #5C5F05; }
         .badge.returned { background: #EDF5DD; color: #344E15; }
-        .badge.overdue { background: #f8d7da; color: #721c24; }
         .empty, .error-box { text-align: center; padding: 40px 20px; color: #52618D; }
         .error-box { color: #c62828; background: #ffebee; border: 2px solid #ef5350; border-radius: 10px; }
         @media (max-width: 700px) {
@@ -259,12 +249,14 @@ if (!$student_qr) {
             .book-row { grid-template-columns: 1fr; }
         }
     </style>
+    <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
-<body>
+<body class="student-app student-profile-page">
+    <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
     <header class="page-header">
-        <a href="/LibraryBorrowingSystem/student/borrow.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="header-brand">
-            <img src="/LibraryBorrowingSystem/Img/Claro_M_Recto_Logo.png" alt="Claro M. Recto High School Logo">
-            <span class="header-brand-text">Claro M. Recto Book Borrowing</span>
+        <a href="/LibraryBorrowingSystem/student/borrow.php" class="header-brand">
+            <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
+            <span class="header-brand-text">Jose Abad Santos High School Book Borrowing</span>
         </a>
         <div class="student-menu">
             <button type="button" class="student-menu-toggle" id="studentMenuToggle" aria-haspopup="true" aria-expanded="false">
@@ -272,12 +264,12 @@ if (!$student_qr) {
                 <span class="student-menu-caret">▼</span>
             </button>
             <div class="student-dropdown" id="studentDropdown">
-                <a href="/LibraryBorrowingSystem/student/profile.php<?php echo $student_qr ? '?qr=' . urlencode($student_qr) : ''; ?>" class="active">Profile</a>
+                <a href="/LibraryBorrowingSystem/student/profile.php" class="active">Profile</a>
                 <?php if ($student_qr): ?>
-                    <a href="/LibraryBorrowingSystem/student/borrow.php?qr=<?php echo urlencode($student_qr); ?>">Search Books</a>
+                    <a href="/LibraryBorrowingSystem/student/borrow.php">Search Books</a>
                 <?php endif; ?>
                 <div class="dropdown-divider"></div>
-                <a href="/LibraryBorrowingSystem/student/portal.php">Logout</a>
+                <a href="/LibraryBorrowingSystem/student/portal.php?logout=1">Logout</a>
             </div>
         </div>
     </header>
@@ -312,6 +304,20 @@ if (!$student_qr) {
                             <div class="info-value"><?php echo htmlspecialchars($student['full_name']); ?></div>
                         </div>
                         <div class="info-item">
+                            <div class="info-label">Section</div>
+                            <div class="info-value"><?php echo htmlspecialchars($student['student_group'] ?: 'N/A'); ?></div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Grade Level</div>
+                            <div class="info-value"><?php echo htmlspecialchars($student['year_level'] ?: 'N/A'); ?></div>
+                        </div>
+                        <?php if (in_array($student['year_level'], ['Grade 11', 'Grade 12'], true)): ?>
+                            <div class="info-item">
+                                <div class="info-label">Department / Strand</div>
+                                <div class="info-value"><?php echo htmlspecialchars($student['department'] ?: 'N/A'); ?></div>
+                            </div>
+                        <?php endif; ?>
+                        <div class="info-item">
                             <div class="info-label">Contact</div>
                             <div class="info-value"><?php echo htmlspecialchars($student['contact_number'] ?? 'N/A'); ?></div>
                         </div>
@@ -321,13 +327,10 @@ if (!$student_qr) {
                         </div>
                     </div>
 
-                    <?php if ($total_penalty > 0): ?>
-                        <div class="penalty-box">Outstanding / recorded penalty: ₱<?php echo number_format($total_penalty, 2); ?></div>
-                    <?php endif; ?>
-
                     <div class="qr-box">
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($student['qr_code']); ?>" alt="Student QR Code">
                         <div class="qr-text"><?php echo htmlspecialchars($student['qr_code']); ?></div>
+                        <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($student['qr_code']); ?>">Download QR Code</a>
                     </div>
                 </div>
             </section>
@@ -341,9 +344,8 @@ if (!$student_qr) {
                         <div class="books-list">
                             <?php foreach ($borrowed_books as $book): ?>
                                 <?php
-                                    $is_overdue = $book['status'] === 'borrowed' && strtotime($book['due_date']) < time();
-                                    $badge_class = $is_overdue ? 'overdue' : strtolower($book['status']);
-                                    $badge_text = $is_overdue ? 'Overdue' : ucfirst($book['status']);
+                                    $badge_class = strtolower($book['status']);
+                                    $badge_text = ucfirst($book['status']);
                                 ?>
                                 <div class="book-row">
                                     <div>
@@ -351,9 +353,8 @@ if (!$student_qr) {
                                         <div class="book-meta">
                                             Author: <?php echo htmlspecialchars($book['author']); ?><br>
                                             Borrowed: <?php echo date('M d, Y', strtotime($book['date_borrowed'])); ?> •
-                                            Due: <?php echo date('M d, Y', strtotime($book['due_date'])); ?>
+                                            Return By: <?php echo date('M d, Y', strtotime($book['due_date'])); ?> (same day)
                                             <?php if (!empty($book['return_date'])): ?> • Returned: <?php echo date('M d, Y', strtotime($book['return_date'])); ?><?php endif; ?>
-                                            <?php if ($book['computed_penalty'] > 0): ?> • Penalty: ₱<?php echo number_format($book['computed_penalty'], 2); ?><?php endif; ?>
                                         </div>
                                     </div>
                                     <span class="badge <?php echo htmlspecialchars($badge_class); ?>"><?php echo htmlspecialchars($badge_text); ?></span>

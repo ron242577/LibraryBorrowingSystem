@@ -1,18 +1,198 @@
 <?php
 /**
  * Student Registration Page
- * Allows students to register with their information
+ * New student accounts are created only after a 6-digit email verification code is confirmed.
  */
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/gmail_smtp.php';
+
+function clearPendingRegistration(): void {
+    unset(
+        $_SESSION['registration_pending_data'],
+        $_SESSION['registration_pending_expires'],
+        $_SESSION['registration_otp_hash'],
+        $_SESSION['registration_otp_expires'],
+        $_SESSION['registration_otp_attempts'],
+        $_SESSION['registration_otp_last_sent']
+    );
+}
+
+function generateUniqueRegistrationQr(mysqli $conn): string {
+    do {
+        $qrCode = 'STU-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+        $stmt = $conn->prepare('SELECT student_id FROM students WHERE qr_code = ? LIMIT 1');
+        if (!$stmt) {
+            throw new RuntimeException('Unable to generate a student QR code right now.');
+        }
+        $stmt->bind_param('s', $qrCode);
+        $stmt->execute();
+        $exists = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+    } while ($exists);
+
+    return $qrCode;
+}
 
 $errors = [];
 $success = false;
 $new_student_no = null;
 $generated_qr = null;
+$verification_pending = false;
+$pending_masked_email = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Validate and sanitize input
+if (isset($_GET['completed']) && !empty($_SESSION['registration_success']) && is_array($_SESSION['registration_success'])) {
+    $successData = $_SESSION['registration_success'];
+    unset($_SESSION['registration_success']);
+    $success = true;
+    $new_student_no = $successData['student_id'] ?? null;
+    $generated_qr = $successData['qr_code'] ?? null;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    $api = (string)($_POST['api'] ?? '');
+
+    try {
+        requireValidCsrf($_POST['csrf_token'] ?? '');
+
+        if ($api === 'verify_registration_code') {
+            $code = preg_replace('/\D+/', '', (string)($_POST['code'] ?? ''));
+            $pending = $_SESSION['registration_pending_data'] ?? null;
+
+            if (!is_array($pending) || empty($_SESSION['registration_otp_hash'])) {
+                throw new RuntimeException('Your registration verification session has expired. Submit the registration form again.');
+            }
+            if (time() > (int)($_SESSION['registration_pending_expires'] ?? 0)) {
+                clearPendingRegistration();
+                throw new RuntimeException('Your registration session expired. Submit the registration form again.');
+            }
+            if (time() > (int)($_SESSION['registration_otp_expires'] ?? 0)) {
+                throw new RuntimeException('The verification code expired. Request a new code.');
+            }
+            if ((int)($_SESSION['registration_otp_attempts'] ?? 0) >= 5) {
+                clearPendingRegistration();
+                throw new RuntimeException('Too many incorrect verification attempts. Submit the registration form again.');
+            }
+            if (!preg_match('/^\d{6}$/', $code)) {
+                throw new RuntimeException('Enter the 6-digit verification code.');
+            }
+
+            $_SESSION['registration_otp_attempts'] = (int)($_SESSION['registration_otp_attempts'] ?? 0) + 1;
+            if (!password_verify($code, $_SESSION['registration_otp_hash'])) {
+                throw new RuntimeException('Incorrect verification code.');
+            }
+
+            $check = $conn->prepare('SELECT student_id FROM students WHERE student_no = ? OR email = ? LIMIT 1');
+            if (!$check) {
+                throw new RuntimeException('Unable to finish registration right now.');
+            }
+            $check->bind_param('ss', $pending['student_no'], $pending['email']);
+            $check->execute();
+            $duplicate = $check->get_result()->num_rows > 0;
+            $check->close();
+            if ($duplicate) {
+                clearPendingRegistration();
+                throw new RuntimeException('Student Number or Email is already registered.');
+            }
+
+            $qrCode = generateUniqueRegistrationQr($conn);
+            $status = 'active';
+            $stmt = $conn->prepare(
+                'INSERT INTO students (full_name, student_no, student_group, department, year_level, contact_number, card_valid_until, email, qr_code, password, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            if (!$stmt) {
+                throw new RuntimeException('Unable to create the student account right now.');
+            }
+
+            $stmt->bind_param(
+                'sssssssssss',
+                $pending['full_name'],
+                $pending['student_no'],
+                $pending['student_group'],
+                $pending['department'],
+                $pending['year_level'],
+                $pending['contact_number'],
+                $pending['card_valid_until'],
+                $pending['email'],
+                $qrCode,
+                $pending['password_hash'],
+                $status
+            );
+
+            if (!$stmt->execute()) {
+                $message = $stmt->error;
+                $stmt->close();
+                logError('Student registration insert error after verification: ' . $message);
+                throw new RuntimeException('Registration could not be completed. Please try again.');
+            }
+
+            $studentId = (int)$conn->insert_id;
+            $stmt->close();
+
+            $_SESSION['registration_success'] = [
+                'student_id' => $studentId,
+                'qr_code' => $qrCode,
+            ];
+            clearPendingRegistration();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Email verified. Your student account has been created.',
+                'redirect' => '/LibraryBorrowingSystem/student/register.php?completed=1'
+            ]);
+            exit();
+        }
+
+        if ($api === 'resend_registration_code') {
+            $pending = $_SESSION['registration_pending_data'] ?? null;
+            if (!is_array($pending) || empty($pending['email']) || time() > (int)($_SESSION['registration_pending_expires'] ?? 0)) {
+                clearPendingRegistration();
+                throw new RuntimeException('Your registration session expired. Submit the registration form again.');
+            }
+
+            $lastSent = (int)($_SESSION['registration_otp_last_sent'] ?? 0);
+            $wait = 60 - (time() - $lastSent);
+            if ($wait > 0) {
+                throw new RuntimeException("Please wait {$wait} second(s) before requesting another code.");
+            }
+
+            $code = generateOtpCode();
+            sendStudentRegistrationVerificationEmail($pending['email'], $pending['full_name'], $code);
+            $_SESSION['registration_otp_hash'] = password_hash($code, PASSWORD_DEFAULT);
+            $_SESSION['registration_otp_expires'] = time() + 300;
+            $_SESSION['registration_otp_attempts'] = 0;
+            $_SESSION['registration_otp_last_sent'] = time();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'A new 6-digit verification code was sent to ' . maskEmail($pending['email']) . '.'
+            ]);
+            exit();
+        }
+
+        if ($api === 'cancel_registration_verification') {
+            clearPendingRegistration();
+            echo json_encode(['success' => true]);
+            exit();
+        }
+
+        throw new RuntimeException('Invalid request.');
+    } catch (Throwable $e) {
+        logError('Student registration verification error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        exit();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['api'])) {
+    try {
+        requireValidCsrf($_POST['csrf_token'] ?? '');
+    } catch (Throwable $e) {
+        $errors[] = $e->getMessage();
+    }
+
     $full_name = trim($_POST['full_name'] ?? '');
     $student_no = trim($_POST['student_no'] ?? '');
     $student_group = trim($_POST['student_group'] ?? '');
@@ -20,98 +200,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $year_level = trim($_POST['year_level'] ?? '');
     $contact_number = trim($_POST['contact_number'] ?? '');
     $email = trim($_POST['email'] ?? '');
-    
-    // Automatically set card validity to 1 year from today
+    $password = (string)($_POST['password'] ?? '');
+    $confirm_password = (string)($_POST['confirm_password'] ?? '');
+
+    $valid_year_levels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+    $senior_high_grades = ['Grade 11', 'Grade 12'];
+    $valid_departments = ['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'Arts and Design', 'Sports'];
     $card_valid_until = date('Y-m-d', strtotime('+1 year'));
 
-    // Validation
-    if (empty($full_name)) {
+    if ($full_name === '') {
         $errors[] = 'Name is required.';
     } elseif (strlen($full_name) < 3) {
         $errors[] = 'Name must be at least 3 characters long.';
     }
 
-    if (empty($student_no)) {
+    if ($student_no === '') {
         $errors[] = 'Student Number is required.';
     } elseif (!preg_match('/^[A-Za-z0-9\-]+$/', $student_no)) {
         $errors[] = 'Student Number contains invalid characters.';
     }
 
-    if (empty($department)) {
-        $errors[] = 'Department is required.';
+    if ($student_group === '') {
+        $errors[] = 'Section is required.';
     }
 
-    if (empty($contact_number)) {
+    if (!in_array($year_level, $valid_year_levels, true)) {
+        $errors[] = 'Please select a valid grade level.';
+    }
+
+    if (in_array($year_level, $senior_high_grades, true)) {
+        if (!in_array($department, $valid_departments, true)) {
+            $errors[] = 'Please select a valid Senior High School strand.';
+        }
+    } else {
+        $department = '';
+    }
+
+    if ($contact_number === '') {
         $errors[] = 'Contact Number is required.';
     } elseif (!preg_match('/^[0-9\+\-\s\(\)]+$/', $contact_number)) {
         $errors[] = 'Contact Number contains invalid characters.';
     }
 
-    if (empty($email)) {
+    if ($email === '') {
         $errors[] = 'Email is required.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Please provide a valid email address.';
     }
 
-    // Check for duplicate student number and email
+    if ($password === '') {
+        $errors[] = 'Password is required.';
+    } else {
+        $password_errors = passwordPolicyErrors($password);
+        if (!empty($password_errors)) {
+            $errors[] = strongPasswordMessage($password_errors);
+        }
+    }
+
+    if ($password !== $confirm_password) {
+        $errors[] = 'Password confirmation does not match.';
+    }
+
     if (empty($errors)) {
         try {
-            $check_stmt = $conn->prepare('SELECT student_no FROM students WHERE student_no = ? OR email = ? LIMIT 1');
+            $check_stmt = $conn->prepare('SELECT student_id FROM students WHERE student_no = ? OR email = ? LIMIT 1');
+            if (!$check_stmt) {
+                throw new RuntimeException('Unable to validate the registration right now.');
+            }
             $check_stmt->bind_param('ss', $student_no, $email);
             $check_stmt->execute();
-            $check_result = $check_stmt->get_result();
-
-            if ($check_result->num_rows > 0) {
+            if ($check_stmt->get_result()->num_rows > 0) {
                 $errors[] = 'Student Number or Email already registered.';
             }
             $check_stmt->close();
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $errors[] = 'Database error during validation.';
             logError('Student registration validation error: ' . $e->getMessage());
         }
     }
 
-    // If no errors, proceed with registration
     if (empty($errors)) {
         try {
-            // Generate QR code
-            $qr_code = 'STU-' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid()), 0, 5));
-            $generated_qr = $qr_code;
+            $code = generateOtpCode();
+            sendStudentRegistrationVerificationEmail($email, $full_name, $code);
 
-            $register_stmt = $conn->prepare(
-                'INSERT INTO students (full_name, student_no, student_group, department, year_level, contact_number, card_valid_until, email, qr_code, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            );
+            clearPendingRegistration();
+            $_SESSION['registration_pending_data'] = [
+                'full_name' => $full_name,
+                'student_no' => $student_no,
+                'student_group' => $student_group,
+                'department' => $department,
+                'year_level' => $year_level,
+                'contact_number' => $contact_number,
+                'card_valid_until' => $card_valid_until,
+                'email' => $email,
+                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            ];
+            $_SESSION['registration_pending_expires'] = time() + 900;
+            $_SESSION['registration_otp_hash'] = password_hash($code, PASSWORD_DEFAULT);
+            $_SESSION['registration_otp_expires'] = time() + 300;
+            $_SESSION['registration_otp_attempts'] = 0;
+            $_SESSION['registration_otp_last_sent'] = time();
 
-            $status = 'active';
-
-            $register_stmt->bind_param(
-                'ssssssssss',
-                $full_name,
-                $student_no,
-                $student_group,
-                $department,
-                $year_level,
-                $contact_number,
-                $card_valid_until,
-                $email,
-                $qr_code,
-                $status
-            );
-
-            if ($register_stmt->execute()) {
-                $new_student_no = $conn->insert_id;
-                $success = true;
-            } else {
-                $errors[] = 'Registration failed. Please try again.';
-                logError('Student registration insert error: ' . $register_stmt->error);
-            }
-
-            $register_stmt->close();
-        } catch (Exception $e) {
-            $errors[] = 'An error occurred during registration.';
-            logError('Student registration error: ' . $e->getMessage());
+            $verification_pending = true;
+            $pending_masked_email = maskEmail($email);
+        } catch (Throwable $e) {
+            clearPendingRegistration();
+            $errors[] = 'Unable to send the registration verification code. Please try again or ask the administrator to check the Gmail setup.';
+            logError('Student registration email verification error: ' . $e->getMessage());
         }
+    }
+}
+
+if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && is_array($_SESSION['registration_pending_data'])) {
+    if (time() <= (int)($_SESSION['registration_pending_expires'] ?? 0)) {
+        $verification_pending = true;
+        $pending_masked_email = maskEmail((string)($_SESSION['registration_pending_data']['email'] ?? ''));
+    } else {
+        clearPendingRegistration();
     }
 }
 ?>
@@ -286,6 +492,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-family: 'Courier New', monospace;
             letter-spacing: 0.5px;
         }
+
+        .qr-download-btn {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 10px 18px;
+            background: #141F52;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .qr-download-btn:hover { background: #52618D; }
 
         .success-actions {
             display: flex;
@@ -516,9 +736,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 font-size: 13px;
             }
         }
+
+        .verification-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0,0,0,.6);
+            z-index: 3000;
+        }
+        .verification-modal.show { display: flex; }
+        .verification-card {
+            width: 100%;
+            max-width: 430px;
+            background: white;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 20px 55px rgba(0,0,0,.3);
+        }
+        .verification-header {
+            background: #141F52;
+            color: white;
+            padding: 20px 22px;
+            border-bottom: 4px solid #F4F916;
+        }
+        .verification-header h3 { margin: 0; font-size: 20px; }
+        .verification-body { padding: 24px; }
+        .verification-info {
+            background: #F3F7FC;
+            color: #52618D;
+            border-radius: 9px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .verification-error {
+            display: none;
+            background: #FBE8DC;
+            color: #7A3A0E;
+            border-radius: 8px;
+            padding: 11px 13px;
+            margin-bottom: 14px;
+            font-size: 13px;
+        }
+        .verification-error.show { display: block; }
+        .verification-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .verification-actions button {
+            padding: 12px 16px;
+            border: 0;
+            border-radius: 9px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .verification-cancel { background: #E7EEF7; color: #202A44; }
+        .verification-submit { background: #141F52; color: white; }
+        .verification-resend {
+            display: block;
+            margin: 15px auto 0;
+            border: 0;
+            background: transparent;
+            color: #141F52;
+            font-weight: 700;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .verification-resend:disabled { opacity: .55; cursor: not-allowed; }
+        @media (max-width: 520px) { .verification-actions { grid-template-columns: 1fr; } }
     </style>
+    <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
-<body>
+<body class="student-register-page">
+    <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
+    <?php if ($success && $new_student_no): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                showToast('Student registration completed. QR code created and your password was securely saved.', 'success', 4200, 'Registration Successful');
+            });
+        </script>
+    <?php elseif (!empty($errors)): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                showToast(<?php echo json_encode('Registration failed. ' . ($errors[0] ?? 'Please check the form and try again.')); ?>, 'error', 4500, 'Registration Failed');
+            });
+        </script>
+    <?php elseif ($verification_pending): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                showToast('A 6-digit registration verification code was sent to <?php echo htmlspecialchars($pending_masked_email, ENT_QUOTES, 'UTF-8'); ?>.', 'success', 4200, 'Verification Code Sent');
+            });
+        </script>
+    <?php endif; ?>
     <div class="container">
         <div class="header">
             <h1>Student Registration</h1>
@@ -546,10 +861,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?php echo urlencode($generated_qr); ?>" 
                                      alt="Student QR Code">
                                 <div class="success-qr-code"><?php echo htmlspecialchars($generated_qr); ?></div>
+                                <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($generated_qr); ?>">Download QR Code</a>
                             </div>
 
                             <p style="color: #52618D; font-size: 13px; margin-top: 16px;">
-                                Save your QR code or remember it. You'll use it to access your library account.
+                                Save your QR code and keep your password private. Email verification is required only when creating a new student account.
                             </p>
 
                             <div class="success-actions">
@@ -576,6 +892,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <!-- Registration Form -->
                     <form method="POST" novalidate>
+                        <?php echo csrfField(); ?>
                         <!-- Personal Information Section -->
                         <h3 style="color: #202A44; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #E7EEF7; padding-bottom: 12px;">
                             Personal Information
@@ -597,30 +914,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
 
                             <div class="form-group">
-                                <label>Group</label>
-                                <input type="text" name="student_group" placeholder="e.g., 3A, Group B" 
-                                       value="<?php echo htmlspecialchars($_POST['student_group'] ?? ''); ?>">
-                                <div class="helper-text">Your assigned group (optional)</div>
+                                <label>Section <span class="required">*</span></label>
+                                <input type="text" name="student_group" placeholder="e.g., Rizal, 10-A" 
+                                       value="<?php echo htmlspecialchars($_POST['student_group'] ?? ''); ?>" required>
+                                <div class="helper-text">Your class section</div>
                             </div>
 
                             <div class="form-group">
-                                <label>Department <span class="required">*</span></label>
-                                <input type="text" name="department" placeholder="e.g., College of Computer Studies" 
-                                       value="<?php echo htmlspecialchars($_POST['department'] ?? ''); ?>" required>
-                                <div class="helper-text">Your department/college</div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Year Level</label>
-                                <select name="year_level">
-                                    <option value="">Select Year Level</option>
-                                    <option value="1st Year" <?php if (($_POST['year_level'] ?? '') === '1st Year') echo 'selected'; ?>>1st Year</option>
-                                    <option value="2nd Year" <?php if (($_POST['year_level'] ?? '') === '2nd Year') echo 'selected'; ?>>2nd Year</option>
-                                    <option value="3rd Year" <?php if (($_POST['year_level'] ?? '') === '3rd Year') echo 'selected'; ?>>3rd Year</option>
-                                    <option value="4th Year" <?php if (($_POST['year_level'] ?? '') === '4th Year') echo 'selected'; ?>>4th Year</option>
-                                    <option value="Masters" <?php if (($_POST['year_level'] ?? '') === 'Masters') echo 'selected'; ?>>Masters</option>
+                                <label>Grade Level <span class="required">*</span></label>
+                                <select name="year_level" id="year_level" required>
+                                    <option value="">Select Grade Level</option>
+                                    <optgroup label="Junior High School">
+                                        <option value="Grade 7" <?php if (($_POST['year_level'] ?? '') === 'Grade 7') echo 'selected'; ?>>Grade 7</option>
+                                        <option value="Grade 8" <?php if (($_POST['year_level'] ?? '') === 'Grade 8') echo 'selected'; ?>>Grade 8</option>
+                                        <option value="Grade 9" <?php if (($_POST['year_level'] ?? '') === 'Grade 9') echo 'selected'; ?>>Grade 9</option>
+                                        <option value="Grade 10" <?php if (($_POST['year_level'] ?? '') === 'Grade 10') echo 'selected'; ?>>Grade 10</option>
+                                    </optgroup>
+                                    <optgroup label="Senior High School">
+                                        <option value="Grade 11" <?php if (($_POST['year_level'] ?? '') === 'Grade 11') echo 'selected'; ?>>Grade 11</option>
+                                        <option value="Grade 12" <?php if (($_POST['year_level'] ?? '') === 'Grade 12') echo 'selected'; ?>>Grade 12</option>
+                                    </optgroup>
                                 </select>
-                                <div class="helper-text">Your academic year level (optional)</div>
+                                <div class="helper-text">Grades 7-10 are Junior High School; Grades 11-12 are Senior High School</div>
+                            </div>
+
+                            <div class="form-group" id="department_group" style="display:none;">
+                                <label>Department / Strand <span class="required">*</span></label>
+                                <select name="department" id="department">
+                                    <option value="">Select Senior High School Strand</option>
+                                    <?php foreach (['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'Arts and Design', 'Sports'] as $strand): ?>
+                                        <option value="<?php echo htmlspecialchars($strand); ?>" <?php if (($_POST['department'] ?? '') === $strand) echo 'selected'; ?>><?php echo htmlspecialchars($strand); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="helper-text">Shown only for Grade 11 and Grade 12 students</div>
                             </div>
                         </div>
 
@@ -639,9 +965,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             <div class="form-group">
                                 <label>Email <span class="required">*</span></label>
-                                <input type="email" name="email" placeholder="e.g., your.email@university.edu" 
+                                <input type="email" name="email" placeholder="e.g., student@example.com" 
                                        value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
-                                <div class="helper-text">Your institutional email address</div>
+                                <div class="helper-text">A 6-digit verification code will be sent here to finish registration.</div>
                             </div>
 
                             <div class="form-group">
@@ -652,9 +978,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
 
+                        <h3 style="color: #202A44; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #E7EEF7; padding-bottom: 12px;">
+                            Account Security
+                        </h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Password <span class="required">*</span></label>
+                                <input type="password" name="password" maxlength="128" autocomplete="new-password" required>
+                                <div class="helper-text">Use at least 10 characters with uppercase, lowercase, number, and special character.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Confirm Password <span class="required">*</span></label>
+                                <input type="password" name="confirm_password" maxlength="128" autocomplete="new-password" required>
+                                <div class="helper-text">Enter the same password again.</div>
+                            </div>
+                        </div>
+
                         <!-- Form Actions -->
                         <div class="form-actions">
-                            <button type="submit" class="btn-submit">Register Account</button>
+                            <button type="submit" class="btn-submit">Send Verification Code</button>
                             <a href="/LibraryBorrowingSystem/student/portal.php" class="btn-back">Cancel</a>
                         </div>
 
@@ -667,5 +1009,134 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
+
+<?php if (!$success): ?>
+<div id="registrationVerificationModal" class="verification-modal<?php echo $verification_pending ? ' show' : ''; ?>" role="dialog" aria-modal="true" aria-labelledby="registrationVerificationTitle">
+    <div class="verification-card">
+        <div class="verification-header">
+            <h3 id="registrationVerificationTitle">Verify Your Email</h3>
+        </div>
+        <div class="verification-body">
+            <div class="verification-info">
+                Enter the 6-digit code sent to <strong id="verificationEmail"><?php echo htmlspecialchars($pending_masked_email ?: 'your email', ENT_QUOTES, 'UTF-8'); ?></strong>.<br>
+                Your account will not be created until this code is verified. The code expires in 5 minutes.
+            </div>
+            <div id="verificationError" class="verification-error"></div>
+            <form id="registrationVerificationForm">
+                <div class="form-group">
+                    <label for="registrationVerificationCode">6-Digit Verification Code</label>
+                    <input type="text" id="registrationVerificationCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="000000" required>
+                </div>
+                <div class="verification-actions">
+                    <button type="button" class="verification-cancel" id="cancelRegistrationVerification">Cancel</button>
+                    <button type="submit" class="verification-submit" id="verifyRegistrationButton">Verify & Finish Registration</button>
+                </div>
+            </form>
+            <button type="button" class="verification-resend" id="resendRegistrationCode">Resend verification code</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>
+    (function () {
+        const gradeSelect = document.getElementById('year_level');
+        const departmentGroup = document.getElementById('department_group');
+        const departmentSelect = document.getElementById('department');
+
+        function toggleDepartment() {
+            if (!gradeSelect || !departmentGroup || !departmentSelect) return;
+            const isSeniorHigh = gradeSelect.value === 'Grade 11' || gradeSelect.value === 'Grade 12';
+            departmentGroup.style.display = isSeniorHigh ? 'flex' : 'none';
+            departmentSelect.required = isSeniorHigh;
+            if (!isSeniorHigh) departmentSelect.value = '';
+        }
+
+        if (gradeSelect) {
+            gradeSelect.addEventListener('change', toggleDepartment);
+            toggleDepartment();
+        }
+
+        const verificationModal = document.getElementById('registrationVerificationModal');
+        const verificationForm = document.getElementById('registrationVerificationForm');
+        const verificationCode = document.getElementById('registrationVerificationCode');
+        const verificationError = document.getElementById('verificationError');
+        const csrfToken = <?php echo json_encode(csrfToken()); ?>;
+
+        async function registrationApi(action, extra = {}) {
+            const body = new URLSearchParams();
+            body.set('api', action);
+            body.set('csrf_token', csrfToken);
+            Object.entries(extra).forEach(([key, value]) => body.set(key, value));
+            const response = await fetch('/LibraryBorrowingSystem/student/register.php', {
+                method: 'POST',
+                headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+                body: body.toString()
+            });
+            return await response.json();
+        }
+
+        function showVerificationError(message) {
+            if (!verificationError) return;
+            verificationError.textContent = message;
+            verificationError.classList.add('show');
+        }
+
+        if (verificationModal && verificationModal.classList.contains('show')) {
+            setTimeout(() => verificationCode && verificationCode.focus(), 150);
+        }
+
+        if (verificationForm) {
+            verificationForm.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                const button = document.getElementById('verifyRegistrationButton');
+                verificationError.classList.remove('show');
+                button.disabled = true;
+                button.textContent = 'Verifying...';
+
+                try {
+                    const data = await registrationApi('verify_registration_code', {code: verificationCode.value});
+                    if (!data.success) throw new Error(data.message || 'Verification failed.');
+                    showToast(data.message || 'Registration completed.', 'success', 2600, 'Registration Successful');
+                    setTimeout(() => window.location.href = data.redirect, 650);
+                } catch (error) {
+                    showVerificationError(error.message);
+                    verificationCode.value = '';
+                    verificationCode.focus();
+                } finally {
+                    button.disabled = false;
+                    button.textContent = 'Verify & Finish Registration';
+                }
+            });
+        }
+
+        const resendButton = document.getElementById('resendRegistrationCode');
+        if (resendButton) {
+            resendButton.addEventListener('click', async function () {
+                this.disabled = true;
+                verificationError.classList.remove('show');
+                try {
+                    const data = await registrationApi('resend_registration_code');
+                    if (!data.success) throw new Error(data.message || 'Unable to resend the code.');
+                    showToast(data.message, 'success', 3500, 'Code Sent');
+                } catch (error) {
+                    showVerificationError(error.message);
+                } finally {
+                    setTimeout(() => { this.disabled = false; }, 1500);
+                }
+            });
+        }
+
+        const cancelVerification = document.getElementById('cancelRegistrationVerification');
+        if (cancelVerification) {
+            cancelVerification.addEventListener('click', async function () {
+                try { await registrationApi('cancel_registration_verification'); } catch (error) {}
+                verificationModal.classList.remove('show');
+                if (verificationCode) verificationCode.value = '';
+                showToast('Registration verification cancelled. Your account was not created.', 'info', 3200);
+            });
+        }
+    })();
+</script>
 </body>
 </html>
