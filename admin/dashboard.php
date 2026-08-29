@@ -1,10 +1,12 @@
 <?php
 /**
- * Admin Dashboard - Jose Abad Santos High School Library Borrowing System
+ * Chief Librarian Dashboard - Jose Abad Santos High School Library Borrowing System
  */
 
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/library_rules.php';
+require_once __DIR__ . '/../includes/notification_helper.php';
 
 // Check if user is admin
 if (!isAdmin()) {
@@ -17,6 +19,40 @@ $total_staff = 0;
 $total_students = 0;
 $total_books = 0;
 $backup_message = '';
+
+try {
+    ensureNotificationTable($conn);
+    $chiefLibrarianId = (int)($_SESSION['user_id'] ?? 0);
+
+    $lowStock = 0;
+    $low = $conn->query("SELECT COUNT(*) AS total FROM books WHERE COALESCE(is_archived,0)=0 AND available_copies <= 2");
+    if ($low) $lowStock = (int)$low->fetch_assoc()['total'];
+
+    if ($lowStock > 0 && $chiefLibrarianId > 0) {
+        $title = 'Low Stock Alert';
+        $msg = $lowStock . ' active book title(s) have two or fewer available copies.';
+        $check = $conn->prepare("SELECT notification_id FROM notifications WHERE user_type='admin' AND user_id=? AND title=? AND message=? AND created_at >= (NOW() - INTERVAL 1 DAY) LIMIT 1");
+        $check->bind_param('iss',$chiefLibrarianId,$title,$msg);
+        $check->execute();
+        $exists = $check->get_result()->num_rows > 0;
+        $check->close();
+        if (!$exists) createNotification($conn,'admin',$chiefLibrarianId,$title,$msg,'/LibraryBorrowingSystem/admin/inventory.php');
+    }
+
+    if ($chiefLibrarianId > 0 && $conn->query("SHOW TABLES LIKE 'book_reservations'")->num_rows > 0) {
+        $pending = $conn->query("SELECT COUNT(*) AS total FROM book_reservations WHERE status='pending'");
+        $pendingCount = $pending ? (int)$pending->fetch_assoc()['total'] : 0;
+        if ($pendingCount > 0) {
+            $title='Pending Reservations';
+            $msg=$pendingCount . ' reservation(s) are waiting to be processed.';
+            $check=$conn->prepare("SELECT notification_id FROM notifications WHERE user_type='admin' AND user_id=? AND title=? AND message=? AND created_at >= (NOW() - INTERVAL 1 DAY) LIMIT 1");
+            $check->bind_param('iss',$chiefLibrarianId,$title,$msg); $check->execute(); $exists=$check->get_result()->num_rows>0; $check->close();
+            if(!$exists) createNotification($conn,'admin',$chiefLibrarianId,$title,$msg,'/LibraryBorrowingSystem/admin/reservations.php');
+        }
+    }
+} catch (Throwable $notificationError) {
+    logError('Dashboard notification generation error: ' . $notificationError->getMessage());
+}
 
 try {
     // Get total active staff accounts
@@ -110,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Library Borrowing System</title>
+    <title>Chief Librarian Dashboard - Library Borrowing System</title>
     <style>
         * {
             margin: 0;
@@ -122,6 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #F3F7FC;
             color: #202A44;
+            overflow-x: hidden;
         }
         
         .container {
@@ -337,7 +374,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             transform: translateY(-5px);
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
         }
-    </style>
+
+
+        .content-container,
+        .container{margin-top:0 !important;}
+
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -346,11 +388,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <div class="container">
         <div class="welcome-section">
             <h2>Welcome, <?php echo htmlspecialchars(getUserFullName()); ?>!</h2>
-            <p>You are logged in as a <strong>Administrator</strong>.</p>
+            <p>You are logged in as the <strong>Chief Librarian</strong>.</p>
             <p>This dashboard provides you with access to the complete Library Borrowing System, including staff management, student records, inventory, QR transactions, and reports.</p>
-            <span class="role-badge">ADMIN</span>
+            <span class="role-badge">CHIEF LIBRARIAN</span>
         </div>
-        
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Total Staff</div>
@@ -421,6 +462,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class="card">
                     <h2>Transactions</h2>
                     <p>View all borrowing and return transactions with detailed information.</p>
+                </div>
+            </a>
+
+            <a href="/LibraryBorrowingSystem/admin/reservations.php" class="card-link">
+                <div class="card">
+                    <h2>Reservations</h2>
+                    <p>Manage student book reservations, waiting lists, ready reservations, and cancellations.</p>
+                </div>
+            </a>
+
+            <a href="/LibraryBorrowingSystem/admin/backup_management.php" class="card-link">
+                <div class="card">
+                    <h2>Backup & Restore</h2>
+                    <p>Create protected database backups, download them, and restore trusted backups when needed.</p>
                 </div>
             </a>
         </div>

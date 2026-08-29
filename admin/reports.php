@@ -51,7 +51,7 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#F3F7FC; color:#202A44; }
+        body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#F3F7FC; color:#202A44; overflow-x:hidden; }
         .container { max-width:1200px; margin:30px auto; padding:0 20px; }
         .page-header,.filter-section,.table-card,.chart-card { background:white; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.07); }
         .page-header { padding:28px; margin-bottom:22px; }
@@ -82,7 +82,12 @@ try {
         tbody tr:hover { background:#F7F9FC; }
         .empty { text-align:center; padding:30px; color:#52618D; }
         @media (max-width:800px) { .filter-grid,.grid-2 { grid-template-columns:1fr; } }
-    </style>
+    .auto-search-submit,.auto-filter-submit{display:none !important;}
+    
+        .content-container,
+        .container{margin-top:0 !important;}
+
+</style>
 </head>
 <body>
 <?php include __DIR__ . '/../navbar.php'; ?>
@@ -108,7 +113,7 @@ try {
                 <div class="filter-group"><label>End Date</label><input type="date" name="end_date" value="<?php echo h($end_date); ?>"></div>
             </div>
             <div class="filter-actions">
-                <button class="btn" type="submit">Apply Filters</button>
+                <button class="btn auto-filter-submit" type="submit">Apply Filters</button>
                 <a class="btn secondary" href="?report=dashboard">Reset</a>
                 <?php if ($report_type !== 'dashboard'): ?>
                     <a class="btn secondary" href="reports/export_csv.php?type=<?php echo h($report_type); ?>&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Export CSV</a>
@@ -180,5 +185,18 @@ if (document.getElementById('monthChart')) new Chart(document.getElementById('mo
 if (document.getElementById('dayChart')) new Chart(document.getElementById('dayChart'), { type:'bar', data:{labels:dayLabels,datasets:[{label:'Borrows',data:dayData,backgroundColor:'#52618D'}]}, options:{responsive:true,maintainAspectRatio:false} });
 <?php endif; ?>
 </script>
+
+<script id="reportsAutoFilterEnhancement">
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('.filter-section form');
+    if (!form) return;
+    form.querySelectorAll('select, input[type="date"]').forEach(function (field) {
+        field.addEventListener('change', function () {
+            form.submit();
+        });
+    });
+});
+</script>
+
 </body>
 </html>

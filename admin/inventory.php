@@ -12,8 +12,44 @@ if (!isAdmin()) {
     exit();
 }
 
-$message = '';
-$message_type = '';
+
+function ensureArchiveColumns($conn) {
+    foreach ([
+        'books' => [
+            'is_archived' => "ALTER TABLE books ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER book_status",
+            'archived_at' => "ALTER TABLE books ADD COLUMN archived_at DATETIME NULL AFTER is_archived",
+            'archived_by' => "ALTER TABLE books ADD COLUMN archived_by INT NULL AFTER archived_at",
+            'library_building' => "ALTER TABLE books ADD COLUMN library_building VARCHAR(150) NULL AFTER location_collection",
+            'shelf_number' => "ALTER TABLE books ADD COLUMN shelf_number VARCHAR(100) NULL AFTER library_building",
+            'library_section' => "ALTER TABLE books ADD COLUMN library_section VARCHAR(150) NULL AFTER shelf_number"
+        ]
+    ] as $table => $columns) {
+        foreach ($columns as $column => $sql) {
+            $safe = $conn->real_escape_string($column);
+            $check = $conn->query("SHOW COLUMNS FROM {$table} LIKE '{$safe}'");
+            if ($check && $check->num_rows === 0) {
+                @$conn->query($sql);
+            }
+        }
+    }
+}
+ensureArchiveColumns($conn);
+
+$message = $_SESSION['inventory_flash_message'] ?? '';
+$message_type = $_SESSION['inventory_flash_type'] ?? '';
+unset($_SESSION['inventory_flash_message'], $_SESSION['inventory_flash_type']);
+
+function redirectInventory($message, $type = 'success') {
+    $_SESSION['inventory_flash_message'] = $message;
+    $_SESSION['inventory_flash_type'] = $type;
+    $url = '/LibraryBorrowingSystem/admin/inventory.php';
+    $filter = $_GET['archive_filter'] ?? $_POST['archive_filter'] ?? 'active';
+    if (in_array($filter, ['active','archived','all'], true)) {
+        $url .= '?archive_filter=' . urlencode($filter);
+    }
+    header('Location: ' . $url);
+    exit;
+}
 
 $qr_dir = __DIR__ . '/../qr_codes';
 if (!is_dir($qr_dir)) {
@@ -164,6 +200,12 @@ function mapBookImportHeader($header) {
         'copy' => 'total_copies',
         'numberofcopies' => 'total_copies',
         'locationcollection' => 'location_collection',
+        'librarybuilding' => 'library_building',
+        'building' => 'library_building',
+        'shelfnumber' => 'shelf_number',
+        'shelf' => 'shelf_number',
+        'librarysection' => 'library_section',
+        'collectionsection' => 'library_section',
         'locationcollectionunderwherethatbook' => 'location_collection',
         'location' => 'location_collection',
         'collection' => 'location_collection',
@@ -474,15 +516,189 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'class' => $_POST['class'] ?? '',
             'type_of_material' => $_POST['type_of_material'] ?? '',
             'location_collection' => $_POST['location_collection'] ?? '',
+            'library_building' => $_POST['library_building'] ?? '',
+            'shelf_number' => $_POST['shelf_number'] ?? '',
+            'library_section' => $_POST['library_section'] ?? '',
             'total_copies' => $_POST['total_copies'] ?? 1
         ];
 
         if (addBookRecord($conn, $data, $error)) {
+            auditRecordChange($conn, 'book_added', 'inventory', 'Added a new book to inventory.', 'success', 'book', null, null, [
+                'title' => $data['title'] ?? '', 'author' => $data['author'] ?? '', 'book_number' => $data['book_number'] ?? '', 'book_pages' => $data['book_pages'] ?? '', 'total_copies' => $data['total_copies'] ?? 1
+            ]);
             $message = 'Book added successfully.';
             $message_type = 'success';
         } else {
             $message = $error;
             $message_type = 'error';
+        }
+    }
+
+    if ($action === 'edit_book') {
+        $book_id = intval($_POST['book_id'] ?? 0);
+        $allowed_statuses = ['available', 'out_of_stock', 'damaged', 'lost'];
+        $new_status = trim((string)($_POST['book_status'] ?? 'available'));
+
+        if ($book_id <= 0) {
+            $message = 'Invalid book ID.';
+            $message_type = 'error';
+        } elseif (!in_array($new_status, $allowed_statuses, true)) {
+            $message = 'Invalid book status selected.';
+            $message_type = 'error';
+        } else {
+            try {
+                $currentStmt = $conn->prepare(
+                    'SELECT title, author, co_authors, place_of_publication, publication_date,
+                            book_number, book_pages, source_of_funds, cost_price, publisher,
+                            edition, volumes, class, type_of_material, location_collection,
+                            library_building, shelf_number, library_section,
+                            total_copies, available_copies, borrowed_copies, lost_copies,
+                            book_status, is_archived
+                     FROM books WHERE book_id = ? LIMIT 1'
+                );
+                $currentStmt->bind_param('i', $book_id);
+                $currentStmt->execute();
+                $oldBook = $currentStmt->get_result()->fetch_assoc();
+                $currentStmt->close();
+
+                if (!$oldBook) {
+                    throw new Exception('Book not found.');
+                }
+
+                if ((int)$oldBook['is_archived'] === 1) {
+                    throw new Exception('Archived books cannot be edited. Restore the book first.');
+                }
+
+                $title = trim((string)($_POST['title'] ?? ''));
+                $author = trim((string)($_POST['author'] ?? ''));
+                $place = trim((string)($_POST['place_of_publication'] ?? ''));
+                $publicationDate = normalizeDateValue($_POST['publication_date'] ?? '');
+                $bookNumber = trim((string)($_POST['book_number'] ?? ''));
+                $bookPages = intval($_POST['book_pages'] ?? 0);
+                $sourceFunds = trim((string)($_POST['source_of_funds'] ?? ''));
+                $costPriceRaw = trim((string)($_POST['cost_price'] ?? ''));
+                $costPrice = $costPriceRaw === '' ? null : (float)$costPriceRaw;
+                $publisher = trim((string)($_POST['publisher'] ?? ''));
+                $edition = trim((string)($_POST['edition'] ?? ''));
+                $volumes = trim((string)($_POST['volumes'] ?? ''));
+                $bookClass = trim((string)($_POST['class'] ?? ''));
+                $material = trim((string)($_POST['type_of_material'] ?? ''));
+                $location = trim((string)($_POST['location_collection'] ?? ''));
+                $building = trim((string)($_POST['library_building'] ?? ''));
+                $shelf = trim((string)($_POST['shelf_number'] ?? ''));
+                $section = trim((string)($_POST['library_section'] ?? ''));
+                $coAuthors = normalizeCoAuthors($_POST['co_authors'] ?? '');
+
+                if ($title === '' || $author === '' || $place === '' || !$publicationDate || $bookNumber === '' || $bookPages <= 0 || $material === '' || $location === '') {
+                    throw new Exception('Please complete all required book fields.');
+                }
+
+                $duplicateStmt = $conn->prepare(
+                    'SELECT book_id FROM books
+                     WHERE book_number = ? AND book_id <> ?
+                     LIMIT 1'
+                );
+                $duplicateStmt->bind_param('si', $bookNumber, $book_id);
+                $duplicateStmt->execute();
+                $duplicate = $duplicateStmt->get_result()->fetch_assoc();
+                $duplicateStmt->close();
+
+                if ($duplicate) {
+                    throw new Exception('That Book Number is already assigned to another book.');
+                }
+
+                $available = (int)$oldBook['available_copies'];
+                $borrowed = (int)$oldBook['borrowed_copies'];
+
+                if ($new_status === 'available' && $available <= 0) {
+                    throw new Exception('Status cannot be Available because there are no available copies.');
+                }
+
+                if ($new_status === 'out_of_stock' && $available > 0) {
+                    throw new Exception('Status cannot be Out of Stock while available copies remain.');
+                }
+
+                $update = $conn->prepare(
+                    'UPDATE books SET
+                        title = ?, author = ?, co_authors = ?, place_of_publication = ?,
+                        publication_date = ?, book_number = ?, book_pages = ?,
+                        source_of_funds = ?, cost_price = ?, publisher = ?, edition = ?,
+                        volumes = ?, class = ?, type_of_material = ?, location_collection = ?,
+                        library_building = ?, shelf_number = ?, library_section = ?,
+                        book_status = ?
+                     WHERE book_id = ?'
+                );
+
+                $update->bind_param(
+                    'ssssssisdssssssssssi',
+                    $title,
+                    $author,
+                    $coAuthors,
+                    $place,
+                    $publicationDate,
+                    $bookNumber,
+                    $bookPages,
+                    $sourceFunds,
+                    $costPrice,
+                    $publisher,
+                    $edition,
+                    $volumes,
+                    $bookClass,
+                    $material,
+                    $location,
+                    $building,
+                    $shelf,
+                    $section,
+                    $new_status,
+                    $book_id
+                );
+
+                if (!$update->execute()) {
+                    throw new Exception('Unable to update the book details.');
+                }
+                $update->close();
+
+                $newBook = [
+                    'title' => $title,
+                    'author' => $author,
+                    'co_authors' => $coAuthors,
+                    'place_of_publication' => $place,
+                    'publication_date' => $publicationDate,
+                    'book_number' => $bookNumber,
+                    'book_pages' => $bookPages,
+                    'source_of_funds' => $sourceFunds,
+                    'cost_price' => $costPrice,
+                    'publisher' => $publisher,
+                    'edition' => $edition,
+                    'volumes' => $volumes,
+                    'class' => $bookClass,
+                    'type_of_material' => $material,
+                    'location_collection' => $location,
+                    'library_building' => $building,
+                    'shelf_number' => $shelf,
+                    'library_section' => $section,
+                    'book_status' => $new_status
+                ];
+
+                auditRecordChange(
+                    $conn,
+                    'book_updated',
+                    'inventory',
+                    'Updated book details and status.',
+                    'success',
+                    'book',
+                    $book_id,
+                    $oldBook,
+                    $newBook
+                );
+
+                $message = 'Book details updated successfully.';
+                $message_type = 'success';
+            } catch (Exception $e) {
+                $message = $e->getMessage();
+                $message_type = 'error';
+                logError('Book edit error: ' . $e->getMessage());
+            }
         }
     }
 
@@ -540,7 +756,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message_type = 'error';
         } else {
             try {
-                $book_stmt = $conn->prepare('SELECT title, qr_code, total_copies, available_copies FROM books WHERE book_id = ?');
+                $book_stmt = $conn->prepare('SELECT title, qr_code, total_copies, available_copies, is_archived FROM books WHERE book_id = ?');
                 $book_stmt->bind_param('i', $book_id);
                 $book_stmt->execute();
                 $book_result = $book_stmt->get_result();
@@ -550,6 +766,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $message_type = 'error';
                 } else {
                     $book = $book_result->fetch_assoc();
+                    if ((int)$book['is_archived'] === 1) {
+                        $message = 'Archived books cannot receive new copies. Restore the book first.';
+                        $message_type = 'error';
+                        $book_stmt->close();
+                    } else {
                     $new_total = (int)$book['total_copies'] + $copies_to_add;
                     $new_available = (int)$book['available_copies'] + $copies_to_add;
                     $book_status = $new_available > 0 ? 'available' : 'out_of_stock';
@@ -557,6 +778,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $update_stmt = $conn->prepare('UPDATE books SET total_copies = ?, available_copies = ?, book_status = ? WHERE book_id = ?');
                     $update_stmt->bind_param('iisi', $new_total, $new_available, $book_status, $book_id);
                     if ($update_stmt->execute()) {
+                        auditRecordChange($conn, 'book_copies_added', 'inventory', 'Added copies to a book.', 'success', 'book', $book_id, [
+                            'title' => $book['title'], 'total_copies' => (int)$book['total_copies'], 'available_copies' => (int)$book['available_copies']
+                        ], [
+                            'title' => $book['title'], 'total_copies' => $new_total, 'available_copies' => $new_available
+                        ], ['copies_added' => $copies_to_add]);
                         $message = 'Added ' . $copies_to_add . ' copy/copies to "' . h($book['title']) . '". New total: ' . $new_total;
                         $message_type = 'success';
                     } else {
@@ -564,8 +790,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $message_type = 'error';
                     }
                     $update_stmt->close();
+                    }
                 }
-                $book_stmt->close();
+                if (isset($book_stmt) && $book_stmt) $book_stmt->close();
             } catch (Exception $e) {
                 $message = 'Error: ' . h($e->getMessage());
                 $message_type = 'error';
@@ -586,7 +813,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message_type = 'error';
         } else {
             try {
-                $book_stmt = $conn->prepare('SELECT title, total_copies, available_copies, borrowed_copies, lost_copies FROM books WHERE book_id = ? LIMIT 1');
+                $book_stmt = $conn->prepare('SELECT title, total_copies, available_copies, borrowed_copies, lost_copies, is_archived FROM books WHERE book_id = ? LIMIT 1');
                 $book_stmt->bind_param('i', $book_id);
                 $book_stmt->execute();
                 $book = $book_stmt->get_result()->fetch_assoc();
@@ -595,14 +822,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (!$book) {
                     $message = 'Book not found.';
                     $message_type = 'error';
-                } elseif ((int)$book['total_copies'] <= 1) {
-                    $message = 'Only one copy remains. Use Remove Book if you want to remove this title completely.';
+                } elseif ((int)$book['total_copies'] <= 0) {
+                    $message = 'This book already has zero copies.';
+                    $message_type = 'error';
+                } elseif ((int)$book['is_archived'] === 1) {
+                    $message = 'Archived books cannot have copies removed.';
                     $message_type = 'error';
                 } elseif ((int)$book['available_copies'] <= 0) {
                     $message = 'No available copies can be removed right now. Return a borrowed copy first.';
                     $message_type = 'error';
                 } else {
-                    $max_removable = min((int)$book['available_copies'], (int)$book['total_copies'] - 1);
+                    $max_removable = min((int)$book['available_copies'], (int)$book['total_copies']);
 
                     if ($copies_to_remove > $max_removable) {
                         $message = 'You can remove a maximum of ' . $max_removable . ' cop' . ($max_removable === 1 ? 'y' : 'ies') . ' while keeping this book record.';
@@ -616,6 +846,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $update_stmt->bind_param('iisi', $new_total, $new_available, $book_status, $book_id);
 
                         if ($update_stmt->execute()) {
+                            auditRecordChange($conn, 'book_copies_removed', 'inventory', 'Removed copies from a book.', 'success', 'book', $book_id, [
+                                'title' => $book['title'], 'total_copies' => (int)$book['total_copies'], 'available_copies' => (int)$book['available_copies']
+                            ], [
+                                'title' => $book['title'], 'total_copies' => $new_total, 'available_copies' => $new_available
+                            ], ['copies_removed' => $copies_to_remove]);
                             $message = $copies_to_remove . ' cop' . ($copies_to_remove === 1 ? 'y' : 'ies') . ' removed from "' . $book['title'] . '". Remaining copies: ' . $new_total . '.';
                             $message_type = 'success';
                         } else {
@@ -633,15 +868,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     }
 
-    if ($action === 'remove_book') {
+    if ($action === 'restore_book') {
         $book_id = intval($_POST['book_id'] ?? 0);
-
         if ($book_id <= 0) {
             $message = 'Invalid book ID.';
             $message_type = 'error';
         } else {
             try {
-                $book_stmt = $conn->prepare('SELECT title, qr_code, borrowed_copies FROM books WHERE book_id = ? LIMIT 1');
+                $book_stmt = $conn->prepare('SELECT title, is_archived, borrowed_copies FROM books WHERE book_id = ? LIMIT 1');
+                $book_stmt->bind_param('i', $book_id);
+                $book_stmt->execute();
+                $book = $book_stmt->get_result()->fetch_assoc();
+                $book_stmt->close();
+                if (!$book) {
+                    $message = 'Book not found.';
+                    $message_type = 'error';
+                } elseif ((int)$book['is_archived'] === 0) {
+                    $message = 'This book is already active.';
+                    $message_type = 'error';
+                } elseif ((int)$book['borrowed_copies'] > 0) {
+                    $message = 'This archived book has an active borrowing record and cannot be restored yet.';
+                    $message_type = 'error';
+                } else {
+                    $stmt = $conn->prepare("UPDATE books SET is_archived = 0, archived_at = NULL, archived_by = NULL, book_status = CASE WHEN available_copies > 0 THEN 'available' ELSE 'out_of_stock' END WHERE book_id = ?");
+                    $stmt->bind_param('i', $book_id);
+                    if (!$stmt->execute()) throw new Exception('Unable to restore the book.');
+                    $stmt->close();
+                    auditRecordChange($conn, 'book_restored', 'inventory', 'Restored an archived book to active inventory.', 'success', 'book', $book_id, ['status'=>'archived'], ['status'=>'active','title'=>$book['title']]);
+                    $message = 'Book restored successfully: ' . $book['title'];
+                    $message_type = 'success';
+                }
+            } catch (Exception $e) {
+                $message = 'Error restoring book: ' . h($e->getMessage());
+                $message_type = 'error';
+                logError('Restore book error: ' . $e->getMessage());
+            }
+        }
+    }
+
+    if ($action === 'remove_book') {
+        $book_id = intval($_POST['book_id'] ?? 0);
+        if ($book_id <= 0) {
+            $message = 'Invalid book ID.';
+            $message_type = 'error';
+        } else {
+            try {
+                $book_stmt = $conn->prepare('SELECT title, qr_code, borrowed_copies, is_archived FROM books WHERE book_id = ? LIMIT 1');
                 $book_stmt->bind_param('i', $book_id);
                 $book_stmt->execute();
                 $book = $book_stmt->get_result()->fetch_assoc();
@@ -650,52 +922,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (!$book) {
                     $message = 'Book not found.';
                     $message_type = 'error';
+                } elseif ((int)$book['is_archived'] === 1) {
+                    $message = 'This book is already archived.';
+                    $message_type = 'error';
                 } elseif ((int)$book['borrowed_copies'] > 0) {
-                    $message = 'This book cannot be removed while it is currently borrowed. Return it first.';
+                    $message = 'This book cannot be archived while it is currently borrowed. Return it first.';
                     $message_type = 'error';
                 } else {
-                    $conn->begin_transaction();
-                    try {
-                        // Remove old transaction history for this book first so the foreign key does not block deletion.
-                        $delete_tx = $conn->prepare('DELETE FROM transactions WHERE book_id = ?');
-                        $delete_tx->bind_param('i', $book_id);
-                        if (!$delete_tx->execute()) {
-                            throw new Exception('Unable to remove related transaction records.');
-                        }
-                        $delete_tx->close();
+                    $stmt = $conn->prepare("UPDATE books SET is_archived = 1, archived_at = NOW(), archived_by = ?, book_status = 'out_of_stock' WHERE book_id = ?");
+                    $admin_id = (int)($_SESSION['user_id'] ?? 0);
+                    $stmt->bind_param('ii', $admin_id, $book_id);
+                    if (!$stmt->execute()) throw new Exception('Unable to archive the book.');
+                    $stmt->close();
 
-                        $delete_book = $conn->prepare('DELETE FROM books WHERE book_id = ?');
-                        $delete_book->bind_param('i', $book_id);
-                        if (!$delete_book->execute() || $delete_book->affected_rows < 1) {
-                            throw new Exception('Unable to remove the book.');
-                        }
-                        $delete_book->close();
-                        $conn->commit();
-
-                        $qr_file = $qr_dir . '/' . basename((string)$book['qr_code']) . '.png';
-                        if (is_file($qr_file)) {
-                            @unlink($qr_file);
-                        }
-
-                        $message = 'Book removed successfully: ' . $book['title'];
-                        $message_type = 'success';
-                    } catch (Exception $e) {
-                        $conn->rollback();
-                        throw $e;
-                    }
+                    auditRecordChange($conn, 'book_archived', 'inventory', 'Archived a book from active inventory while preserving its transaction history.', 'success', 'book', $book_id, ['title'=>$book['title'],'status'=>'active','qr_code'=>$book['qr_code']], ['title'=>$book['title'],'status'=>'archived']);
+                    $message = 'Book archived successfully: ' . $book['title'];
+                    $message_type = 'success';
                 }
             } catch (Exception $e) {
-                $message = 'Error removing book: ' . $e->getMessage();
+                $message = 'Error archiving book: ' . h($e->getMessage());
                 $message_type = 'error';
-                logError('Remove book error: ' . $e->getMessage());
+                logError('Archive book error: ' . $e->getMessage());
             }
         }
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $message !== '') {
+    redirectInventory($message, $message_type ?: 'info');
+}
+
 $stats = ['total_titles' => 0, 'total_copies' => 0, 'available_copies' => 0, 'borrowed_copies' => 0, 'lost_copies' => 0];
 try {
-    $stats_result = $conn->query('SELECT COUNT(*) AS total_titles, COALESCE(SUM(total_copies),0) AS total_copies, COALESCE(SUM(available_copies),0) AS available_copies, COALESCE(SUM(borrowed_copies),0) AS borrowed_copies, COALESCE(SUM(lost_copies),0) AS lost_copies FROM books');
+    $stats_result = $conn->query('SELECT COUNT(*) AS total_titles, COALESCE(SUM(total_copies),0) AS total_copies, COALESCE(SUM(available_copies),0) AS available_copies, COALESCE(SUM(borrowed_copies),0) AS borrowed_copies, COALESCE(SUM(lost_copies),0) AS lost_copies FROM books WHERE is_archived = 0');
     if ($stats_result) {
         $stats = $stats_result->fetch_assoc();
     }
@@ -705,7 +964,7 @@ try {
 
 $low_stock_books = [];
 try {
-    $low_stock_result = $conn->query('SELECT book_id, title, author, book_number, available_copies, total_copies FROM books WHERE available_copies <= 2 ORDER BY available_copies ASC, title ASC LIMIT 10');
+    $low_stock_result = $conn->query('SELECT book_id, title, author, book_number, available_copies, total_copies FROM books WHERE is_archived = 0 AND available_copies <= 2 ORDER BY available_copies ASC, title ASC LIMIT 10');
     if ($low_stock_result) {
         while ($row = $low_stock_result->fetch_assoc()) {
             $low_stock_books[] = $row;
@@ -715,9 +974,13 @@ try {
     logError('Error fetching low stock books: ' . $e->getMessage());
 }
 
+$archive_filter = $_GET['archive_filter'] ?? 'active';
+if (!in_array($archive_filter, ['active','archived','all'], true)) $archive_filter = 'active';
+$archive_where = $archive_filter === 'archived' ? 'WHERE is_archived = 1' : ($archive_filter === 'active' ? 'WHERE is_archived = 0' : '');
+
 $all_books = [];
 try {
-    $books_result = $conn->query('SELECT book_id, title, author, co_authors, place_of_publication, publication_date, book_number, book_pages, source_of_funds, cost_price, publisher, edition, volumes, class, type_of_material, location_collection, qr_code, total_copies, available_copies, borrowed_copies, lost_copies, book_status, created_at FROM books ORDER BY title ASC');
+    $books_result = $conn->query("SELECT book_id, title, author, co_authors, place_of_publication, publication_date, book_number, book_pages, source_of_funds, cost_price, publisher, edition, volumes, class, type_of_material, location_collection, library_building, shelf_number, library_section, book_condition, qr_code, total_copies, available_copies, borrowed_copies, lost_copies, book_status, is_archived, archived_at, created_at FROM books {$archive_where} ORDER BY title ASC");
     if ($books_result) {
         while ($row = $books_result->fetch_assoc()) {
             $all_books[] = $row;
@@ -741,6 +1004,7 @@ try {
             background: #F3F7FC;
             color: #202A44;
             padding-bottom: 40px;
+            overflow-x: hidden;
         }
 
         .container {
@@ -954,7 +1218,7 @@ try {
         .btn-danger { padding: 7px 14px; background: #c0392b; color: white; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
         .btn-danger:hover { background: #a93226; }
         .inventory-action-group { display: flex; gap: 6px; flex-wrap: wrap; }
-        .btn-details { padding: 7px 14px; background: #52618D; color: white; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.btn-details { padding: 7px 14px; background: #52618D; color: white; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
         .btn-details:hover { background: #141F52; }
         .book-details-modal-content { max-width: 760px; max-height: 88vh; overflow-y: auto; }
         .book-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -1127,6 +1391,21 @@ try {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
             th, td { padding: 10px; }
         }
+            .details-modal-header{align-items:flex-start;}
+        .details-heading{display:flex;align-items:center;gap:10px;min-width:0;}
+        .details-heading h2{margin:0;}
+        .details-edit-btn{display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border:0;border-radius:8px;background:#52618D;color:#fff;font-size:12px;font-weight:700;cursor:pointer;}
+        .details-edit-btn:hover{background:#141F52;}
+        .edit-modal-header{align-items:flex-start;}
+        .modal-subtitle{margin-top:5px;color:#52618D;font-size:12px;line-height:1.45;}
+        .edit-section-title{margin:20px 0 12px;padding:10px 13px;border:1px solid #E7EEF7;border-left:4px solid #141F52;border-radius:9px;background:#F7F9FC;color:#141F52;font-size:13px;font-weight:800;}
+        .book-edit-modal-content{max-width:950px;width:94%;max-height:92vh;overflow-y:auto;border:1px solid #D2E2F6;}
+        .book-edit-modal-content .form-row{gap:22px 24px;}
+        .book-edit-modal-content .form-group{margin-bottom:16px;}
+        .book-edit-modal-content input,.book-edit-modal-content select{padding:12px 14px;border-radius:8px;}
+        .inventory-action-btn{cursor:pointer;}
+        .inventory-action-btn:focus-visible,.details-edit-btn:focus-visible{outline:3px solid rgba(244,249,22,.55);outline-offset:2px;}
+
     </style>
 </head>
 <body>
@@ -1136,7 +1415,7 @@ try {
     <div class="container">
         <div class="page-header">
             <div>
-                <h1>Inventory Management</h1>
+                <h1>Cataloging</h1>
                 <p>Add complete book details, import via CSV/XLSX, and monitor real-time library inventory</p>
             </div>
         </div>
@@ -1182,10 +1461,11 @@ try {
         
 
         <div class="table-section">
-            <div class="inventory-toolbar">
-                <div class="inventory-left">
+            <div class="inventory-left">
                     <h2>All Books Inventory</h2>
                 </div>
+            <div class="inventory-toolbar">
+                
                 <div class="inventory-center">
                     <input 
                         type="text"
@@ -1194,15 +1474,27 @@ try {
                         oninput="filterTable()"
                         class="search-input"
                     >
-                    <select 
+                    <select
                         id="statusFilter"
                         onchange="filterTable()"
                         class="filter-select"
                     >
                         <option value="">All Status</option>
-                        <option value="Available">Available</option>
-                        <option value="Limited Copy">Limited Copy</option>
-                        <option value="Not Available">Not Available</option>
+                        <option value="available">Available</option>
+                        <option value="limited">Limited Copy</option>
+                        <option value="not_available">Not Available</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                    <select id="classFilter" class="filter-select" onchange="filterTable()">
+                        <option value="">All Classes</option>
+                    </select>
+                    <select id="sectionFilter" class="filter-select" onchange="filterTable()">
+                        <option value="">All Library Sections</option>
+                    </select>
+                    <select id="archiveFilter" class="filter-select" onchange="applyInventoryFilters()">
+                        <option value="active" <?php echo $archive_filter === 'active' ? 'selected' : ''; ?>>Active Books</option>
+                        <option value="archived" <?php echo $archive_filter === 'archived' ? 'selected' : ''; ?>>Archived Books</option>
+                        <option value="all" <?php echo $archive_filter === 'all' ? 'selected' : ''; ?>>All Books</option>
                     </select>
                 </div>
                 <div class="inventory-right">
@@ -1249,7 +1541,18 @@ try {
                         </thead>
                         <tbody>
                             <?php foreach ($all_books as $book): ?>
-                                <tr>
+                                <?php
+                                    $inventoryAvailability = (int)$book['is_archived'] === 1
+                                        ? 'archived'
+                                        : ((int)$book['available_copies'] > 0
+                                            ? ((int)$book['available_copies'] < (int)$book['total_copies'] ? 'limited' : 'available')
+                                            : 'not_available');
+                                ?>
+                                <tr data-search="<?php echo h($book['title'] . ' ' . $book['author'] . ' ' . $book['book_number']); ?>"
+                                    data-status="<?php echo h($inventoryAvailability); ?>"
+                                    data-condition="<?php echo h($book['book_condition'] ?? ''); ?>"
+                                    data-class="<?php echo h($book['class'] ?? ''); ?>"
+                                    data-section="<?php echo h($book['library_section'] ?? ($book['location_collection'] ?? '')); ?>">
                                     <td>
                                         <img src="/LibraryBorrowingSystem/qr_codes/<?php echo h($book['qr_code']); ?>.png"
                                              alt="QR"
@@ -1285,7 +1588,7 @@ try {
                                     <td><strong><?php echo (int)$book['available_copies']; ?></strong></td>
                                     <td><?php echo (int)$book['borrowed_copies']; ?></td>
                                     <td><?php echo (int)$book['lost_copies']; ?></td>
-                                    <td><?php echo getStatusBadge($book['available_copies'], $book['total_copies']); ?></td>
+                                    <td><?php echo (int)$book['is_archived'] === 1 ? '<span class="badge badge-danger">Archived</span>' : getStatusBadge($book['available_copies'], $book['total_copies']); ?></td>
                                     <td>
                                         <?php
                                             $book_modal_data = [
@@ -1305,31 +1608,34 @@ try {
                                                 'class' => $book['class'],
                                                 'type_of_material' => $book['type_of_material'],
                                                 'location_collection' => $book['location_collection'],
+                                                'library_building' => $book['library_building'],
+                                                'shelf_number' => $book['shelf_number'],
+                                                'library_section' => $book['library_section'],
                                                 'qr_code' => $book['qr_code'],
                                                 'total_copies' => (int)$book['total_copies'],
                                                 'available_copies' => (int)$book['available_copies'],
                                                 'borrowed_copies' => (int)$book['borrowed_copies'],
                                                 'lost_copies' => (int)$book['lost_copies'],
                                                 'book_status' => $book['book_status'],
+                                                'is_archived' => (int)$book['is_archived'],
+                                                'archived_at' => $book['archived_at'],
                                                 'created_at' => $book['created_at']
                                             ];
                                             $book_modal_json = json_encode($book_modal_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                                         ?>
                                         <div class="inventory-action-group">
-                                            <button class="btn" type="button" style="padding:7px 14px;font-size:12px;"
-                                                onclick="openAddCopiesModal(<?php echo (int)$book['book_id']; ?>,'<?php echo h($book['title']); ?>')">
-                                                + Add
-                                            </button>
-                                            <button type="button" class="btn-danger"
-                                                data-book='<?php echo h($book_modal_json); ?>'
-                                                onclick="openRemoveBookModal(this)">
-                                                Remove
-                                            </button>
-                                            <button type="button" class="btn-details"
-                                                data-book='<?php echo h($book_modal_json); ?>'
-                                                onclick="openBookDetailsModal(this)">
-                                                Details
-                                            </button>
+                                            <?php if ((int)$book['is_archived'] === 1): ?>
+                                                <form method="POST" style="display:inline;" data-confirm-title="Restore Book" data-confirm-message="Restore this archived book to the active inventory? Its borrowing history will remain intact." data-confirm-text="Restore Book" data-confirm-danger="0">
+                                                    <?php echo csrfField(); ?>
+                                                    <input type="hidden" name="action" value="restore_book">
+                                                    <input type="hidden" name="book_id" value="<?php echo (int)$book['book_id']; ?>">
+                                                    <button type="submit" class="btn-primary" style="padding:7px 14px;font-size:12px;">Restore</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <button class="btn" type="button" style="padding:7px 14px;font-size:12px;" onclick="openAddCopiesModal(<?php echo (int)$book['book_id']; ?>,'<?php echo h($book['title']); ?>')">+ Add</button>
+                                                <button type="button" class="btn-danger inventory-action-btn" data-action="remove" data-book-b64="<?php echo base64_encode($book_modal_json); ?>">Remove</button>
+                                            <?php endif; ?>
+                                            <button type="button" class="btn-details inventory-action-btn" data-action="details" data-book-b64="<?php echo base64_encode($book_modal_json); ?>">Details</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1346,7 +1652,7 @@ try {
             </div>
             <div id="addBookFormWrapper">
                 <div class="modal-note" style="margin-bottom:16px;">Fill out the complete book details below. A unique QR code will be generated automatically after saving.</div>
-                <form method="POST">
+                <form method="POST" id="addBookForm">
                     <?php echo csrfField(); ?>
                     <input type="hidden" name="action" value="add">
 
@@ -1402,6 +1708,18 @@ try {
                         <div class="form-group">
                             <label for="location_collection">Location - Collection *</label>
                             <input type="text" id="location_collection" name="location_collection" required placeholder="e.g. Filipiniana Section / Shelf A1">
+                        </div>
+                        <div class="form-group">
+                            <label for="library_building">Building / Room</label>
+                            <input type="text" id="library_building" name="library_building" placeholder="e.g. Main Library">
+                        </div>
+                        <div class="form-group">
+                            <label for="shelf_number">Shelf Number</label>
+                            <input type="text" id="shelf_number" name="shelf_number" placeholder="e.g. A-04">
+                        </div>
+                        <div class="form-group">
+                            <label for="library_section">Library Section</label>
+                            <input type="text" id="library_section" name="library_section" placeholder="e.g. Science Section">
                         </div>
                         <div class="form-group">
                             <label for="total_copies">Number of Copies *</label>
@@ -1470,7 +1788,7 @@ try {
                 <code>Title, Author, Co-Authors, Place of Publication, Date, Book Number, Book Pages, Source of Funds, Cost Price, Publisher, Edition, Volumes, Class, Type of Material, Location Collection, Total Copies</code><br>
                 Book Number and Book Pages are required. Source of Funds, Cost Price, Publisher, Edition, Volumes, and Class are optional. Co-authors can be separated with semicolons or placed on separate lines.
             </div>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="bulkAddBooksForm">
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="import_books">
                 <div class="form-group">
@@ -1524,7 +1842,7 @@ try {
             <div class="remove-choice-grid">
                 <div class="remove-choice">
                     <h3>Remove Copies</h3>
-                    <p>Choose the number of available physical copies to remove while keeping the book record, QR code, and at least one copy in the system.</p>
+                    <p>Choose the number of available physical copies to remove and leave the title at zero copies if all available copies are removed.</p>
                     <form method="POST" id="removeCopyForm">
                         <?php echo csrfField(); ?>
                         <input type="hidden" name="action" value="remove_copy">
@@ -1557,8 +1875,11 @@ try {
 
     <div id="bookDetailsModal" class="modal">
         <div class="modal-content book-details-modal-content">
-            <div class="modal-header">
-                <h2>Book Details</h2>
+            <div class="modal-header details-modal-header">
+                <div class="details-heading">
+                    <h2 id="bookDetailsHeading">Book Details</h2>
+                    <button type="button" class="details-edit-btn" id="detailsEditButton" onclick="openEditFromDetails()">Edit</button>
+                </div>
                 <button class="close" type="button" onclick="closeBookDetailsModal()">&times;</button>
             </div>
             <div class="book-details-grid">
@@ -1623,6 +1944,18 @@ try {
                     <div class="book-detail-value" id="detailLocation">—</div>
                 </div>
                 <div class="book-detail-item">
+                    <div class="book-detail-label">Building / Room</div>
+                    <div class="book-detail-value" id="detailBuilding">—</div>
+                </div>
+                <div class="book-detail-item">
+                    <div class="book-detail-label">Shelf Number</div>
+                    <div class="book-detail-value" id="detailShelf">—</div>
+                </div>
+                <div class="book-detail-item">
+                    <div class="book-detail-label">Library Section</div>
+                    <div class="book-detail-value" id="detailLibrarySection">—</div>
+                </div>
+                <div class="book-detail-item">
                     <div class="book-detail-label">Total Copies</div>
                     <div class="book-detail-value" id="detailTotalCopies">—</div>
                 </div>
@@ -1658,6 +1991,139 @@ try {
             <div class="modal-buttons" style="justify-content:flex-end;">
                 <button type="button" class="btn-secondary" onclick="closeBookDetailsModal()">Close</button>
             </div>
+        </div>
+    </div>
+
+    <div id="editBookModal" class="modal">
+        <div class="modal-content book-edit-modal-content">
+            <div class="modal-header edit-modal-header">
+                <div>
+                    <h2>Edit Book Details</h2>
+                    <p class="modal-subtitle">Update the catalog information for this book.</p>
+                </div>
+                <button class="close" type="button" onclick="closeEditBookModal()">&times;</button>
+            </div>
+            <form method="POST" id="editBookForm">
+                <?php echo csrfField(); ?>
+                <input type="hidden" name="action" value="edit_book">
+                <input type="hidden" name="book_id" id="editBookId">
+
+                <div class="edit-section-title">Basic Information</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editTitle">Title *</label>
+                        <input type="text" id="editTitle" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editAuthor">Author *</label>
+                        <input type="text" id="editAuthor" name="author" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editCoAuthors">Co-Author(s)</label>
+                        <input type="text" id="editCoAuthors" name="co_authors" placeholder="Separate names with semicolons">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPlace">Place of Publication *</label>
+                        <input type="text" id="editPlace" name="place_of_publication" required>
+                    </div>
+                </div>
+
+                <div class="edit-section-title">Publication Details</div>
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="editPublicationDate">Date Published *</label>
+                        <input type="date" id="editPublicationDate" name="publication_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editBookNumber">Book Number *</label>
+                        <input type="text" id="editBookNumber" name="book_number" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editBookPages">Book Pages *</label>
+                        <input type="number" id="editBookPages" name="book_pages" min="1" required>
+                    </div>
+                </div>
+
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="editSourceFunds">Source of Funds</label>
+                        <input type="text" id="editSourceFunds" name="source_of_funds">
+                    </div>
+                    <div class="form-group">
+                        <label for="editCostPrice">Cost Price</label>
+                        <input type="number" id="editCostPrice" name="cost_price" min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPublisher">Publisher</label>
+                        <input type="text" id="editPublisher" name="publisher">
+                    </div>
+                </div>
+
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="editEdition">Edition</label>
+                        <input type="text" id="editEdition" name="edition">
+                    </div>
+                    <div class="form-group">
+                        <label for="editVolumes">Volumes</label>
+                        <input type="text" id="editVolumes" name="volumes">
+                    </div>
+                    <div class="form-group">
+                        <label for="editClass">Class</label>
+                        <input type="text" id="editClass" name="class">
+                    </div>
+                </div>
+
+                <div class="edit-section-title">Classification &amp; Collection</div>
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="editMaterial">Type of Material *</label>
+                        <input type="text" id="editMaterial" name="type_of_material" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editLocation">Location / Collection *</label>
+                        <input type="text" id="editLocation" name="location_collection" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editStatus">Status *</label>
+                        <select id="editStatus" name="book_status" required>
+                            <option value="available">Available</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="damaged">Damaged</option>
+                            <option value="lost">Lost</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="edit-section-title">Physical Location</div>
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="editBuilding">Building / Room</label>
+                        <input type="text" id="editBuilding" name="library_building">
+                    </div>
+                    <div class="form-group">
+                        <label for="editShelf">Shelf Number</label>
+                        <input type="text" id="editShelf" name="shelf_number">
+                    </div>
+                    <div class="form-group">
+                        <label for="editLibrarySection">Library Section</label>
+                        <input type="text" id="editLibrarySection" name="library_section">
+                    </div>
+                </div>
+
+                <div class="edit-section-title">Status</div>
+                <div class="modal-note">
+                    Copy quantities are managed separately using Add or Remove Copies.
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                    <button type="button" class="btn-secondary" onclick="closeEditBookModal()">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1740,17 +2206,70 @@ try {
 
         /* ── Search & Filter ── */
         function filterTable() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const status = document.getElementById('statusFilter').value.toLowerCase();
-            const rows = document.querySelectorAll('tbody tr');
+            const search = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+            const status = document.getElementById('statusFilter')?.value || '';
+            const condition = document.getElementById('conditionFilter')?.value || '';
+            const classValue = document.getElementById('classFilter')?.value || '';
+            const sectionValue = document.getElementById('sectionFilter')?.value || '';
+
+            const rows = document.querySelectorAll('tbody tr[data-search]');
             rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                const badge = row.querySelector('.badge');
-                const badgeText = badge ? badge.textContent.trim().toLowerCase() : '';
-                const matchSearch = !search || text.includes(search);
-                const matchStatus = !status || badgeText.includes(status.toLowerCase());
-                row.style.display = matchSearch && matchStatus ? '' : 'none';
+                const rowSearch = (row.dataset.search || '').toLowerCase();
+                const matchSearch = !search || rowSearch.includes(search);
+                const matchStatus = !status || row.dataset.status === status;
+                const matchCondition = !condition || row.dataset.condition === condition;
+                const matchClass = !classValue || row.dataset.class === classValue;
+                const matchSection = !sectionValue || row.dataset.section === sectionValue;
+
+                row.style.display = matchSearch && matchStatus && matchCondition && matchClass && matchSection ? '' : 'none';
             });
+
+            updateInventoryVisibleCount();
+        }
+
+        function populateInventoryFilters() {
+            const rows = document.querySelectorAll('tbody tr[data-search]');
+
+            function fill(selectId, dataKey) {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+
+                const values = new Set();
+                rows.forEach(row => {
+                    const value = (row.dataset[dataKey] || '').trim();
+                    if (value) values.add(value);
+                });
+
+                Array.from(values).sort((a, b) => a.localeCompare(b)).forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    select.appendChild(option);
+                });
+            }
+
+            fill('classFilter', 'class');
+            fill('sectionFilter', 'section');
+        }
+
+        function updateInventoryVisibleCount() {
+            const rows = document.querySelectorAll('tbody tr[data-search]');
+            let visible = 0;
+
+            rows.forEach(row => {
+                if (row.style.display !== 'none') visible++;
+            });
+
+            const counter = document.getElementById('inventoryVisibleCount');
+            if (counter) counter.textContent = visible;
+        }
+
+
+        function applyInventoryFilters() {
+            const value = document.getElementById('archiveFilter')?.value || 'active';
+            const url = new URL(window.location.href);
+            url.searchParams.set('archive_filter', value);
+            window.location.href = url.toString();
         }
 
         /* ── Add Copies Modal ── */
@@ -1782,6 +2301,11 @@ try {
 
         function parseBookButtonData(button) {
             try {
+                if (button.dataset.bookB64) {
+                    const binary = atob(button.dataset.bookB64);
+                    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+                    return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+                }
                 return JSON.parse(button.dataset.book || '{}');
             } catch (error) {
                 console.error('Unable to read book data:', error);
@@ -1807,13 +2331,13 @@ try {
             const total = Number(book.total_copies || 0);
             const available = Number(book.available_copies || 0);
             const borrowed = Number(book.borrowed_copies || 0);
-            const maxRemovable = Math.max(0, Math.min(available, total - 1));
+            const maxRemovable = Math.max(0, Math.min(available, total));
 
             let note = 'Total: ' + total + ' | Available: ' + available + ' | Borrowed: ' + borrowed;
             let canRemoveCopy = maxRemovable > 0;
 
             if (total <= 1) {
-                note += '. Only one copy remains, so use Remove Book to remove the title completely.';
+                note += '. You may remove the remaining available copy/copies and leave this title at zero copies.';
             } else if (available <= 0) {
                 note += '. No available copy can be removed until a borrowed copy is returned.';
             } else {
@@ -1842,7 +2366,7 @@ try {
             const copiesToRemove = Number(copiesInput.value || 0);
             const total = Number(selectedRemovalBook.total_copies || 0);
             const available = Number(selectedRemovalBook.available_copies || 0);
-            const maxRemovable = Math.max(0, Math.min(available, total - 1));
+            const maxRemovable = Math.max(0, Math.min(available, total));
 
             if (!Number.isInteger(copiesToRemove) || copiesToRemove < 1 || copiesToRemove > maxRemovable) {
                 showToast('Enter a number from 1 to ' + maxRemovable + ' copies.', 'error');
@@ -1891,6 +2415,8 @@ try {
             return value !== null && value !== undefined && String(value).trim() !== '' ? String(value) : '—';
         }
 
+        let selectedDetailsBook = null;
+
         function openBookDetailsModal(button) {
             const book = parseBookButtonData(button);
             if (!book) {
@@ -1898,6 +2424,7 @@ try {
                 return;
             }
 
+            selectedDetailsBook = book;
             document.getElementById('detailTitle').textContent = detailText(book.title);
             document.getElementById('detailAuthor').textContent = detailText(book.author);
             document.getElementById('detailCoAuthors').textContent = detailText(book.co_authors);
@@ -1913,6 +2440,9 @@ try {
             document.getElementById('detailCostPrice').textContent = book.cost_price !== null && book.cost_price !== '' ? '₱' + Number(book.cost_price).toFixed(2) : '—';
             document.getElementById('detailMaterial').textContent = detailText(book.type_of_material);
             document.getElementById('detailLocation').textContent = detailText(book.location_collection);
+            document.getElementById('detailBuilding').textContent = detailText(book.library_building);
+            document.getElementById('detailShelf').textContent = detailText(book.shelf_number);
+            document.getElementById('detailLibrarySection').textContent = detailText(book.library_section);
             document.getElementById('detailTotalCopies').textContent = detailText(book.total_copies);
             document.getElementById('detailAvailableCopies').textContent = detailText(book.available_copies);
             document.getElementById('detailBorrowedCopies').textContent = detailText(book.borrowed_copies);
@@ -1921,9 +2451,15 @@ try {
             document.getElementById('detailCreatedAt').textContent = detailText(book.created_at);
             document.getElementById('detailQrCode').textContent = detailText(book.qr_code);
             document.getElementById('detailQrImage').src = '/LibraryBorrowingSystem/qr_codes/' + encodeURIComponent(book.qr_code) + '.png';
-            document.getElementById('detailQrDownload').href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(book.qr_code);
+            document.getElementById('detailQrDownload').href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(book.qr_code) + '&type=book';
 
             document.getElementById('bookDetailsModal').classList.add('active');
+        }
+
+        function openEditFromDetails() {
+            if (!selectedDetailsBook) return;
+            closeBookDetailsModal();
+            openEditBookModalFromData(selectedDetailsBook);
         }
 
         function closeBookDetailsModal() {
@@ -1934,6 +2470,72 @@ try {
             if (e.target === this) closeBookDetailsModal();
         });
 
+        /* ── Edit Book Modal ── */
+        function setEditValue(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.value = value === null || value === undefined ? '' : String(value);
+        }
+
+        function openEditBookModal(button) {
+            openEditBookModalFromData(parseBookButtonData(button));
+        }
+
+        function openEditBookModalFromData(book) {
+            if (!book) {
+                showToast('Unable to load the selected book for editing.', 'error');
+                return;
+            }
+
+            if (Number(book.is_archived || 0) === 1) {
+                showToast('Archived books cannot be edited. Restore the book first.', 'error');
+                return;
+            }
+
+            setEditValue('editBookId', book.book_id);
+            setEditValue('editTitle', book.title);
+            setEditValue('editAuthor', book.author);
+            setEditValue('editCoAuthors', book.co_authors);
+            setEditValue('editPlace', book.place_of_publication);
+            setEditValue('editPublicationDate', book.publication_date);
+            setEditValue('editBookNumber', book.book_number);
+            setEditValue('editBookPages', book.book_pages);
+            setEditValue('editSourceFunds', book.source_of_funds);
+            setEditValue('editCostPrice', book.cost_price);
+            setEditValue('editPublisher', book.publisher);
+            setEditValue('editEdition', book.edition);
+            setEditValue('editVolumes', book.volumes);
+            setEditValue('editClass', book.class);
+            setEditValue('editMaterial', book.type_of_material);
+            setEditValue('editLocation', book.location_collection);
+            setEditValue('editBuilding', book.library_building);
+            setEditValue('editShelf', book.shelf_number);
+            setEditValue('editLibrarySection', book.library_section);
+
+            const status = document.getElementById('editStatus');
+            if (status) {
+                status.value = book.book_status || (Number(book.available_copies || 0) > 0 ? 'available' : 'out_of_stock');
+            }
+
+            document.getElementById('editBookModal').classList.add('active');
+        }
+
+        function closeEditBookModal() {
+            document.getElementById('editBookModal').classList.remove('active');
+        }
+
+        document.getElementById('editBookModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditBookModal();
+        });
+
+        document.addEventListener('click', function(event) {
+            const button = event.target.closest('.inventory-action-btn');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            if (action === 'details') openBookDetailsModal(button);
+            if (action === 'remove') openRemoveBookModal(button);
+        });
+
         /* ── QR Modal ── */
         function openQRModal(qrCode, bookTitle) {
             const filePath = '/LibraryBorrowingSystem/qr_codes/' + qrCode + '.png';
@@ -1941,7 +2543,7 @@ try {
             document.getElementById('qrBookInfo').textContent = 'ID: ' + qrCode + ' | ' + bookTitle;
             document.getElementById('qrImage').src = filePath;
             const downloadBtn = document.getElementById('downloadBookQrBtn');
-            downloadBtn.href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(qrCode);
+            downloadBtn.href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(qrCode) + '&type=book';
             downloadBtn.removeAttribute('download');
             document.getElementById('qrModal').classList.add('show');
         }
@@ -1953,6 +2555,25 @@ try {
         document.getElementById('qrModal').addEventListener('click', function(e) {
             if (e.target === this) closeQRModal();
         });
-    </script>
+    
+        let inventorySubmitLocked = false;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            populateInventoryFilters();
+            filterTable();
+
+            ['addBookForm', 'bulkAddBooksForm'].forEach(function(formId) {
+                const form = document.getElementById(formId);
+                if (!form) return;
+                form.addEventListener('submit', function() {
+                    if (inventorySubmitLocked) return;
+                    inventorySubmitLocked = true;
+                    const submit = form.querySelector('button[type="submit"]');
+                    if (submit) submit.disabled = true;
+                });
+            });
+        });
+</script>
+<?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
 </body>
 </html>

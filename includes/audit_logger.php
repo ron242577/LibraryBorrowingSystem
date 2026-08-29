@@ -1,11 +1,4 @@
 <?php
-/**
- * Database audit logger for Jose Abad Santos High School Library Borrowing System.
- *
- * This logger records every application request/process that reaches PHP and uses
- * the database connection. Sensitive values such as passwords, verification
- * codes, CAPTCHA answers, CSRF tokens, and mail credentials are never stored.
- */
 
 if (function_exists('auditLogEvent')) {
     return;
@@ -40,6 +33,22 @@ function ensureAuditLogTable(mysqli $conn): void
 
     if (!$conn->query($sql)) {
         error_log('Unable to create audit_logs table: ' . $conn->error);
+        return;
+    }
+
+    $columnChecks = [
+        'old_values' => "ALTER TABLE audit_logs ADD COLUMN old_values LONGTEXT NULL AFTER metadata",
+        'new_values' => "ALTER TABLE audit_logs ADD COLUMN new_values LONGTEXT NULL AFTER old_values"
+    ];
+
+    foreach ($columnChecks as $column => $alter) {
+        $safe = $conn->real_escape_string($column);
+        $check = $conn->query("SHOW COLUMNS FROM audit_logs LIKE '$safe'");
+        if ($check && $check->num_rows === 0) {
+            if (!$conn->query($alter)) {
+                error_log('Unable to add audit_logs column ' . $column . ': ' . $conn->error);
+            }
+        }
     }
 }
 
@@ -110,7 +119,7 @@ function auditCurrentActor(): array
         return [
             'type' => 'admin',
             'id' => (int)$_SESSION['user_id'],
-            'name' => (string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Admin')
+            'name' => (string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Chief Librarian')
         ];
     }
 
@@ -190,7 +199,7 @@ function auditInferEventType(): string
     }
 
     if ($module === 'login' && $method === 'POST') {
-        return 'admin_login';
+        return 'login_security_event';
     }
     if ($module === 'logout') {
         return 'admin_logout';
@@ -216,13 +225,27 @@ function auditLogEvent(
     string $status = 'info',
     ?string $targetType = null,
     int|string|null $targetId = null,
-    array $metadata = []
+    array $metadata = [],
+    mixed $oldValues = null,
+    mixed $newValues = null,
+    array $actorOverride = []
 ): void {
     if (!in_array($status, ['info', 'success', 'failure', 'attempt'], true)) {
         $status = 'info';
     }
 
     $actor = auditCurrentActor();
+
+    if (isset($actorOverride['actor_type_override'])) {
+        $actor['type'] = $actorOverride['actor_type_override'];
+    }
+    if (array_key_exists('actor_id_override', $actorOverride)) {
+        $actor['id'] = $actorOverride['actor_id_override'];
+    }
+    if (array_key_exists('actor_name_override', $actorOverride)) {
+        $actor['name'] = $actorOverride['actor_name_override'];
+    }
+
     $requestMethod = auditRequestMethod();
     $requestUri = auditRequestUri();
     $ipAddress = auditIpAddress();
@@ -232,14 +255,18 @@ function auditLogEvent(
     $metadataJson = empty($safeMetadata)
         ? null
         : json_encode($safeMetadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    $oldJsonValue = $oldValues === null ? null : json_encode(auditSanitizeValue($oldValues), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    $newJsonValue = $newValues === null ? null : json_encode(auditSanitizeValue($newValues), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
 
     $actorId = $actor['id'];
     $actorName = $actor['name'];
     $targetIdString = $targetId === null ? null : (string)$targetId;
 
+    ensureAuditLogTable($conn);
+
     $stmt = $conn->prepare("INSERT INTO audit_logs
-        (event_type, module, description, status, actor_type, actor_id, actor_name, target_type, target_id, request_method, request_uri, ip_address, user_agent, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        (event_type, module, description, status, actor_type, actor_id, actor_name, target_type, target_id, request_method, request_uri, ip_address, user_agent, metadata, old_values, new_values)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     if (!$stmt) {
         error_log('Audit logger prepare failed: ' . $conn->error);
@@ -247,7 +274,7 @@ function auditLogEvent(
     }
 
     $stmt->bind_param(
-        'sssssissssssss',
+        'sssssissssssssss',
         $eventType,
         $module,
         $description,
@@ -261,13 +288,91 @@ function auditLogEvent(
         $requestUri,
         $ipAddress,
         $userAgent,
-        $metadataJson
+        $metadataJson,
+        $oldJsonValue,
+        $newJsonValue
     );
 
     if (!$stmt->execute()) {
         error_log('Audit logger execute failed: ' . $stmt->error);
     }
     $stmt->close();
+}
+
+
+
+/**
+ * Write a login-security audit record using the account identified during the
+ * authentication attempt. Failed pre-authentication attempts can therefore be
+ * distinguished from successful admin/student activity.
+ */
+function auditLogLoginEvent(
+    mysqli $conn,
+    string $accountType,
+    ?array $account,
+    string $identifier,
+    string $status,
+    string $description,
+    array $metadata = []
+): void {
+    $actorType = in_array($accountType, ['admin', 'student'], true) ? $accountType : 'guest';
+
+    if ($actorType === 'admin' && $account) {
+        $eventType = $status === 'success' ? 'admin_login_success' : 'admin_login_failure';
+        $actorId = isset($account['user_id']) ? (int)$account['user_id'] : null;
+        $actorName = (string)($account['full_name'] ?? 'Chief Librarian');
+        $targetType = 'admin_account';
+        $targetId = isset($account['user_id']) ? (string)$account['user_id'] : null;
+    } elseif ($actorType === 'student' && $account) {
+        $eventType = $status === 'success' ? 'student_login_success' : 'student_login_failure';
+        $actorId = isset($account['student_id']) ? (int)$account['student_id'] : null;
+        $actorName = (string)($account['full_name'] ?? 'Student');
+        $targetType = 'student_account';
+        $targetId = isset($account['student_id']) ? (string)$account['student_id'] : null;
+    } else {
+        $eventType = 'login_failure';
+        $actorId = null;
+        $actorName = 'Unknown Login Attempt';
+        $targetType = null;
+        $targetId = null;
+    }
+
+    $metadata['login_identifier'] = $identifier;
+    $metadata['account_type'] = $actorType;
+    $metadata['identity_status'] = $account ? 'account_identified' : 'pre_authentication';
+
+    auditLogEvent(
+        $conn,
+        $eventType,
+        'login_security',
+        $description,
+        $status,
+        $targetType,
+        $targetId,
+        $metadata,
+        null,
+        null,
+        [
+            'actor_type_override' => $actorType,
+            'actor_id_override' => $actorId,
+            'actor_name_override' => $actorName
+        ]
+    );
+}
+
+function auditRecordChange(
+    mysqli $conn,
+    string $eventType,
+    string $module,
+    string $description,
+    string $status,
+    string $targetType,
+    int|string|null $targetId,
+    mixed $oldValues,
+    mixed $newValues,
+    array $metadata = []
+): void {
+    auditLogEvent($conn, $eventType, $module, $description, $status, $targetType, $targetId, $metadata, $oldValues, $newValues);
 }
 
 function auditRequestMetadata(float $startedAt): array
@@ -316,8 +421,14 @@ function registerAuditRequestLogger(mysqli $conn): void
             }
 
             $module = auditModuleFromPath();
-            $eventType = auditInferEventType();
             $method = auditRequestMethod();
+
+            if ($module === 'login' && $method === 'POST') {
+                // login.php writes an explicit account-aware audit event.
+                return;
+            }
+
+            $eventType = auditInferEventType();
             $responseCode = http_response_code();
             $description = $method . ' ' . auditRequestUri();
 

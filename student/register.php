@@ -810,6 +810,60 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
         }
         .verification-resend:disabled { opacity: .55; cursor: not-allowed; }
         @media (max-width: 520px) { .verification-actions { grid-template-columns: 1fr; } }
+    
+        .password-field {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-field > input[type="password"],
+        .password-field > input[type="text"] {
+            width: 100%;
+            padding-right: 78px !important;
+        }
+
+        .show-password-btn {
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            transform: translateY(-50%) !important;
+            min-width: 62px !important;
+            width: auto !important;
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 5px 9px !important;
+            border: 1px solid #D2E2F6 !important;
+            border-radius: 6px !important;
+            background: #F7F9FC !important;
+            color: #52618D !important;
+            box-shadow: none !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            line-height: 1 !important;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .show-password-btn:hover {
+            background: #E7EEF7 !important;
+            color: #141F52 !important;
+            transform: translateY(-50%) !important;
+            box-shadow: none !important;
+        }
+
+        .show-password-btn:focus-visible {
+            outline: 2px solid #141F52;
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 480px) {
+            .show-password-btn {
+                min-width: 58px !important;
+                font-size: 10px !important;
+                right: 6px;
+            }
+        }
+
     </style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
@@ -861,7 +915,7 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?php echo urlencode($generated_qr); ?>" 
                                      alt="Student QR Code">
                                 <div class="success-qr-code"><?php echo htmlspecialchars($generated_qr); ?></div>
-                                <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($generated_qr); ?>">Download QR Code</a>
+                                <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($generated_qr); ?>&type=student">Download QR Code</a>
                             </div>
 
                             <p style="color: #52618D; font-size: 13px; margin-top: 16px;">
@@ -984,12 +1038,18 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Password <span class="required">*</span></label>
-                                <input type="password" name="password" maxlength="128" autocomplete="new-password" required>
+                                <div class="password-field">
+                                    <input type="password" name="password" maxlength="128" autocomplete="new-password" required>
+                                    <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
+                                </div>
                                 <div class="helper-text">Use at least 10 characters with uppercase, lowercase, number, and special character.</div>
                             </div>
                             <div class="form-group">
                                 <label>Confirm Password <span class="required">*</span></label>
-                                <input type="password" name="confirm_password" maxlength="128" autocomplete="new-password" required>
+                                <div class="password-field">
+                                    <input type="password" name="confirm_password" maxlength="128" autocomplete="new-password" required>
+                                    <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
+                                </div>
                                 <div class="helper-text">Enter the same password again.</div>
                             </div>
                         </div>
@@ -1138,5 +1198,36 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
         }
     })();
 </script>
+
+<script>
+(function () {
+    function initPasswordToggles(root) {
+        (root || document).querySelectorAll('.password-field').forEach(function (wrapper) {
+            var input = wrapper.querySelector('input[type="password"], input[type="text"]');
+            var button = wrapper.querySelector('.show-password-btn');
+            if (!input || !button || button.dataset.ready === '1') return;
+
+            button.dataset.ready = '1';
+            button.addEventListener('click', function () {
+                var showing = input.type === 'text';
+                input.type = showing ? 'password' : 'text';
+                button.textContent = showing ? 'Show' : 'Hide';
+                button.setAttribute('aria-pressed', showing ? 'false' : 'true');
+                button.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+                input.focus({preventScroll: true});
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            initPasswordToggles();
+        });
+    } else {
+        initPasswordToggles();
+    }
+})();
+</script>
+
 </body>
 </html>

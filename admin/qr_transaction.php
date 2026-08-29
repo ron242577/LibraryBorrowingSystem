@@ -6,6 +6,8 @@
 
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/library_rules.php';
+require_once __DIR__ . '/../includes/notification_helper.php';
 
 if (!isAdmin()) {
     header('Location: /LibraryBorrowingSystem/login.php');
@@ -20,7 +22,7 @@ function getStudentByQr($conn, $student_qr) {
     $stmt = $conn->prepare('
         SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, email, card_valid_until, qr_code, status
         FROM students
-        WHERE qr_code = ? AND status = "active"
+        WHERE qr_code = ? AND status = "active" AND COALESCE(is_archived,0) = 0
         LIMIT 1
     ');
     $stmt->bind_param('s', $student_qr);
@@ -46,7 +48,7 @@ function getBookStateByQr($conn, $book_qr) {
             b.volumes,
             b.class,
             b.qr_code,
-            b.book_status,
+            b.book_status, b.book_condition,
             b.total_copies,
             b.available_copies,
             b.borrowed_copies,
@@ -59,7 +61,7 @@ function getBookStateByQr($conn, $book_qr) {
         FROM books b
         LEFT JOIN transactions t ON b.book_id = t.book_id AND t.status = "borrowed"
         LEFT JOIN students s ON t.student_id = s.student_id
-        WHERE b.qr_code = ?
+        WHERE b.qr_code = ? AND COALESCE(b.is_archived,0) = 0
         ORDER BY t.date_borrowed ASC
         LIMIT 1
     ');
@@ -122,11 +124,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api'])) {
 $message = '';
 $message_type = '';
 $transaction_details = null;
+expireStaleReservations($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'process_transaction') {
     try { requireValidCsrf($_POST['csrf_token'] ?? ''); } catch (Throwable $e) { $message = $e->getMessage(); $message_type = 'error'; }
     $student_qr = trim($_POST['student_qr'] ?? '');
     $book_qr = trim($_POST['book_qr'] ?? '');
+
+    $valid_conditions = ['Excellent', 'Good', 'Fair', 'Damaged', 'Lost'];
+    if (!in_array($return_condition, $valid_conditions, true)) {
+        $return_condition = 'Good';
+    }
 
     if ($message_type === 'error') {
         // CSRF validation already supplied the message.
@@ -156,10 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
 
                     $update_transaction = $conn->prepare('
                         UPDATE transactions
-                        SET return_date = ?, status = ?
+                        SET return_date = ?, status = ?, return_condition = ?
                         WHERE transaction_id = ?
                     ');
-                    $update_transaction->bind_param('ssi', $return_date, $status, $transaction_id);
+                    $update_transaction->bind_param('sssi', $return_date, $status, $return_condition, $transaction_id);
                     if (!$update_transaction->execute()) {
                         throw new Exception('Failed to update transaction: ' . $update_transaction->error);
                     }
@@ -170,15 +178,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
 
                     $update_book = $conn->prepare('
                         UPDATE books
-                        SET borrowed_copies = ?, available_copies = ?, book_status = ?
+                        SET borrowed_copies = ?, available_copies = ?, book_status = ?, book_condition = ?
                         WHERE book_id = ?
                     ');
-                    $update_book->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
+                    $update_book->bind_param('iissi', $new_borrowed, $new_available, $book_status, $return_condition, $book_id);
                     if (!$update_book->execute()) {
                         throw new Exception('Failed to update book: ' . $update_book->error);
                     }
 
                     $conn->commit();
+                    auditRecordChange($conn, 'book_returned', 'qr_transaction', 'Processed a book return.', 'success', 'transaction', $transaction_id, ['status' => 'borrowed', 'return_date' => null], ['status' => 'returned', 'return_date' => $return_date, 'return_condition' => $return_condition], ['book_title' => $book['title'], 'student_name' => $book['borrower_name'] ?? 'Unknown']);
                     $message = 'Book returned successfully.';
                     $message_type = 'success';
                     $transaction_details = [
@@ -204,64 +213,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                     $message_type = 'error';
                 } else {
                     $student = getStudentByQr($conn, $student_qr);
+
                     if (!$student) {
                         $message = 'Student not found or account is inactive. Please scan a valid student QR code.';
                         $message_type = 'error';
                     } elseif ((int)$book['available_copies'] <= 0) {
                         $message = 'No available copies of this book. Please select another book.';
                         $message_type = 'error';
+                    } elseif (in_array($book['book_condition'] ?? '', ['Damaged', 'Lost'], true)) {
+                        $message = 'This book is marked as ' . $book['book_condition'] . ' and cannot be borrowed.';
+                        $message_type = 'error';
                     } else {
-                        $conn->begin_transaction();
-                        try {
-                            $student_id = (int)$student['student_id'];
-                            $book_id = (int)$book['book_id'];
-                            $date_borrowed = date('Y-m-d H:i:s');
-                            $due_date = date('Y-m-d') . ' 23:59:59';
-                            $status = 'borrowed';
+                        $student_id = (int)$student['student_id'];
+                        $book_id = (int)$book['book_id'];
+                        $max_active_books = getLibraryRule($conn, 'max_active_books_per_student', 3);
+                        $active_count = countActiveBorrowings($conn, $student_id);
 
-                            $insert = $conn->prepare('
-                                INSERT INTO transactions (student_id, book_id, date_borrowed, due_date, status)
-                                VALUES (?, ?, ?, ?, ?)
-                            ');
-                            $insert->bind_param('iisss', $student_id, $book_id, $date_borrowed, $due_date, $status);
-                            if (!$insert->execute()) {
-                                throw new Exception('Failed to create transaction: ' . $insert->error);
+                        if ($active_count >= $max_active_books) {
+                            $message = 'This student has reached the maximum of ' . $max_active_books . ' active borrowed book(s).';
+                            $message_type = 'error';
+                        } else {
+                            $readyReservation = getReadyReservationForBook($conn, $book_id);
+
+                            if ($readyReservation && (int)$readyReservation['student_id'] !== $student_id) {
+                                $message = 'This copy is reserved for another student.';
+                                $message_type = 'error';
+                            } else {
+                                $duplicate_stmt = $conn->prepare("
+                                    SELECT transaction_id
+                                    FROM transactions
+                                    WHERE student_id=? AND book_id=? AND status='borrowed'
+                                    LIMIT 1
+                                ");
+                                $duplicate_stmt->bind_param('ii', $student_id, $book_id);
+                                $duplicate_stmt->execute();
+                                $has_duplicate = $duplicate_stmt->get_result()->num_rows > 0;
+                                $duplicate_stmt->close();
+
+                                if ($has_duplicate) {
+                                    $message = 'This student already has an active borrowing record for this book.';
+                                    $message_type = 'error';
+                                } else {
+                                    $conn->begin_transaction();
+                                    try {
+                                        $date_borrowed = date('Y-m-d H:i:s');
+                                        $due_date = date('Y-m-d') . ' 23:59:59';
+                                        $status = 'borrowed';
+                                        $borrow_condition = $book['book_condition'] ?? 'Good';
+
+                                        $insert = $conn->prepare("
+                                            INSERT INTO transactions
+                                            (student_id, book_id, date_borrowed, due_date, status, borrow_condition)
+                                            VALUES (?, ?, ?, ?, ?, ?)
+                                        ");
+                                        $insert->bind_param('iissss', $student_id, $book_id, $date_borrowed, $due_date, $status, $borrow_condition);
+
+                                        if (!$insert->execute()) {
+                                            throw new Exception('Failed to create transaction: ' . $insert->error);
+                                        }
+
+                                        $transaction_id = $conn->insert_id;
+                                        $new_borrowed = (int)$book['borrowed_copies'] + 1;
+                                        $new_available = (int)$book['available_copies'] - 1;
+                                        $book_status = $new_available <= 0 ? 'out_of_stock' : 'available';
+
+                                        $update = $conn->prepare("
+                                            UPDATE books
+                                            SET borrowed_copies=?, available_copies=?, book_status=?
+                                            WHERE book_id=?
+                                        ");
+                                        $update->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
+
+                                        if (!$update->execute()) {
+                                            throw new Exception('Failed to update inventory: ' . $update->error);
+                                        }
+
+                                        if ($readyReservation && (int)$readyReservation['student_id'] === $student_id) {
+                                            $fulfillStmt = $conn->prepare("
+                                                UPDATE book_reservations
+                                                SET status='fulfilled', fulfilled_at=NOW()
+                                                WHERE reservation_id=? AND status='ready'
+                                            ");
+                                            $fulfillStmt->bind_param('i', $readyReservation['reservation_id']);
+                                            $fulfillStmt->execute();
+                                            $fulfillStmt->close();
+                                        }
+
+                                        $conn->commit();
+
+                                        if (function_exists('createNotification')) {
+                                            createNotification(
+                                                $conn,
+                                                'student',
+                                                $student_id,
+                                                'Book Borrowing Confirmed',
+                                                'Your borrowing of "' . $book['title'] . '" was recorded successfully. Return it by ' .
+                                                date('F d, Y', strtotime($due_date)) . ' (same day).'
+                                            );
+                                        }
+
+                                        $message = 'Book borrowed successfully. Transaction ID: ' . $transaction_id . '.';
+                                        $message_type = 'success';
+                                        $transaction_details = [
+                                            'mode' => 'Borrow',
+                                            'transaction_id' => $transaction_id,
+                                            'student_name' => $student['full_name'],
+                                            'student_no' => $student['student_no'] ?? 'N/A',
+                                            'book_title' => $book['title'],
+                                            'book_author' => $book['author'],
+                                            'date_borrowed' => $date_borrowed,
+                                            'due_date' => $due_date,
+                                            'return_date' => null
+                                        ];
+
+                                        $insert->close();
+                                        $update->close();
+                                    } catch (Throwable $e) {
+                                        $conn->rollback();
+                                        throw $e;
+                                    }
+                                }
                             }
-                            $transaction_id = $conn->insert_id;
-
-                            $new_borrowed = (int)$book['borrowed_copies'] + 1;
-                            $new_available = (int)$book['available_copies'] - 1;
-                            $book_status = $new_available <= 0 ? 'out_of_stock' : 'available';
-
-                            $update = $conn->prepare('
-                                UPDATE books
-                                SET borrowed_copies = ?, available_copies = ?, book_status = ?
-                                WHERE book_id = ?
-                            ');
-                            $update->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
-                            if (!$update->execute()) {
-                                throw new Exception('Failed to update inventory: ' . $update->error);
-                            }
-
-                            $conn->commit();
-                            $message = 'Book borrowed successfully. Transaction ID: ' . $transaction_id . '.';
-                            $message_type = 'success';
-                            $transaction_details = [
-                                'mode' => 'Borrow',
-                                'transaction_id' => $transaction_id,
-                                'student_name' => $student['full_name'],
-                                'student_no' => $student['student_no'] ?? 'N/A',
-                                'book_title' => $book['title'],
-                                'book_author' => $book['author'],
-                                'date_borrowed' => $date_borrowed,
-                                'due_date' => $due_date,
-                                'return_date' => null
-                            ];
-                            $insert->close();
-                            $update->close();
-                        } catch (Exception $e) {
-                            $conn->rollback();
-                            throw $e;
                         }
                     }
                 }
@@ -283,7 +355,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #F3F7FC; color: #202A44; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #F3F7FC; color: #202A44; overflow-x: hidden; }
         .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
         .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 25px; }
         .page-header h2 { color: #202A44; font-size: 28px; margin-bottom: 8px; }
@@ -350,7 +422,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
             .form-grid { grid-template-columns: 1fr; }
             .controls-row button { width: 100%; }
         }
-    </style>
+    
+        .content-container,
+        .container{margin-top:0 !important;}
+
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -505,10 +581,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         let studentValid = false;
         let bookValid = false;
         let transactionMode = null;
+            updateReturnConditionVisibility();
 
         document.addEventListener('DOMContentLoaded', function() {
             updateSteps();
         });
+
+
+        function updateReturnConditionVisibility() {
+            const group = document.getElementById('returnConditionGroup');
+            const select = document.getElementById('return_condition');
+            const show = transactionMode === 'return';
+            if (group) group.style.display = show ? 'block' : 'none';
+            if (select) select.required = show;
+        }
 
         function goToStep(stepNumber) {
             const step = document.getElementById('step' + stepNumber);
@@ -643,6 +729,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                     } else {
                         bookValid = false;
                         transactionMode = null;
+            updateReturnConditionVisibility();
                         setStatus('bookStatus', data.message || 'Unavailable', 'error');
                         document.getElementById('bookSummary').classList.remove('show');
                     }
@@ -651,6 +738,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 .catch(() => {
                     bookValid = false;
                     transactionMode = null;
+            updateReturnConditionVisibility();
                     setStatus('bookStatus', 'Lookup failed', 'error');
                     updateSteps();
                 });
@@ -762,6 +850,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
             studentValid = false;
             bookValid = false;
             transactionMode = null;
+            updateReturnConditionVisibility();
             document.getElementById('studentSummary').classList.remove('show');
             document.getElementById('bookSummary').classList.remove('show');
             setStatus('studentStatus', 'Waiting', 'pending');
@@ -789,5 +878,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
             return div.innerHTML;
         }
     </script>
+<?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
 </body>
 </html>

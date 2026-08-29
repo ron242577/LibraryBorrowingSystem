@@ -6,6 +6,8 @@
 
 require_once __DIR__ . '/../includes/student_session.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/library_rules.php';
+require_once __DIR__ . '/../includes/notification_helper.php';
 
 $student = null;
 $student_error = null;
@@ -13,11 +15,15 @@ $books = [];
 $modal_data = null;
 $modal_type = '';
 $borrowed_books = [];
+$reserved_book_ids = [];
 $student_id = (int)$_SESSION['student_id'];
 $student_qr = $_SESSION['student_qr'] ?? '';
 
+$max_active_books = getLibraryRule($conn, 'max_active_books_per_student', 3);
+expireStaleReservations($conn);
+
 try {
-    $student_stmt = $conn->prepare("\n        SELECT student_id, student_no, full_name, contact_number, qr_code, status, created_at\n        FROM students\n        WHERE student_id = ? AND status = 'active'\n        LIMIT 1\n    ");
+    $student_stmt = $conn->prepare("\n        SELECT student_id, student_no, full_name, contact_number, qr_code, status, created_at\n        FROM students\n        WHERE student_id = ? AND status = 'active' AND COALESCE(is_archived,0) = 0\n        LIMIT 1\n    ");
     $student_stmt->bind_param('i', $student_id);
     $student_stmt->execute();
     $student = $student_stmt->get_result()->fetch_assoc();
@@ -37,6 +43,24 @@ try {
         $borrowed_books[] = (int)$row['book_id'];
     }
     $borrowed_stmt->close();
+
+    try {
+        $reservation_stmt = $conn->prepare("
+            SELECT book_id
+            FROM book_reservations
+            WHERE student_id = ? AND status IN ('pending','ready')
+        ");
+        $reservation_stmt->bind_param('i', $student_id);
+        $reservation_stmt->execute();
+        $reservation_result = $reservation_stmt->get_result();
+        while ($row = $reservation_result->fetch_assoc()) {
+            $reserved_book_ids[] = (int)$row['book_id'];
+        }
+        $reservation_stmt->close();
+    } catch (Throwable $reservation_error) {
+        $reserved_book_ids = [];
+        logError('Reservation lookup error: ' . $reservation_error->getMessage());
+    }
 } catch (Exception $e) {
     $student_error = 'Unable to load your student account right now.';
     logError('Student borrow page error: ' . $e->getMessage());
@@ -56,13 +80,19 @@ if ($student) {
                 edition,
                 volumes,
                 class,
+                location_collection,
+                library_building,
+                shelf_number,
+                library_section,
+                book_condition,
                 qr_code,
                 book_status,
                 total_copies,
                 available_copies,
                 borrowed_copies
             FROM books
-            WHERE book_status IN ('available', 'out_of_stock')
+            WHERE COALESCE(is_archived,0) = 0 AND COALESCE(is_archived,0) = 0
+                AND book_status IN ('available', 'out_of_stock')
             AND qr_code IS NOT NULL
             AND qr_code != ''
             GROUP BY book_id
@@ -100,6 +130,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                     edition,
                     volumes,
                     class,
+                    location_collection,
+                    library_building,
+                    shelf_number,
+                    library_section,
                     qr_code,
                     book_status,
                     total_copies,
@@ -107,6 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                     borrowed_copies
                 FROM books
                 WHERE (title LIKE ? OR author LIKE ?) 
+                AND COALESCE(is_archived,0) = 0
                 AND book_status IN ('available', 'out_of_stock')
                 AND qr_code IS NOT NULL
                 AND qr_code != ''
@@ -140,6 +175,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                         'edition' => $book['edition'],
                         'volumes' => $book['volumes'],
                         'class' => $book['class'],
+                        'location_collection' => $book['location_collection'],
+                        'library_building' => $book['library_building'],
+                        'shelf_number' => $book['shelf_number'],
+                        'library_section' => $book['library_section'],
                         'qr_code' => $book['qr_code'],
                         'book_status' => $book['book_status'],
                         'total_copies' => $book['total_copies'],
@@ -208,125 +247,247 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     try { requireValidCsrf($_POST['csrf_token'] ?? ''); } catch (Throwable $e) { $modal_type = 'error'; $modal_data = ['title' => 'Security Check Failed', 'message' => $e->getMessage(), 'icon' => 'error']; }
     $action = $modal_type === 'error' ? '' : $_POST['action'];
     
+    if ($action === 'create_reservation' && $student) {
+        $book_id = (int)($_POST['book_id'] ?? 0);
+
+        try {
+            if ($book_id <= 0) throw new Exception('Please select a valid book.');
+
+            $book_stmt = $conn->prepare("
+                SELECT book_id, title, available_copies, is_archived
+                FROM books
+                WHERE book_id = ? LIMIT 1
+            ");
+            $book_stmt->bind_param('i', $book_id);
+            $book_stmt->execute();
+            $book = $book_stmt->get_result()->fetch_assoc();
+            $book_stmt->close();
+
+            if (!$book || (int)$book['is_archived'] === 1) {
+                throw new Exception('This book is not available for reservation.');
+            }
+            if ((int)$book['available_copies'] > 0) {
+                throw new Exception('A copy is available. You can borrow this book instead.');
+            }
+
+            $borrowedCheck = $conn->prepare("
+                SELECT transaction_id FROM transactions
+                WHERE student_id=? AND book_id=? AND status='borrowed'
+                LIMIT 1
+            ");
+            $borrowedCheck->bind_param('ii', $student_id, $book_id);
+            $borrowedCheck->execute();
+            $alreadyBorrowed = $borrowedCheck->get_result()->num_rows > 0;
+            $borrowedCheck->close();
+
+            if ($alreadyBorrowed) {
+                throw new Exception('You already borrowed this book. You cannot reserve a book you currently have.');
+            }
+
+            $check = $conn->prepare("
+                SELECT reservation_id
+                FROM book_reservations
+                WHERE student_id = ? AND book_id = ? AND status IN ('pending','ready')
+                LIMIT 1
+            ");
+            $check->bind_param('ii', $student_id, $book_id);
+            $check->execute();
+            $exists = $check->get_result()->num_rows > 0;
+            $check->close();
+
+            if ($exists) throw new Exception('You already have an active reservation for this book.');
+
+            $insert = $conn->prepare("
+                INSERT INTO book_reservations (student_id, book_id, status, reserved_at)
+                VALUES (?, ?, 'pending', NOW())
+            ");
+            $insert->bind_param('ii', $student_id, $book_id);
+            if (!$insert->execute()) throw new Exception('Unable to create the reservation.');
+            $reservation_id = $conn->insert_id;
+            $insert->close();
+
+            if (function_exists('auditRecordChange')) {
+                auditRecordChange(
+                    $conn,
+                    'book_reserved',
+                    'student/borrow',
+                    'Student created a book reservation.',
+                    'success',
+                    'reservation',
+                    $reservation_id,
+                    null,
+                    ['student_id'=>$student_id,'book_id'=>$book_id,'book_title'=>$book['title']]
+                );
+            }
+
+            $modal_type='success';
+            $modal_data=[
+                'title'=>'Reservation Created',
+                'message'=>'Your reservation has been recorded. You will be notified when a copy becomes available.',
+                'icon'=>'success'
+            ];
+        } catch (Throwable $e) {
+            $modal_type='error';
+            $modal_data=[
+                'title'=>'Reservation Failed',
+                'message'=>$e->getMessage(),
+                'icon'=>'error'
+            ];
+        }
+    }
+
     if ($action === 'process_borrow' && $student) {
-        $book_id = isset($_POST['book_id']) ? intval($_POST['book_id']) : 0;
-        
+        $book_id = (int)($_POST['book_id'] ?? 0);
+
         if ($book_id <= 0) {
             $modal_type = 'error';
-            $modal_data = [
-                'title' => 'Invalid Book',
-                'message' => 'Please select a valid book to borrow.',
-                'icon' => 'error'
-            ];
+            $modal_data = ['title'=>'Invalid Book','message'=>'Please select a valid book to borrow.','icon'=>'error'];
         } else {
             try {
-                // Get book details
                 $book_stmt = $conn->prepare("
-                    SELECT book_id, title, available_copies, borrowed_copies 
-                    FROM books 
+                    SELECT book_id, title, available_copies, borrowed_copies,
+                           book_status, book_condition, is_archived
+                    FROM books
                     WHERE book_id = ?
+                    LIMIT 1
                 ");
                 $book_stmt->bind_param('i', $book_id);
                 $book_stmt->execute();
-                $book_result = $book_stmt->get_result();
-                
-                if ($book_result->num_rows === 0) {
-                    $modal_type = 'error';
-                    $modal_data = [
-                        'title' => 'Book Not Found',
-                        'message' => 'The selected book was not found in the system.',
-                        'icon' => 'error'
-                    ];
-                } else {
-                    $book = $book_result->fetch_assoc();
-                    
-                    // Check if available copies > 0
-                    if ($book['available_copies'] <= 0) {
-                        $modal_type = 'error';
-                        $modal_data = [
-                            'title' => 'No Copies Available',
-                            'message' => 'Unfortunately, all copies of this book are currently borrowed. Please select another book.',
-                            'icon' => 'error'
-                        ];
-                    } else {
-                        // Calculate dates
-                        $date_borrowed = date('Y-m-d H:i:s');
-                        $due_date = date('Y-m-d') . ' 23:59:59';
-                        $status = 'borrowed';
-                        $book_status = 'available';
-                        $student_id = $student['student_id'];
-                        
-                        // Begin transaction
-                        $conn->begin_transaction();
-                        
-                        try {
-                            // Insert transaction
-                            $insert_stmt = $conn->prepare("
-                                INSERT INTO transactions 
-                                (student_id, book_id, date_borrowed, due_date, status) 
-                                VALUES (?, ?, ?, ?, ?)
-                            ");
-                            $insert_stmt->bind_param('iisss', $student_id, $book_id, $date_borrowed, $due_date, $status);
-                            
-                            if (!$insert_stmt->execute()) {
-                                throw new Exception('Failed to create transaction: ' . $insert_stmt->error);
-                            }
-                            
-                            $transaction_id = $conn->insert_id;
-                            
-                            // Update inventory
-                            $new_borrowed = $book['borrowed_copies'] + 1;
-                            $new_available = $book['available_copies'] - 1;
-                            $book_status = ($new_available === 0) ? 'out_of_stock' : 'available';
-                            
-                            $update_stmt = $conn->prepare("
-                                UPDATE books 
-                                SET borrowed_copies = ?, available_copies = ?, book_status = ? 
-                                WHERE book_id = ?
-                            ");
-                            $update_stmt->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
-                            
-                            if (!$update_stmt->execute()) {
-                                throw new Exception('Failed to update inventory: ' . $update_stmt->error);
-                            }
-                            
-                            $conn->commit();
-                            
-                            $modal_type = 'success';
-                            $modal_data = [
-                                'title' => 'Book Successfully Borrowed!',
-                                'message' => 'Your borrowing has been confirmed.',
-                                'icon' => 'success',
-                                'transaction_id' => $transaction_id,
-                                'student_name' => htmlspecialchars($student['full_name']),
-                                'book_title' => htmlspecialchars($book['title']),
-                                'due_date' => date('F d, Y', strtotime($due_date)),
-                                'date_borrowed' => date('F d, Y', strtotime($date_borrowed))
-                            ];
-                            
-                            $insert_stmt->close();
-                            $update_stmt->close();
-                        } catch (Exception $e) {
-                            $conn->rollback();
-                            $modal_type = 'error';
-                            $modal_data = [
-                                'title' => 'Transaction Error',
-                                'message' => 'An error occurred while processing your request. Please try again.',
-                                'icon' => 'error'
-                            ];
-                            logError('Borrow transaction error: ' . $e->getMessage());
-                        }
-                    }
-                }
+                $book = $book_stmt->get_result()->fetch_assoc();
                 $book_stmt->close();
-            } catch (Exception $e) {
+
+                if (!$book) {
+                    throw new Exception('The selected book was not found.');
+                }
+                if ((int)$book['is_archived'] === 1) {
+                    throw new Exception('This book is archived and cannot be borrowed.');
+                }
+                if ((int)$book['available_copies'] <= 0) {
+                    throw new Exception('There are no available copies of this book.');
+                }
+                if (in_array($book['book_condition'] ?? '', ['Damaged','Lost'], true)) {
+                    throw new Exception('This book is marked as ' . $book['book_condition'] . ' and cannot be borrowed.');
+                }
+
+                $activeCount = countActiveBorrowings($conn, $student_id);
+                if ($activeCount >= $max_active_books) {
+                    throw new Exception(
+                        'You have reached the maximum of ' . $max_active_books .
+                        ' active borrowed book(s). Return a book before borrowing another.'
+                    );
+                }
+
+                $duplicate_stmt = $conn->prepare("
+                    SELECT transaction_id
+                    FROM transactions
+                    WHERE student_id=? AND book_id=? AND status='borrowed'
+                    LIMIT 1
+                ");
+                $duplicate_stmt->bind_param('ii', $student_id, $book_id);
+                $duplicate_stmt->execute();
+                $alreadyBorrowed = $duplicate_stmt->get_result()->num_rows > 0;
+                $duplicate_stmt->close();
+
+                if ($alreadyBorrowed) {
+                    throw new Exception('You already have an active borrowing record for this book.');
+                }
+
+                $readyReservation = getReadyReservationForBook($conn, $book_id);
+                if ($readyReservation && (int)$readyReservation['student_id'] !== $student_id) {
+                    throw new Exception('This copy is reserved for another student.');
+                }
+
+                $date_borrowed = date('Y-m-d H:i:s');
+                $due_date = date('Y-m-d') . ' 23:59:59';
+                $status = 'borrowed';
+
+                $conn->begin_transaction();
+                try {
+                    $insert_stmt = $conn->prepare("
+                        INSERT INTO transactions
+                        (student_id, book_id, date_borrowed, due_date, status, borrow_condition)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ");
+                    $borrow_condition = $book['book_condition'] ?? 'Good';
+                    $insert_stmt->bind_param(
+                        'iissss',
+                        $student_id,
+                        $book_id,
+                        $date_borrowed,
+                        $due_date,
+                        $status,
+                        $borrow_condition
+                    );
+                    if (!$insert_stmt->execute()) {
+                        throw new Exception('Failed to create the borrowing record.');
+                    }
+
+                    $transaction_id = $conn->insert_id;
+                    $new_borrowed = (int)$book['borrowed_copies'] + 1;
+                    $new_available = (int)$book['available_copies'] - 1;
+                    $book_status = $new_available === 0 ? 'out_of_stock' : 'available';
+
+                    $update_stmt = $conn->prepare("
+                        UPDATE books
+                        SET borrowed_copies=?, available_copies=?, book_status=?
+                        WHERE book_id=?
+                    ");
+                    $update_stmt->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
+
+                    if (!$update_stmt->execute()) {
+                        throw new Exception('Failed to update the book inventory.');
+                    }
+
+                    if ($readyReservation && (int)$readyReservation['student_id'] === $student_id) {
+                        $fulfill_stmt = $conn->prepare("
+                            UPDATE book_reservations
+                            SET status='fulfilled', fulfilled_at=NOW()
+                            WHERE reservation_id=? AND status='ready'
+                        ");
+                        $fulfill_stmt->bind_param('i', $readyReservation['reservation_id']);
+                        $fulfill_stmt->execute();
+                        $fulfill_stmt->close();
+                    }
+
+                    $conn->commit();
+
+                    if (function_exists('createNotification')) {
+                        createNotification(
+                            $conn,
+                            'student',
+                            $student_id,
+                            'Book Borrowing Confirmed',
+                            'Your borrowing of "' . $book['title'] . '" was recorded successfully. Return it by ' .
+                            date('F d, Y', strtotime($due_date)) . ' (same day).'
+                        );
+                    }
+
+                    $modal_type = 'success';
+                    $modal_data = [
+                        'title'=>'Book Successfully Borrowed!',
+                        'message'=>'Your borrowing has been confirmed.',
+                        'icon'=>'success',
+                        'transaction_id'=>$transaction_id,
+                        'student_name'=>htmlspecialchars($student['full_name']),
+                        'book_title'=>htmlspecialchars($book['title']),
+                        'due_date'=>date('F d, Y', strtotime($due_date)),
+                        'date_borrowed'=>date('F d, Y', strtotime($date_borrowed))
+                    ];
+
+                    $insert_stmt->close();
+                    $update_stmt->close();
+                } catch (Throwable $e) {
+                    $conn->rollback();
+                    throw $e;
+                }
+            } catch (Throwable $e) {
                 $modal_type = 'error';
                 $modal_data = [
-                    'title' => 'System Error',
-                    'message' => 'An unexpected error occurred. Please try again later.',
-                    'icon' => 'error'
+                    'title'=>'Borrowing Failed',
+                    'message'=>$e->getMessage(),
+                    'icon'=>'error'
                 ];
-                logError('QR Borrow error: ' . $e->getMessage());
+                logError('Student borrowing rule error: ' . $e->getMessage());
             }
         }
     }
@@ -769,6 +930,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             box-shadow: 0 4px 15px rgba(20, 31, 82, 0.3);
         }
         
+        .reserve-button{display:block;width:100%;background:#52618D!important}
+        .reserve-button:hover:not(:disabled){background:#202A44!important}
         .borrow-btn:hover:not(:disabled) {
             background: #52618D;
             transform: translateY(-2px);
@@ -1050,8 +1213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .student-dropdown a.active {
             background: #EDF3FA;
             color: #141F52;
-            transform: none;
-            box-shadow: none;
+            border-left: 3px solid #F4F916;
         }
 
         .student-dropdown .dropdown-divider {
@@ -1060,10 +1222,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             margin: 6px 0;
         }
         
-        /* Adjust body to account for fixed header */
-        body {
-            padding-top: 70px;
-        }
         
         @media (max-width: 768px) {
             .grid {
@@ -1112,7 +1270,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 padding-top: 60px;
             }
         }
-    </style>
+    <style id="student-book-filter-css">
+        .search-form select {
+            min-width: 190px;
+            padding: 12px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            color: #202A44;
+        }
+
+        .search-form select:focus {
+            outline: none;
+            border-color: #141F52;
+            box-shadow: 0 0 0 3px rgba(244, 249, 22, 0.35);
+        }
+
+        @media (max-width: 700px) {
+            .search-form select,
+            .search-form input,
+            .search-form button {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+.auto-search-submit { display:none !important; }
+    
+        .student-notification-wrap{position:relative;display:flex;align-items:center;margin-right:8px}
+        .student-notification-bell{position:relative;width:40px;height:40px;border:1px solid #D2E2F6;border-radius:9px;background:#fff;color:#141F52;cursor:pointer}
+        .student-notification-count{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#F4F916;color:#141F52;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+        .student-notification-panel{position:absolute;right:0;top:48px;width:330px;max-width:calc(100vw - 30px);background:#fff;border:1px solid #D2E2F6;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.18);display:none;z-index:1300;overflow:hidden;color:#202A44}
+        .student-notification-panel.show{display:block}
+        .student-notification-header{display:flex;justify-content:space-between;align-items:center;padding:12px 13px;border-bottom:1px solid #E7EEF7}
+        .student-notification-header button{border:0;background:none;color:#52618D;font-size:11px;font-weight:700;cursor:pointer}
+        .student-notification-item{padding:12px 13px;border-bottom:1px solid #EEF2F7}
+        .student-notification-item.unread{background:#F3F7FC}
+        .student-notification-title{font-size:12px;font-weight:800}
+        .student-notification-message{font-size:12px;color:#52618D;line-height:1.4;margin-top:3px}
+        .student-notification-time{font-size:10px;color:#8793A7;margin-top:5px}
+        .student-notification-empty{padding:22px;text-align:center;color:#8793A7;font-size:12px}
+        @media(max-width:700px){.student-notification-wrap{margin-right:4px}.student-notification-panel{right:-60px}}
+
+
+        .header-brand-text{display:flex;flex-direction:column;line-height:1.1;}
+        .header-brand-subtitle{display:block;margin-top:4px;font-size:11px;font-weight:600;color:#52618D;}
+        .page-header{gap:10px;}
+        @media(max-width:700px){.header-brand-text{font-size:16px;}.header-brand-subtitle{font-size:10px;}}
+        
+        .student-header-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+        .student-notification-wrap{margin:0!important}
+        @media(max-width:700px){.student-header-actions{gap:4px}.student-notification-bell{width:38px;height:38px}.student-menu-name{max-width:120px}}
+
+
+        .page-header{height:78px;padding:0 40px;box-sizing:border-box;position:sticky;top:0;z-index:900;background:#fff;}
+        .student-header-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+        .student-notification-wrap{margin:0!important;}
+        @media(max-width:700px){.page-header{height:60px;padding:0 16px;}.student-header-actions{gap:4px;}}
+        </style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
 <body class="student-app student-borrow-page">
@@ -1121,9 +1336,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <header class="page-header">
         <a href="/LibraryBorrowingSystem/student/borrow.php" class="header-brand">
             <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
-            <span class="header-brand-text">Jose Abad Santos High School Book Borrowing</span>
+            <span class="header-brand-text">Jose Abad Santos High School<span class="header-brand-subtitle">Library Management System</span></span>
         </a>
-        <div class="student-menu">
+        <div class="student-header-actions">
+        <div class="student-notification-wrap">
+    <button type="button" class="student-notification-bell" id="studentNotificationBell" aria-label="Notifications">
+        <span>🔔</span><span class="student-notification-count" id="studentNotificationCount" style="display:none;">0</span>
+    </button>
+    <div class="student-notification-panel" id="studentNotificationPanel">
+        <div class="student-notification-header"><strong>Notifications</strong><button type="button" id="studentMarkAllNotifications">Mark all read</button></div>
+        <div id="studentNotificationList"><div class="student-notification-empty">Loading notifications...</div></div>
+    </div>
+</div>
+
+<div class="student-menu">
             <button type="button" class="student-menu-toggle" id="studentMenuToggle" aria-haspopup="true" aria-expanded="false">
                 <span class="student-menu-name"><?php echo $student ? htmlspecialchars($student['full_name']) : 'Student'; ?></span>
                 <span class="student-menu-caret">▼</span>
@@ -1131,30 +1357,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="student-dropdown" id="studentDropdown">
                 <?php if ($student_qr): ?>
                     <a href="/LibraryBorrowingSystem/student/profile.php">Profile</a>
-                <?php else: ?>
                 <?php endif; ?>
                 <a href="/LibraryBorrowingSystem/student/borrow.php" class="active">Search Books</a>
                 <div class="dropdown-divider"></div>
                 <a href="/LibraryBorrowingSystem/student/portal.php?logout=1">Logout</a>
             </div>
         </div>
+    </div>
     </header>
     
     <div class="container">
         <!-- Header -->
         <div class="header">
             <h1>Search Books</h1>
-            <p>Search available library books by title or author</p>
+            <p>Search by title, author, or book number and use the filters to narrow results.</p>
         </div>
         
         <!-- Search Section -->
         <div class="search-section">
             <form class="search-form" id="searchForm">
-                <input type="text" 
+                <input type="text"
                        id="searchInput"
-                       placeholder="Search by book title or author..." 
+                       placeholder="Search title, author, or book number..."
                        autofocus>
-                <button type="submit">Search Books</button>
+                <select id="classFilter" aria-label="Filter by class">
+                    <option value="">All Classes</option>
+                </select>
+                <select id="sectionFilter" aria-label="Filter by library section">
+                    <option value="">All Sections</option>
+                </select>
+                <select id="availabilityFilter" aria-label="Filter by availability">
+                    <option value="">All Availability</option>
+                    <option value="available">Available</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                </select>
+                <button type="submit" class="auto-search-submit">Search Books</button>
             </form>
         </div>
         
@@ -1188,6 +1425,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             <div class="info-label">Contact</div>
                             <div class="info-value"><?php echo htmlspecialchars($student['contact_number'] ?? 'N/A'); ?></div>
                         </div>
+                        <div class="info-item">
+                            <div class="info-label">Active Books</div>
+                            <div class="info-value"><?php echo countActiveBorrowings($conn, $student_id); ?> / <?php echo (int)$max_active_books; ?></div>
+                        </div>
                     </div>
                     
                     <!-- QR Code -->
@@ -1196,7 +1437,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($student['qr_code']); ?>" 
                              alt="Student QR Code">
                         <div class="qr-text"><?php echo htmlspecialchars($student['qr_code']); ?></div>
-                        <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($student['qr_code']); ?>">Download Student QR</a>
+                        <a class="qr-download-btn" href="/LibraryBorrowingSystem/student/download_qr.php">Download Student QR</a>
                     </div>
                 <?php else: ?>
                     <div class="no-selection">
@@ -1208,6 +1449,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <!-- Books Results Column -->
             <div class="results-section">
                 <h2>Available Books (<span id="bookCount"><?php echo count($books); ?></span>)</h2>
+                <div style="margin:-10px 0 14px;color:#52618D;font-size:12px;">
+                    Maximum active books: <strong><?php echo (int)$max_active_books; ?></strong>. Reservations do not count toward this limit.
+                </div>
                 
                 <div class="results-list" id="booksList">
                     <?php if (empty($books) && $student): ?>
@@ -1254,6 +1498,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <div class="detail-label">Book Pages</div>
                     <div class="detail-value" id="selectedBookPages">—</div>
                 </div>
+                <div class="detail-item" id="locationDetail">
+                    <div class="detail-label">Library Location</div>
+                    <div class="detail-value" id="selectedBookLocation">—</div>
+                </div>
+                <div class="detail-item" id="buildingDetail" style="display:none;">
+                    <div class="detail-label">Building / Room</div>
+                    <div class="detail-value" id="selectedBookBuilding">—</div>
+                </div>
+                <div class="detail-item" id="shelfDetail" style="display:none;">
+                    <div class="detail-label">Shelf Number</div>
+                    <div class="detail-value" id="selectedBookShelf">—</div>
+                </div>
+                <div class="detail-item" id="librarySectionDetail" style="display:none;">
+                    <div class="detail-label">Library Section</div>
+                    <div class="detail-value" id="selectedBookLibrarySection">—</div>
+                </div>
                 <div class="detail-item" id="publisherDetail" style="display:none;">
                     <div class="detail-label">Publisher</div>
                     <div class="detail-value" id="selectedBookPublisher">—</div>
@@ -1292,6 +1552,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <a id="selectedBookQRDownload" class="qr-download-btn" href="#">Download Book QR</a>
             </div>
             
+            <!-- Reservation Button -->
+            <div id="reservationActions" style="display:none;margin-top:20px;">
+                <div class="modal-note" style="margin-bottom:12px;">
+                    This book is currently unavailable. Reserve it to be notified when a copy is returned.
+                </div>
+                <form method="POST" id="reservationForm">
+                    <?php echo csrfField(); ?>
+                    <input type="hidden" name="action" value="create_reservation">
+                    <input type="hidden" name="book_id" id="reserveBookId" value="">
+                    <button type="submit" class="borrow-btn reserve-button" id="reserveBookButton">Reserve This Book</button>
+                </form>
+            </div>
+
             <!-- Borrow Button -->
             <form method="POST" id="borrowForm" style="margin-top: 20px;">
                 <?php echo csrfField(); ?>
@@ -1317,6 +1590,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <script>
 let selectedBookId = null;
 let allBooks = <?php echo json_encode($books); ?>;
+let reservedBookIds = <?php echo json_encode($reserved_book_ids); ?>;
 let formSubmitting = false;
 
 // Initialize on page load
@@ -1330,6 +1604,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('searchInput').addEventListener('input', function() {
         performSearch();
     });
+
+    populateCatalogFilters();
     
     // Set up borrow form
     document.getElementById('borrowForm').addEventListener('submit', function(e) {
@@ -1341,21 +1617,75 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function performSearch() {
-    const query = document.getElementById('searchInput').value.toLowerCase();
-    const booksList = document.getElementById('booksList');
-    
-    if (!query) {
-        // Show all books if search is empty
-        displayBooks(allBooks);
-    } else {
-        // Filter books
-        const filtered = allBooks.filter(book => 
-            book.title.toLowerCase().includes(query) || 
-            book.author.toLowerCase().includes(query)
-        );
-        displayBooks(filtered);
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    const classValue = document.getElementById('classFilter')?.value || '';
+    const sectionValue = document.getElementById('sectionFilter')?.value || '';
+    const availabilityValue = document.getElementById('availabilityFilter')?.value || '';
+    const conditionValue = document.getElementById('conditionFilter')?.value || '';
+
+    const filtered = allBooks.filter(book => {
+        const searchable = [
+            book.title,
+            book.author,
+            book.book_number
+        ].map(value => String(value || '').toLowerCase()).join(' ');
+
+        const bookClass = String(book.class || '');
+        const section = String(book.library_section || book.location_collection || '');
+        const condition = String(book.book_condition || '');
+        const availability = Number(book.available_copies || 0) > 0 ? 'available' : 'out_of_stock';
+
+        return (!query || searchable.includes(query))
+            && (!classValue || bookClass === classValue)
+            && (!sectionValue || section === sectionValue)
+            && (!availabilityValue || availability === availabilityValue)
+            && (!conditionValue || condition === conditionValue);
+    });
+
+    displayBooks(filtered);
+}
+
+function populateCatalogFilters() {
+    const classFilter = document.getElementById('classFilter');
+    const sectionFilter = document.getElementById('sectionFilter');
+    const conditionFilter = document.getElementById('conditionFilter');
+
+    const uniqueValues = (key, fallbackKey = '') => {
+        const set = new Set();
+        allBooks.forEach(book => {
+            const value = String(book[key] || book[fallbackKey] || '').trim();
+            if (value) set.add(value);
+        });
+        return Array.from(set).sort((a,b) => a.localeCompare(b));
+    };
+
+    if (classFilter) {
+        uniqueValues('class').forEach(value => {
+            classFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
+        });
+        classFilter.addEventListener('change', performSearch);
+    }
+
+    if (sectionFilter) {
+        uniqueValues('library_section', 'location_collection').forEach(value => {
+            sectionFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
+        });
+        sectionFilter.addEventListener('change', performSearch);
+    }
+
+    if (conditionFilter) {
+        uniqueValues('book_condition').forEach(value => {
+            conditionFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
+        });
+        conditionFilter.addEventListener('change', performSearch);
+    }
+
+    const availabilityFilter = document.getElementById('availabilityFilter');
+    if (availabilityFilter) {
+        availabilityFilter.addEventListener('change', performSearch);
     }
 }
+
 
 function displayBooks(books) {
     const booksList = document.getElementById('booksList');
@@ -1414,7 +1744,6 @@ function setOptionalBookDetail(containerId, valueId, value) {
 }
 
 function selectBook(bookId, title, availableCopies) {
-    if (availableCopies <= 0) return; // Don't allow selecting unavailable books
     
     selectedBookId = bookId;
     
@@ -1435,13 +1764,35 @@ function selectBook(bookId, title, availableCopies) {
 
     document.getElementById('selectedBookAvailable').textContent = book.available_copies;
     document.getElementById('selectedBookTotal').textContent = book.total_copies;
-    document.getElementById('selectedBookStatus').textContent = book.available_copies > 0 ? '✓ Available' : 'Out of Stock';
+
+    const unavailable = Number(book.available_copies || 0) <= 0;
+    document.getElementById('selectedBookStatus').textContent = unavailable ? 'Out of Stock' : '✓ Available';
+
+    const reservationActions = document.getElementById('reservationActions');
+    const reserveBookId = document.getElementById('reserveBookId');
+    const reserveButton = document.getElementById('reserveBookButton');
+    const borrowForm = document.getElementById('borrowForm');
+
+    if (reservationActions && reserveBookId && reserveButton && borrowForm) {
+        reserveBookId.value = book.book_id;
+        const alreadyReserved = reservedBookIds.map(Number).includes(Number(book.book_id));
+
+        if (unavailable) {
+            reservationActions.style.display = 'block';
+            borrowForm.style.display = 'none';
+            reserveButton.disabled = alreadyReserved;
+            reserveButton.textContent = alreadyReserved ? 'Already Reserved' : 'Reserve This Book';
+        } else {
+            reservationActions.style.display = 'none';
+            borrowForm.style.display = 'block';
+        }
+    }
     
     // Set QR code
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(book.qr_code)}`;
     document.getElementById('selectedBookQR').src = qrUrl;
     document.getElementById('selectedBookQRText').textContent = book.qr_code;
-    document.getElementById('selectedBookQRDownload').href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(book.qr_code);
+    document.getElementById('selectedBookQRDownload').href = '/LibraryBorrowingSystem/student/download_book_qr.php?book_id=' + encodeURIComponent(book.book_id);
     
     // Set hidden form field
     document.getElementById('borrowBookId').value = bookId;
@@ -1579,5 +1930,24 @@ function escapeHtml(text) {
             });
         }
     </script>
+
+<script>
+(function(){
+  const bell=document.getElementById('studentNotificationBell');
+  const panel=document.getElementById('studentNotificationPanel');
+  const count=document.getElementById('studentNotificationCount');
+  const list=document.getElementById('studentNotificationList');
+  const markAll=document.getElementById('studentMarkAllNotifications');
+  if(!bell||!panel||!list)return;
+  function esc(v){const d=document.createElement('div');d.textContent=v??'';return d.innerHTML;}
+  function relativeTime(v){const t=new Date(v.replace(' ','T')).getTime(),m=Math.floor(Math.max(0,Date.now()-t)/60000);if(m<1)return'Just now';if(m<60)return m+' min ago';const h=Math.floor(m/60);if(h<24)return h+' hr ago';return Math.floor(h/24)+' day(s) ago';}
+  function load(){fetch('/LibraryBorrowingSystem/notifications.php?action=list',{credentials:'same-origin'}).then(r=>r.json()).then(d=>{if(!d.ok)return;const u=Number(d.unread||0);count.textContent=u>99?'99+':u;count.style.display=u?'flex':'none';if(!d.notifications.length){list.innerHTML='<div class="student-notification-empty">No notifications yet.</div>';return;}list.innerHTML=d.notifications.map(n=>`<div class="student-notification-item ${Number(n.is_read)===0?'unread':''}" data-id="${Number(n.notification_id)}"><div class="student-notification-title">${esc(n.title)}</div><div class="student-notification-message">${esc(n.message)}</div><div class="student-notification-time">${relativeTime(n.created_at)}</div></div>`).join('');list.querySelectorAll('.student-notification-item').forEach(el=>el.onclick=function(){fetch('/LibraryBorrowingSystem/notifications.php?action=read',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'notification_id='+encodeURIComponent(this.dataset.id)}).then(load);});}).catch(()=>{});}
+  bell.addEventListener('click',e=>{e.stopPropagation();panel.classList.toggle('show');load();});
+  panel.addEventListener('click',e=>e.stopPropagation());document.addEventListener('click',()=>panel.classList.remove('show'));
+  markAll.addEventListener('click',()=>fetch('/LibraryBorrowingSystem/notifications.php?action=read_all',{method:'POST',credentials:'same-origin'}).then(load));
+  load();setInterval(load,30000);
+})();
+</script>
+
 </body>
 </html>

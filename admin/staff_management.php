@@ -75,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $insert_stmt->bind_param('sss', $full_name, $username, $hashed_password);
                     
                     if ($insert_stmt->execute()) {
+                        auditRecordChange($conn, 'staff_created', 'staff_management', 'Created a staff account.', 'success', 'user', $conn->insert_id, null, ['full_name' => $full_name, 'username' => $username, 'status' => 'active']);
                         $message = 'Staff account created successfully!';
                         $message_type = 'success';
                         
@@ -122,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $update_stmt->bind_param('si', $hashed_password, $user_id);
                 
                 if ($update_stmt->execute() && $update_stmt->affected_rows > 0) {
+                    auditRecordChange($conn, 'staff_password_reset', 'staff_management', 'Reset a staff account password.', 'success', 'user', $user_id, ['password' => '[REDACTED]'], ['password' => '[REDACTED]']);
                     $message = 'Password reset successfully!';
                     $message_type = 'success';
                 } else {
@@ -149,6 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $update_stmt->bind_param('si', $new_status, $user_id);
             
             if ($update_stmt->execute() && $update_stmt->affected_rows > 0) {
+                auditRecordChange($conn, 'staff_status_changed', 'staff_management', 'Changed staff account status.', 'success', 'user', $user_id, ['status' => $new_status === 'active' ? 'inactive' : 'active'], ['status' => $new_status]);
                 $status_text = $new_status === 'active' ? 'activated' : 'deactivated';
                 $message = 'Staff account ' . $status_text . ' successfully!';
                 $message_type = 'success';
@@ -689,5 +692,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
     </script>
+<?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
 </body>
 </html>

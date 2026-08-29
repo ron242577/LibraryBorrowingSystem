@@ -78,6 +78,20 @@ function ensureStudentDetailColumns($conn) {
 }
 ensureStudentDetailColumns($conn);
 
+function ensureStudentArchiveColumns($conn) {
+    foreach ([
+        'is_archived' => "ALTER TABLE students ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status",
+        'archived_at' => "ALTER TABLE students ADD COLUMN archived_at DATETIME NULL AFTER is_archived",
+        'archived_by' => "ALTER TABLE students ADD COLUMN archived_by INT NULL AFTER archived_at"
+    ] as $column => $sql) {
+        $safe = $conn->real_escape_string($column);
+        $check = $conn->query("SHOW COLUMNS FROM students LIKE '{$safe}'");
+        if ($check && $check->num_rows === 0) @$conn->query($sql);
+    }
+}
+ensureStudentArchiveColumns($conn);
+
+
 function normalizeDateValue($value) {
     $value = trim((string)$value);
     if ($value === '') {
@@ -397,6 +411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $generated_qr,
         $error
     )) {
+        auditRecordChange($conn, 'student_created', 'student_records', 'Created a student record.', 'success', 'student', null, null, ['student_no' => $_POST['student_no'] ?? '', 'full_name' => $_POST['full_name'] ?? '', 'section' => $_POST['student_group'] ?? '', 'grade_level' => $_POST['year_level'] ?? '', 'department' => $_POST['department'] ?? '']);
         $message = 'Student added successfully! QR Code: ' . htmlspecialchars($generated_qr) . '. Password saved securely.';
         $message_type = 'success';
         header("Refresh: 2; url=/LibraryBorrowingSystem/admin/student_records.php");
@@ -451,6 +466,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
 
+            auditRecordChange($conn, 'students_imported', 'student_records', 'Imported student records.', 'success', 'student_import', null, null, ['successful_rows' => $success_count, 'error_count' => count($errors)]);
             $message = $success_count . ' student' . ($success_count === 1 ? '' : 's') . ' imported successfully with securely hashed passwords.';
             if (!empty($errors)) {
                 $message .= ' Some rows were skipped: ' . implode(' | ', array_slice($errors, 0, 5));
@@ -468,6 +484,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['archive_student','restore_student'], true)) {
+    try { requireValidCsrf($_POST['csrf_token'] ?? ''); } catch (Throwable $e) { $message = $e->getMessage(); $message_type = 'error'; $_POST['action'] = ''; }
+    $action = $_POST['action'] ?? '';
+    $sid = (int)($_POST['student_id'] ?? 0);
+    if ($message_type !== 'error' && $sid <= 0) { $message='Invalid student ID.'; $message_type='error'; }
+    if ($message_type !== 'error' && $action === 'archive_student') {
+        try {
+            $q=$conn->prepare("SELECT full_name, status, is_archived, currently_borrowed FROM (SELECT s.full_name,s.status,s.is_archived, SUM(CASE WHEN t.status='borrowed' THEN 1 ELSE 0 END) AS currently_borrowed FROM students s LEFT JOIN transactions t ON s.student_id=t.student_id WHERE s.student_id=? GROUP BY s.student_id,s.full_name,s.status,s.is_archived) x");
+            $q->bind_param('i',$sid); $q->execute(); $st=$q->get_result()->fetch_assoc(); $q->close();
+            if (!$st) { $message='Student not found.'; $message_type='error'; }
+            elseif ((int)$st['is_archived']===1) { $message='Student is already archived.'; $message_type='error'; }
+            elseif ((int)$st['currently_borrowed']>0) { $message='This student cannot be archived while they have a borrowed book. Return it first.'; $message_type='error'; }
+            else {
+                $u=$conn->prepare('UPDATE students SET is_archived=1, archived_at=NOW(), archived_by=? WHERE student_id=?');
+                $uid=(int)($_SESSION['user_id']??0); $u->bind_param('ii',$uid,$sid); $u->execute(); $u->close();
+                auditRecordChange($conn,'student_archived','student_records','Archived a student record while preserving borrowing history.','success','student',$sid,['name'=>$st['full_name'],'status'=>'active'],['name'=>$st['full_name'],'status'=>'archived']);
+                $message='Student archived successfully.'; $message_type='success';
+            }
+        } catch(Exception $e){$message='Unable to archive student right now.';$message_type='error';logError('Archive student error: '.$e->getMessage());}
+    } elseif ($message_type !== 'error' && $action === 'restore_student') {
+        try {
+            $q=$conn->prepare('SELECT full_name, is_archived FROM students WHERE student_id=? LIMIT 1'); $q->bind_param('i',$sid); $q->execute(); $st=$q->get_result()->fetch_assoc(); $q->close();
+            if (!$st) { $message='Student not found.'; $message_type='error'; }
+            elseif ((int)$st['is_archived']===0) { $message='Student is already active.'; $message_type='error'; }
+            else {
+                $u=$conn->prepare("UPDATE students SET is_archived=0, archived_at=NULL, archived_by=NULL WHERE student_id=?"); $u->bind_param('i',$sid); $u->execute(); $u->close();
+                auditRecordChange($conn,'student_restored','student_records','Restored an archived student record.','success','student',$sid,['name'=>$st['full_name'],'status'=>'archived'],['name'=>$st['full_name'],'status'=>'active']);
+                $message='Student restored successfully.'; $message_type='success';
+            }
+        } catch(Exception $e){$message='Unable to restore student right now.';$message_type='error';logError('Restore student error: '.$e->getMessage());}
+    }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RECORDS logic
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -477,6 +526,8 @@ $offset        = ($page - 1) * $per_page;
 
 $search_rec    = $_GET['search']  ?? '';
 $status_filter = $_GET['status']  ?? '';
+$archive_filter = $_GET['archive_filter'] ?? 'active';
+if (!in_array($archive_filter, ['active','archived','all'], true)) $archive_filter = 'active';
 $sort_by       = $_GET['sort']    ?? 'full_name';
 $sort_order    = $_GET['order']   ?? 'ASC';
 
@@ -486,6 +537,8 @@ if (!in_array($sort_by,    $allowed_sorts))  $sort_by    = 'full_name';
 if (!in_array($sort_order, $allowed_orders)) $sort_order = 'ASC';
 
 $where = "WHERE 1=1";
+if ($archive_filter === 'active') $where .= " AND s.is_archived = 0";
+elseif ($archive_filter === 'archived') $where .= " AND s.is_archived = 1";
 if (!empty($search_rec)) {
     $sp = '%' . $conn->real_escape_string($search_rec) . '%';
     $where .= " AND (s.full_name LIKE '$sp' OR s.student_no LIKE '$sp' OR s.student_group LIKE '$sp' OR s.department LIKE '$sp' OR s.year_level LIKE '$sp' OR s.contact_number LIKE '$sp' OR s.email LIKE '$sp' OR s.qr_code LIKE '$sp')";
@@ -502,7 +555,7 @@ $total_pages    = max(1, ceil($total_students / $per_page));
 $qry = "SELECT
             s.student_id, s.student_no, s.full_name, s.student_group, s.department,
             s.year_level, s.contact_number, s.card_valid_until, s.email, s.qr_code,
-            s.status, s.created_at, s.updated_at,
+            s.status, s.is_archived, s.archived_at, s.created_at, s.updated_at,
             COUNT(t.transaction_id)                                    AS total_borrows,
             SUM(CASE WHEN t.status = 'borrowed' THEN 1 ELSE 0 END)    AS currently_borrowed
         FROM students s
@@ -510,7 +563,7 @@ $qry = "SELECT
         $where
         GROUP BY s.student_id, s.student_no, s.full_name, s.student_group, s.department,
                  s.year_level, s.contact_number, s.card_valid_until, s.email, s.qr_code,
-                 s.status, s.created_at, s.updated_at
+                 s.status, s.is_archived, s.archived_at, s.created_at, s.updated_at
         ORDER BY $sort_by $sort_order
         LIMIT $offset, $per_page";
 
@@ -527,7 +580,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     $sid = intval($_GET['ajax_student']);
     $out = ['student' => null, 'transactions' => []];
 
-    $ss = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, card_valid_until, email, qr_code, status, created_at
+    $ss = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, card_valid_until, email, qr_code, status, is_archived, archived_at, created_at
                            FROM students WHERE student_id = ?");
     $ss->bind_param('i', $sid);
     $ss->execute();
@@ -571,6 +624,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             color: #202A44;
             padding-bottom: 50px;
             margin-left: 260px;
+            overflow-x: hidden;
         }
         @media (max-width: 992px) { body { margin-left: 0; } }
 
@@ -987,7 +1041,12 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             .stu-info-grid { grid-template-columns: 1fr; }
             body { margin-left: 0; }
         }
-    </style>
+    .auto-search-submit,.auto-filter-submit{display:none !important;}
+    
+        .content-container,
+        .container{margin-top:0 !important;}
+
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -1017,7 +1076,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 <h4>Active Students</h4>
                 <div class="value">
                     <?php
-                    $ar = $conn->query("SELECT COUNT(*) AS c FROM students WHERE status='active'");
+                    $ar = $conn->query("SELECT COUNT(*) AS c FROM students WHERE status='active' AND is_archived=0");
                     echo number_format($ar ? $ar->fetch_assoc()['c'] : 0);
                     ?>
                 </div>
@@ -1026,7 +1085,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 <h4>Inactive Students</h4>
                 <div class="value">
                     <?php
-                    $ir = $conn->query("SELECT COUNT(*) AS c FROM students WHERE status='inactive'");
+                    $ir = $conn->query("SELECT COUNT(*) AS c FROM students WHERE status='inactive' AND is_archived=0");
                     echo number_format($ir ? $ir->fetch_assoc()['c'] : 0);
                     ?>
                 </div>
@@ -1066,6 +1125,14 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label>Records</label>
+                        <select name="archive_filter">
+                            <option value="active" <?php echo $archive_filter==='active'?'selected':''; ?>>Active Records</option>
+                            <option value="archived" <?php echo $archive_filter==='archived'?'selected':''; ?>>Archived Records</option>
+                            <option value="all" <?php echo $archive_filter==='all'?'selected':''; ?>>All Records</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label>Order</label>
                         <select name="order">
                             <option value="ASC"  <?php echo $sort_order === 'ASC'  ? 'selected' : ''; ?>>Ascending</option>
@@ -1075,7 +1142,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 </div>
                 <div class="filter-actions">
                     <div class="filter-action-left">
-                        <button type="submit" class="btn btn-primary">Search</button>
+                        <button type="submit" class="btn btn-primary auto-search-submit">Search</button>
                         <a href="?" class="btn btn-reset">↺ Reset</a>
                     </div>
                     <div class="filter-action-right">
@@ -1207,6 +1274,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                                 <th>Email</th>
                                 <th>QR Code</th>
                                 <th>Status</th>
+                                <th>Archive</th>
                                 <th>Total Borrows</th>
                                 <th>Currently Borrowed</th>
                                 <th>Date Added</th>
@@ -1233,6 +1301,25 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                                         <span class="badge badge-<?php echo $student['status']; ?>">
                                             <?php echo htmlspecialchars($student['status']); ?>
                                         </span>
+                                    </td>
+                                    <td>
+                                        <?php if ((int)$student['is_archived'] === 1): ?>
+                                            <form method="POST" data-confirm-title="Restore Student" data-confirm-message="Restore this archived student record? Their borrowing history will remain intact." data-confirm-text="Restore Student">
+                                                <?php echo csrfField(); ?>
+                                                <input type="hidden" name="action" value="restore_student">
+                                                <input type="hidden" name="student_id" value="<?php echo (int)$student['student_id']; ?>">
+                                                <button type="submit" class="btn btn-primary">Restore</button>
+                                            </form>
+                                        <?php elseif ((int)($student['currently_borrowed'] ?? 0) === 0): ?>
+                                            <form method="POST" data-confirm-title="Archive Student" data-confirm-message="Archive this student record? Their borrowing history will be preserved and the account will no longer be available for normal student access." data-confirm-text="Archive Student" data-confirm-danger="1">
+                                                <?php echo csrfField(); ?>
+                                                <input type="hidden" name="action" value="archive_student">
+                                                <input type="hidden" name="student_id" value="<?php echo (int)$student['student_id']; ?>">
+                                                <button type="submit" class="btn btn-reset">Archive</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="muted">Return book first</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?php echo $student['total_borrows'] ?? 0; ?></td>
                                     <td>
@@ -1538,7 +1625,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 <div class="stu-info-item">
                     <div class="stu-info-label">Status</div>
                     <div class="stu-info-value" style="color:${s.status==='active'?'#567D1F':'#c0392b'};">
-                        ${s.status === 'active' ? '✓ Active' : '✕ Inactive'}
+                        ${s.is_archived == 1 ? '▣ Archived' : (s.status === 'active' ? '✓ Active' : '✕ Inactive')}
                     </div>
                 </div>
                 <div class="stu-info-item">
@@ -1600,7 +1687,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         document.getElementById('qrImage').src = qrPath;
         const downloadBtn = document.getElementById('downloadQrBtn');
         if (downloadBtn) {
-            downloadBtn.href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(qrCode);
+            downloadBtn.href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(qrCode) + '&type=student';
             downloadBtn.removeAttribute('download');
         }
         document.getElementById('qrModal').classList.add('show');
@@ -1613,5 +1700,31 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         if (e.target === qm) qm.classList.remove('show');
     });
     </script>
+
+<script id="autoFilterEnhancement">
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('filterForm');
+    if (!form) return;
+    const search = form.querySelector('input[name="search"]');
+    let timer = null;
+
+    function autoSubmit() {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            form.submit();
+        }, 350);
+    }
+
+    if (search) search.addEventListener('input', autoSubmit);
+    form.querySelectorAll('select').forEach(function (select) {
+        select.addEventListener('change', function () {
+            clearTimeout(timer);
+            form.submit();
+        });
+    });
+});
+</script>
+
+<?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
 </body>
 </html>

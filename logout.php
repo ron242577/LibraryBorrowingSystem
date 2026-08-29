@@ -6,7 +6,7 @@ require_once __DIR__ . '/db.php';
 startSecureSession();
 
 if (!empty($_SESSION['user_id'])) {
-    auditLogEvent($conn, 'admin_logout', 'logout', 'Admin logged out of the system.', 'success');
+    auditLogEvent($conn, 'admin_logout', 'logout', 'Chief Librarian logged out of the system.', 'success');
 }
 
 $_SESSION = [];

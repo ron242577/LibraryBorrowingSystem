@@ -54,7 +54,7 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
     }
 
     .sidebar-brand {
-        min-height: 72px;
+        min-height: 78px;
         padding: 14px 16px;
         display: flex;
         align-items: center;
@@ -239,6 +239,7 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
         .sidebar-overlay.active { display: block; }
         body { margin-left: 0 !important; }
     }
+
 </style>
 
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
@@ -265,24 +266,29 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
         </li>
         <li class="sidebar-item dropdown <?php echo $books_open ? 'open' : ''; ?>">
             <button type="button" class="sidebar-link dropdown-toggle" aria-expanded="<?php echo $books_open ? 'true' : 'false'; ?>">
-                <span>Books</span><span class="dropdown-icon">▼</span>
+                <span>Circulation</span><span class="dropdown-icon">▼</span>
             </button>
             <ul class="dropdown-menu">
                 <li><a href="/LibraryBorrowingSystem/admin/qr_transaction.php" class="dropdown-link <?php echo isActiveNav('/admin/qr_transaction.php'); ?>">QR Transactions</a></li>
-                <li><a href="/LibraryBorrowingSystem/admin/inventory.php" class="dropdown-link <?php echo isActiveNav('/admin/inventory.php'); ?>">Inventory</a></li>
+                <li><a href="/LibraryBorrowingSystem/admin/inventory.php" class="dropdown-link <?php echo isActiveNav('/admin/inventory.php'); ?>">Cataloging</a></li>
             </ul>
         </li>
         <li class="sidebar-item">
             <a href="/LibraryBorrowingSystem/admin/transactions.php" class="sidebar-link <?php echo isActiveNav('/admin/transactions.php'); ?>">Transaction Records</a>
         </li>
+        <li class="sidebar-item">
+            <a href="/LibraryBorrowingSystem/admin/reservations.php" class="sidebar-link <?php echo isActiveNav('/admin/reservations.php'); ?>">Reservations</a>
+        </li>
+        <li class="sidebar-item">
+            <a href="/LibraryBorrowingSystem/admin/backup_management.php" class="sidebar-link <?php echo isActiveNav('/admin/backup_management.php'); ?>">Backup &amp; Restore</a>
+        </li>
     </ul>
 
     <div class="sidebar-user">
         <div class="sidebar-user-label">Signed in as</div>
-        <div class="sidebar-user-name" title="<?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="sidebar-user-role" title="<?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>">
             <?php echo htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8'); ?>
         </div>
-        <div class="sidebar-user-role">Admin</div>
         <a href="/LibraryBorrowingSystem/logout.php" class="sidebar-logout">Logout</a>
     </div>
 </aside>

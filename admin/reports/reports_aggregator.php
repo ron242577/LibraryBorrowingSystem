@@ -125,13 +125,13 @@ class ReportsAggregator {
 
     public function getSystemMetrics($start_date, $end_date) {
         return [
-            'active_students' => $this->scalar("SELECT COUNT(*) FROM students WHERE status = 'active'"),
-            'total_students' => $this->scalar('SELECT COUNT(*) FROM students'),
+            'active_students' => $this->scalar("SELECT COUNT(*) FROM students WHERE status = 'active' AND COALESCE(is_archived,0)=0"),
+            'total_students' => $this->scalar('SELECT COUNT(*) FROM students WHERE COALESCE(is_archived,0)=0'),
             'active_users' => $this->scalar("SELECT COUNT(*) FROM users WHERE status = 'active'"),
             'total_users' => $this->scalar('SELECT COUNT(*) FROM users'),
-            'total_books' => $this->scalar('SELECT COALESCE(SUM(total_copies),0) FROM books'),
-            'available_books' => $this->scalar('SELECT COALESCE(SUM(available_copies),0) FROM books'),
-            'borrowed_books' => $this->scalar('SELECT COALESCE(SUM(borrowed_copies),0) FROM books'),
+            'total_books' => $this->scalar('SELECT COALESCE(SUM(total_copies),0) FROM books WHERE COALESCE(is_archived,0)=0'),
+            'available_books' => $this->scalar('SELECT COALESCE(SUM(available_copies),0) FROM books WHERE COALESCE(is_archived,0)=0'),
+            'borrowed_books' => $this->scalar('SELECT COALESCE(SUM(borrowed_copies),0) FROM books WHERE COALESCE(is_archived,0)=0'),
             'active_transactions' => $this->scalar("SELECT COUNT(*) FROM transactions WHERE status = 'borrowed'"),
             'most_used_features' => [
                 'total_borrows' => $this->getTotalBorrows($start_date, $end_date),
@@ -147,6 +147,7 @@ class ReportsAggregator {
                                              COALESCE(SUM(available_copies),0) AS available_copies,
                                              COALESCE(SUM(borrowed_copies),0) AS borrowed_copies
                                       FROM books
+                                      WHERE COALESCE(is_archived,0)=0
                                       GROUP BY book_status");
         $rows = [];
         if ($result) while ($row = $result->fetch_assoc()) $rows[] = $row;

@@ -100,7 +100,12 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
         .print-actions { margin-bottom: 18px; text-align: right; }
         button { border: 0; background: #141F52; color: white; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
         @media print { .print-actions { display: none; } body { margin: 0; } }
-    </style>
+    .auto-search-submit,.auto-filter-submit{display:none !important;}
+    
+        .content-container,
+        .container{margin-top:0 !important;}
+
+</style>
 </head>
 <body>
     <div class="print-actions"><button onclick="window.print()">Print / Save PDF</button></div>
@@ -136,6 +141,28 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
         <?php endforeach; endif; ?>
         </tbody>
     </table>
+
+<script id="transactionAutoFilterEnhancement">
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('.toolbar form');
+    if (!form) return;
+    const search = form.querySelector('input[name="search"]');
+    let timer = null;
+    if (search) {
+        search.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                form.submit();
+            }, 350);
+        });
+    }
+    const statusCards = document.querySelectorAll('.stats-grid .stat-card[href]');
+    statusCards.forEach(function (card) {
+        // Status cards remain click navigation by design.
+    });
+});
+</script>
+
 </body>
 </html>
 <?php exit(); endif; ?>
@@ -200,7 +227,7 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
             <form method="GET">
                 <input type="hidden" name="status" value="<?php echo h($filter_status); ?>">
                 <input type="text" name="search" value="<?php echo h($search); ?>" placeholder="Search student, book, book number, or transaction ID">
-                <button class="btn" type="submit">Search</button>
+                <button class="btn auto-search-submit" type="submit">Search</button>
                 <?php if ($search !== ''): ?><a class="btn secondary" href="?status=<?php echo h($filter_status); ?>">Clear</a><?php endif; ?>
             </form>
             <a class="btn secondary" href="?status=<?php echo h($filter_status); ?>&search=<?php echo urlencode($search); ?>&report=1" target="_blank">Print Report</a>

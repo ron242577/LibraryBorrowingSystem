@@ -102,10 +102,12 @@ define('JASHS_UI_FEEDBACK_INCLUDED', true);
     .jashs-confirm-overlay.show { display: flex; }
 
     .jashs-confirm-dialog {
-        width: min(430px, 100%);
+        width: min(430px, calc(100vw - 40px));
+        max-height: calc(100vh - 40px);
         background: #fff;
         border-radius: 14px;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
         box-shadow: 0 22px 60px rgba(0, 0, 0, .28);
         animation: jashsModalIn .16s ease-out;
     }
