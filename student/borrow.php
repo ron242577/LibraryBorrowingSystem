@@ -91,8 +91,7 @@ if ($student) {
                 available_copies,
                 borrowed_copies
             FROM books
-            WHERE COALESCE(is_archived,0) = 0 AND COALESCE(is_archived,0) = 0
-                AND book_status IN ('available', 'out_of_stock')
+            WHERE COALESCE(is_archived,0) = 0
             AND qr_code IS NOT NULL
             AND qr_code != ''
             GROUP BY book_id
@@ -134,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                     library_building,
                     shelf_number,
                     library_section,
+                    book_condition,
                     qr_code,
                     book_status,
                     total_copies,
@@ -142,7 +142,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                 FROM books
                 WHERE (title LIKE ? OR author LIKE ?) 
                 AND COALESCE(is_archived,0) = 0
-                AND book_status IN ('available', 'out_of_stock')
                 AND qr_code IS NOT NULL
                 AND qr_code != ''
                 GROUP BY book_id
@@ -179,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api']) && $_GET['api'] 
                         'library_building' => $book['library_building'],
                         'shelf_number' => $book['shelf_number'],
                         'library_section' => $book['library_section'],
+                        'book_condition' => $book['book_condition'],
                         'qr_code' => $book['qr_code'],
                         'book_status' => $book['book_status'],
                         'total_copies' => $book['total_copies'],
@@ -1391,6 +1391,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <option value="available">Available</option>
                     <option value="out_of_stock">Out of Stock</option>
                 </select>
+                <select id="conditionFilter" aria-label="Filter by book condition">
+                    <option value="">All Conditions</option>
+                    <option value="New">New</option>
+                    <option value="Old">Old</option>
+                </select>
                 <button type="submit" class="auto-search-submit">Search Books</button>
             </form>
         </div>
@@ -1465,7 +1470,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <?php else: ?>
                         <?php foreach ($books as $book): ?>
                             <div class="book-item <?php echo $book['available_copies'] <= 0 ? 'unavailable' : ''; ?>" 
-                                 onclick="selectBook(<?php echo $book['book_id']; ?>, '<?php echo htmlspecialchars(addslashes($book['title'])); ?>', <?php echo $book['available_copies']; ?>)">
+                                 onclick="selectBook(<?php echo $book['book_id']; ?>, '<?php echo htmlspecialchars(addslashes($book['title'])); ?>', <?php echo $book['available_copies']; ?>, this)">
                                 <div class="book-icon">📕</div>
                                 <div class="book-info">
                                     <div class="book-title"><?php echo htmlspecialchars($book['title']); ?></div>
@@ -1627,19 +1632,25 @@ function performSearch() {
         const searchable = [
             book.title,
             book.author,
-            book.book_number
+            book.book_number,
+            book.publisher,
+            book.edition,
+            book.class,
+            book.library_section,
+            book.location_collection
         ].map(value => String(value || '').toLowerCase()).join(' ');
 
         const bookClass = String(book.class || '');
         const section = String(book.library_section || book.location_collection || '');
-        const condition = String(book.book_condition || '');
+        const condition = String(book.book_condition || '').trim().toLowerCase();
+        const selectedCondition = String(conditionValue || '').trim().toLowerCase();
         const availability = Number(book.available_copies || 0) > 0 ? 'available' : 'out_of_stock';
 
         return (!query || searchable.includes(query))
             && (!classValue || bookClass === classValue)
             && (!sectionValue || section === sectionValue)
             && (!availabilityValue || availability === availabilityValue)
-            && (!conditionValue || condition === conditionValue);
+            && (!selectedCondition || condition === selectedCondition);
     });
 
     displayBooks(filtered);
@@ -1674,9 +1685,14 @@ function populateCatalogFilters() {
     }
 
     if (conditionFilter) {
-        uniqueValues('book_condition').forEach(value => {
-            conditionFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
-        });
+        // Keep only the fixed conditions used by the borrowing page.
+        // Database values are normalized during filtering.
+        conditionFilter.innerHTML = `
+            <option value="">All Conditions</option>
+            <option value="New">New</option>
+            <option value="Old">Old</option>
+        `;
+
         conditionFilter.addEventListener('change', performSearch);
     }
 
@@ -1717,7 +1733,7 @@ function displayBooks(books) {
             const isUnavailable = book.available_copies <= 0;
             html += `
                 <div class="book-item ${isUnavailable ? 'unavailable' : ''}" 
-                     onclick="selectBook(${book.book_id}, '${book.title.replace(/'/g, "\\'")}', ${book.available_copies})">
+                     onclick="selectBook(${book.book_id}, '${book.title.replace(/'/g, "\\'")}', ${book.available_copies}, this)">
                     <div class="book-icon">📕</div>
                     <div class="book-info">
                         <div class="book-title">${escapeHtml(book.title)}</div>
@@ -1743,7 +1759,7 @@ function setOptionalBookDetail(containerId, valueId, value) {
     valueElement.textContent = hasValue ? String(value) : '—';
 }
 
-function selectBook(bookId, title, availableCopies) {
+function selectBook(bookId, title, availableCopies, element = null) {
     
     selectedBookId = bookId;
     
@@ -1807,7 +1823,7 @@ function selectBook(bookId, title, availableCopies) {
     document.querySelectorAll('.book-item').forEach(item => {
         item.classList.remove('active');
     });
-    event.currentTarget.classList.add('active');
+    if (element) { element.classList.add('active'); }
 }
 
 function submitBorrow() {

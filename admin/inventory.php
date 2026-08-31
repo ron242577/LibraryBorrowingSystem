@@ -390,6 +390,8 @@ function addBookRecord($conn, $data, &$error_message) {
     $volumes = trim($data['volumes'] ?? '');
     $class = trim($data['class'] ?? '');
     $type_of_material = trim($data['type_of_material'] ?? '');
+    $book_condition = trim($data['book_condition'] ?? 'New');
+    if (!in_array($book_condition, ['New','Old'], true)) { $book_condition = 'New'; }
     $location_collection = trim($data['location_collection'] ?? '');
     $total_copies = isset($data['total_copies']) && trim((string)$data['total_copies']) !== '' ? (int)$data['total_copies'] : 1;
 
@@ -454,12 +456,12 @@ function addBookRecord($conn, $data, &$error_message) {
 
     $stmt = $conn->prepare('
         INSERT INTO books
-            (title, author, co_authors, place_of_publication, publication_date, book_number, book_pages, source_of_funds, cost_price, publisher, edition, volumes, class, type_of_material, location_collection, qr_code, book_status, total_copies, available_copies, borrowed_copies, lost_copies)
+            (title, author, co_authors, place_of_publication, publication_date, book_number, book_pages, source_of_funds, cost_price, publisher, edition, volumes, class, type_of_material, location_collection, book_condition, qr_code, book_status, total_copies, available_copies, borrowed_copies, lost_copies)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
     $stmt->bind_param(
-        'ssssssisdssssssssiiii',
+        'ssssssisdsssssssssiiii',
         $title,
         $author,
         $co_authors,
@@ -475,6 +477,7 @@ function addBookRecord($conn, $data, &$error_message) {
         $class,
         $type_of_material,
         $location_collection,
+        $book_condition,
         $book_qr_code,
         $status,
         $total_copies,
@@ -515,6 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'volumes' => $_POST['volumes'] ?? '',
             'class' => $_POST['class'] ?? '',
             'type_of_material' => $_POST['type_of_material'] ?? '',
+            'book_condition' => $_POST['book_condition'] ?? 'New',
             'location_collection' => $_POST['location_collection'] ?? '',
             'library_building' => $_POST['library_building'] ?? '',
             'shelf_number' => $_POST['shelf_number'] ?? '',
@@ -551,7 +555,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'SELECT title, author, co_authors, place_of_publication, publication_date,
                             book_number, book_pages, source_of_funds, cost_price, publisher,
                             edition, volumes, class, type_of_material, location_collection,
-                            library_building, shelf_number, library_section,
+                            library_building, shelf_number, library_section, book_condition,
                             total_copies, available_copies, borrowed_copies, lost_copies,
                             book_status, is_archived
                      FROM books WHERE book_id = ? LIMIT 1'
@@ -583,6 +587,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $volumes = trim((string)($_POST['volumes'] ?? ''));
                 $bookClass = trim((string)($_POST['class'] ?? ''));
                 $material = trim((string)($_POST['type_of_material'] ?? ''));
+                $bookCondition = trim((string)($_POST['book_condition'] ?? 'New'));
+                if (!in_array($bookCondition, ['New','Old'], true)) { $bookCondition = 'New'; }
                 $location = trim((string)($_POST['location_collection'] ?? ''));
                 $building = trim((string)($_POST['library_building'] ?? ''));
                 $shelf = trim((string)($_POST['shelf_number'] ?? ''));
@@ -623,14 +629,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         title = ?, author = ?, co_authors = ?, place_of_publication = ?,
                         publication_date = ?, book_number = ?, book_pages = ?,
                         source_of_funds = ?, cost_price = ?, publisher = ?, edition = ?,
-                        volumes = ?, class = ?, type_of_material = ?, location_collection = ?,
+                        volumes = ?, class = ?, type_of_material = ?, location_collection = ?, book_condition = ?,
                         library_building = ?, shelf_number = ?, library_section = ?,
                         book_status = ?
                      WHERE book_id = ?'
                 );
 
                 $update->bind_param(
-                    'ssssssisdssssssssssi',
+                    'ssssssisdsssssssssssi',
                     $title,
                     $author,
                     $coAuthors,
@@ -646,6 +652,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $bookClass,
                     $material,
                     $location,
+                    $bookCondition,
                     $building,
                     $shelf,
                     $section,
@@ -1164,7 +1171,7 @@ try {
         .low-stock-badge { font-size: 11px; font-weight: 600; background: #FBFDCB; color: #5C5F05; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
 
         .table-wrapper { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 1650px; }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; }
         thead { background: #F7F9FC; border-bottom: 2px solid #D2E2F6; }
         th { padding: 12px 14px; text-align: left; font-weight: 600; color: #52618D; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
         td { padding: 12px 14px; border-bottom: 1px solid #E7EEF7; font-size: 13px; vertical-align: top; }
@@ -1406,7 +1413,24 @@ try {
         .inventory-action-btn{cursor:pointer;}
         .inventory-action-btn:focus-visible,.details-edit-btn:focus-visible{outline:3px solid rgba(244,249,22,.55);outline-offset:2px;}
 
-    </style>
+    
+.inventory-compact-table th:nth-child(1),
+.inventory-compact-table td:nth-child(1),
+.inventory-compact-table th:nth-child(4),
+.inventory-compact-table td:nth-child(4),
+.inventory-compact-table th:nth-child(5),
+.inventory-compact-table td:nth-child(5),
+.inventory-compact-table th:nth-child(6),
+.inventory-compact-table td:nth-child(6),
+.inventory-compact-table th:nth-child(7),
+.inventory-compact-table td:nth-child(7),
+.inventory-compact-table th:nth-child(9),
+.inventory-compact-table td:nth-child(9),
+.inventory-compact-table th:nth-child(12),
+.inventory-compact-table td:nth-child(12),
+.inventory-compact-table th:nth-child(13),
+.inventory-compact-table td:nth-child(13) { display:none; }
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -1481,9 +1505,14 @@ try {
                     >
                         <option value="">All Status</option>
                         <option value="available">Available</option>
-                        <option value="limited">Limited Copy</option>
-                        <option value="not_available">Not Available</option>
-                        <option value="archived">Archived</option>
+                        <option value="out_of_stock">Out of Stock</option>
+                        <option value="damaged">Damaged</option>
+                        <option value="lost">Lost</option>
+                    </select>
+                    <select id="conditionFilter" class="filter-select" onchange="filterTable()">
+                        <option value="">All Conditions</option>
+                        <option value="New">New</option>
+                        <option value="Old">Old</option>
                     </select>
                     <select id="classFilter" class="filter-select" onchange="filterTable()">
                         <option value="">All Classes</option>
@@ -1519,7 +1548,7 @@ try {
                 <div class="empty-message">No books in inventory yet.</div>
             <?php else: ?>
                 <div class="table-wrapper">
-                    <table>
+                    <table class="inventory-compact-table">
                         <thead>
                             <tr>
                                 <th>QR</th>
@@ -1549,8 +1578,8 @@ try {
                                             : 'not_available');
                                 ?>
                                 <tr data-search="<?php echo h($book['title'] . ' ' . $book['author'] . ' ' . $book['book_number']); ?>"
-                                    data-status="<?php echo h($inventoryAvailability); ?>"
-                                    data-condition="<?php echo h($book['book_condition'] ?? ''); ?>"
+                                    data-status="<?php echo h($book['book_status'] ?? 'available'); ?>" 
+                                    data-condition="<?php echo h(($book['book_condition'] ?? '') === 'Old' ? 'Old' : ($book['book_condition'] ?? 'New')); ?>"
                                     data-class="<?php echo h($book['class'] ?? ''); ?>"
                                     data-section="<?php echo h($book['library_section'] ?? ($book['location_collection'] ?? '')); ?>">
                                     <td>
@@ -1607,6 +1636,7 @@ try {
                                                 'volumes' => $book['volumes'],
                                                 'class' => $book['class'],
                                                 'type_of_material' => $book['type_of_material'],
+                                                'book_condition' => (($book['book_condition'] ?? 'New') === 'Old' ? 'Old' : ($book['book_condition'] ?? 'New')),
                                                 'location_collection' => $book['location_collection'],
                                                 'library_building' => $book['library_building'],
                                                 'shelf_number' => $book['shelf_number'],
@@ -1704,6 +1734,13 @@ try {
                         <div class="form-group">
                             <label for="type_of_material">Type of Material *</label>
                             <input type="text" id="type_of_material" name="type_of_material" required placeholder="e.g. Book, Thesis, Magazine">
+                        </div>
+                        <div class="form-group">
+                            <label for="book_condition">Book Condition *</label>
+                            <select id="book_condition" name="book_condition" required>
+                                <option value="New">New</option>
+                                <option value="Old">Old</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="location_collection">Location - Collection *</label>
@@ -1940,6 +1977,10 @@ try {
                     <div class="book-detail-value" id="detailMaterial">—</div>
                 </div>
                 <div class="book-detail-item">
+                    <div class="book-detail-label">Book Condition</div>
+                    <div class="book-detail-value" id="detailCondition">—</div>
+                </div>
+                <div class="book-detail-item">
                     <div class="book-detail-label">Location / Collection</div>
                     <div class="book-detail-value" id="detailLocation">—</div>
                 </div>
@@ -2086,6 +2127,13 @@ try {
                     <div class="form-group">
                         <label for="editLocation">Location / Collection *</label>
                         <input type="text" id="editLocation" name="location_collection" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editBookCondition">Book Condition *</label>
+                        <select id="editBookCondition" name="book_condition" required>
+                            <option value="New">New</option>
+                            <option value="Old">Old</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="editStatus">Status *</label>
@@ -2439,6 +2487,7 @@ try {
             document.getElementById('detailSourceFunds').textContent = detailText(book.source_of_funds);
             document.getElementById('detailCostPrice').textContent = book.cost_price !== null && book.cost_price !== '' ? '₱' + Number(book.cost_price).toFixed(2) : '—';
             document.getElementById('detailMaterial').textContent = detailText(book.type_of_material);
+            if (document.getElementById('detailCondition')) document.getElementById('detailCondition').textContent = detailText(book.book_condition || 'New');
             document.getElementById('detailLocation').textContent = detailText(book.location_collection);
             document.getElementById('detailBuilding').textContent = detailText(book.library_building);
             document.getElementById('detailShelf').textContent = detailText(book.shelf_number);
@@ -2506,7 +2555,9 @@ try {
             setEditValue('editVolumes', book.volumes);
             setEditValue('editClass', book.class);
             setEditValue('editMaterial', book.type_of_material);
+            setEditValue('editBookCondition', book.book_condition || 'New');
             setEditValue('editLocation', book.location_collection);
+            setEditValue('editBookCondition', book.book_condition || 'New');
             setEditValue('editBuilding', book.library_building);
             setEditValue('editShelf', book.shelf_number);
             setEditValue('editLibrarySection', book.library_section);

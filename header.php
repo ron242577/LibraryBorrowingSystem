@@ -210,7 +210,6 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
         <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
         <div class="jashs-header-title-wrap">
             <h1 class="jashs-header-title">Jose Abad Santos High School</h1>
-            <p class="jashs-header-subtitle">Library Management System</p>
         </div>
     </div>
 

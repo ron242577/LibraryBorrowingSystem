@@ -160,8 +160,8 @@ if($result) while($row=$result->fetch_assoc()) $reservations[]=$row;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reservations - Library Borrowing System</title>
 <style>
-body{font-family:Segoe UI,Arial,sans-serif;background:#F3F7FC;color:#202A44;margin:0}
-.container{max-width:1200px;margin:100px auto 30px;padding:0 20px}
+body{font-family:Segoe UI,Arial,sans-serif;background:#F3F7FC;color:#202A44;}
+.container{max-width:1200px;margin:24px auto 30px;padding:0 20px}
 .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
 h1{margin:0 0 8px}.muted{color:#52618D;font-size:13px;margin-bottom:20px}
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;border-bottom:1px solid #E7EEF7;font-size:13px}th{font-size:12px;text-transform:uppercase;color:#52618D}
@@ -176,11 +176,12 @@ h1{margin:0 0 8px}.muted{color:#52618D;font-size:13px;margin-bottom:20px}
 .rules-field small{display:block;color:#8793A7;font-size:10px;margin-top:5px}
 .save-rules-btn{height:39px;padding:0 18px;border:0;border-radius:7px;background:#141F52;color:#fff;font-weight:700;cursor:pointer}
 .save-rules-btn:hover{background:#52618D}
-@media(max-width:800px){.rules-form{grid-template-columns:1fr}.save-rules-btn{width:100%}}
-
+*{box-sizing:border-box} body{ margin:0;background:#F3F7FC;color:#202A44;font-family:'Segoe UI',Tahoma,sans-serif; overflow-x:hidden;}.container{max-width:1200px;margin:30px auto;padding:0 20px}.page-header,.backup-card,.history-card{background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)}.page-header{padding:28px;margin-bottom:22px}.page-header h1{margin:0 0 7px;color:#141F52}.page-header p{margin:0;color:#52618D}.backup-card{padding:24px;margin-bottom:22px}.backup-card h2,.history-card h2{margin:0 0 12px;color:#141F52}.backup-card p{color:#52618D;line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;border:0;border-radius:8px;background:#141F52;color:#fff;font-weight:700;cursor:pointer;text-decoration:none}.btn:hover{background:#52618D}.btn-danger{background:#B42318}.notice{padding:13px 15px;border-radius:8px;margin-bottom:20px}.notice.success{background:#EDF5DD;color:#344E15;border:1px solid #B5D27A}.notice.error{background:#FBE8DC;color:#7A3A0E;border:1px solid #E8B08A}.warning{background:#FFF8D8;border:1px solid #E5CC55;color:#5C5F05;padding:14px;border-radius:8px;margin-top:15px}.history-card{padding:0;overflow:hidden}.history-head{padding:20px;border-bottom:1px solid #E7EEF7}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:800px}th{background:#141F52;color:#fff;text-align:left;padding:12px;font-size:12px;white-space:nowrap}td{padding:12px;border-bottom:1px solid #E7EEF7;font-size:13px;vertical-align:top}.status{display:inline-block;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase}.status-success{background:#EDF5DD;color:#344E15}.status-failed{background:#F8D7DA;color:#721C24}.status-started{background:#FBFDCB;color:#5C5F05}.inline-form{display:inline}.restore-file{max-width:260px}.danger-note{font-size:12px;color:#721c24;margin-top:10px}@media(max-width:768px){.container{margin:16px auto;padding:0 12px}.page-header,.backup-card{padding:18px}.actions{flex-direction:column}.btn{width:100%}.restore-file{max-width:none;width:100%}}
 
         .content-container,
         .container{margin-top:0 !important;}
+@media(max-width:800px){.rules-form{grid-template-columns:1fr}.save-rules-btn{width:100%}}
+
 
 </style>
 </head>

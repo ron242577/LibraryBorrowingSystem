@@ -248,7 +248,7 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
         <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
-        <span class="sidebar-brand-text">Jose Abad Santos High School</span>
+        <span class="sidebar-brand-text">Library Management System</span>
     </div>
 
     <ul class="sidebar-menu">

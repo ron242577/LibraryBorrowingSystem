@@ -497,7 +497,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
             elseif ((int)$st['is_archived']===1) { $message='Student is already archived.'; $message_type='error'; }
             elseif ((int)$st['currently_borrowed']>0) { $message='This student cannot be archived while they have a borrowed book. Return it first.'; $message_type='error'; }
             else {
-                $u=$conn->prepare('UPDATE students SET is_archived=1, archived_at=NOW(), archived_by=? WHERE student_id=?');
+                $u=$conn->prepare("UPDATE students SET is_archived=1, status='inactive', archived_at=NOW(), archived_by=? WHERE student_id=?");
                 $uid=(int)($_SESSION['user_id']??0); $u->bind_param('ii',$uid,$sid); $u->execute(); $u->close();
                 auditRecordChange($conn,'student_archived','student_records','Archived a student record while preserving borrowing history.','success','student',$sid,['name'=>$st['full_name'],'status'=>'active'],['name'=>$st['full_name'],'status'=>'archived']);
                 $message='Student archived successfully.'; $message_type='success';
@@ -509,7 +509,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
             if (!$st) { $message='Student not found.'; $message_type='error'; }
             elseif ((int)$st['is_archived']===0) { $message='Student is already active.'; $message_type='error'; }
             else {
-                $u=$conn->prepare("UPDATE students SET is_archived=0, archived_at=NULL, archived_by=NULL WHERE student_id=?"); $u->bind_param('i',$sid); $u->execute(); $u->close();
+                $u=$conn->prepare("UPDATE students SET is_archived=0, status='active', archived_at=NULL, archived_by=NULL WHERE student_id=?"); $u->bind_param('i',$sid); $u->execute(); $u->close();
                 auditRecordChange($conn,'student_restored','student_records','Restored an archived student record.','success','student',$sid,['name'=>$st['full_name'],'status'=>'archived'],['name'=>$st['full_name'],'status'=>'active']);
                 $message='Student restored successfully.'; $message_type='success';
             }
@@ -1046,6 +1046,21 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
         .content-container,
         .container{margin-top:0 !important;}
 
+
+.student-compact-table th:nth-child(4),
+.student-compact-table td:nth-child(4),
+.student-compact-table th:nth-child(7),
+.student-compact-table td:nth-child(7),
+.student-compact-table th:nth-child(8),
+.student-compact-table td:nth-child(8),
+.student-compact-table th:nth-child(9),
+.student-compact-table td:nth-child(9),
+.student-compact-table th:nth-child(12),
+.student-compact-table td:nth-child(12),
+.student-compact-table th:nth-child(13),
+.student-compact-table td:nth-child(13),
+.student-compact-table th:nth-child(14),
+.student-compact-table td:nth-child(14) { display:none; }
 </style>
 </head>
 <body>
@@ -1100,7 +1115,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                     <div class="filter-group">
                         <label>Search by student information</label>
                         <input type="text" name="search"
-                               placeholder="Enter name, student no, section, strand, grade level, contact, email, or QR code…"
+                               placeholder="Enter student no, name, section, grade level, or contact number…"
                                value="<?php echo htmlspecialchars($search_rec); ?>">
                     </div>
                     <div class="filter-group">
@@ -1117,11 +1132,11 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                             <option value="full_name"      <?php echo $sort_by === 'full_name'      ? 'selected' : ''; ?>>Name</option>
                             <option value="student_no"     <?php echo $sort_by === 'student_no'     ? 'selected' : ''; ?>>Student No</option>
                             <option value="student_group"  <?php echo $sort_by === 'student_group'  ? 'selected' : ''; ?>>Section</option>
-                            <option value="department"     <?php echo $sort_by === 'department'     ? 'selected' : ''; ?>>Department / Strand</option>
+                            
                             <option value="year_level"     <?php echo $sort_by === 'year_level'     ? 'selected' : ''; ?>>Grade Level</option>
                             <option value="created_at"     <?php echo $sort_by === 'created_at'     ? 'selected' : ''; ?>>Date Added</option>
                             <option value="contact_number" <?php echo $sort_by === 'contact_number' ? 'selected' : ''; ?>>Contact</option>
-                            <option value="email"          <?php echo $sort_by === 'email'          ? 'selected' : ''; ?>>Email</option>
+                            
                         </select>
                     </div>
                     <div class="filter-group">
@@ -1261,7 +1276,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table>
+                    <table class="student-compact-table">
                         <thead>
                             <tr>
                                 <th>Student No</th>
