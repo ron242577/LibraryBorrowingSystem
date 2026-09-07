@@ -403,8 +403,7 @@ $csrf = csrfToken();
         <p>Jose Abad Santos High School Library Borrowing System</p>
     </div>
 
-    <div class="account-note">Use the <strong>Chief Librarian username</strong> or your <strong>Student Number, Email, or Contact Number</strong> to log in.</div>
-
+    
     <?php if ($error): ?>
     <script>document.addEventListener('DOMContentLoaded',()=>showToast(<?php echo json_encode($error); ?>,'error',4500,'Login'));</script>
     <?php endif; ?>
