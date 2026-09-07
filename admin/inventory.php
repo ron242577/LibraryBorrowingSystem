@@ -22,6 +22,7 @@ function ensureArchiveColumns($conn) {
             'library_building' => "ALTER TABLE books ADD COLUMN library_building VARCHAR(150) NULL AFTER location_collection",
             'shelf_number' => "ALTER TABLE books ADD COLUMN shelf_number VARCHAR(100) NULL AFTER library_building",
             'library_section' => "ALTER TABLE books ADD COLUMN library_section VARCHAR(150) NULL AFTER shelf_number"
+            ,'damaged_copies' => "ALTER TABLE books ADD COLUMN damaged_copies INT NOT NULL DEFAULT 0 AFTER lost_copies"
         ]
     ] as $table => $columns) {
         foreach ($columns as $column => $sql) {
@@ -100,7 +101,13 @@ function generateUniqueBookQRId($conn) {
     return $code;
 }
 
-function getStatusBadge($available_copies, $total_copies) {
+function getStatusBadge($available_copies, $total_copies, $book_status = '') {
+    if ($book_status === 'lost') {
+        return '<span class="badge badge-danger">Lost</span>';
+    }
+    if ($book_status === 'damaged') {
+        return '<span class="badge badge-warning">Damaged</span>';
+    }
     if ((int)$available_copies <= 0) {
         return '<span class="badge badge-danger">Not Available</span>';
     }
@@ -556,7 +563,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             book_number, book_pages, source_of_funds, cost_price, publisher,
                             edition, volumes, class, type_of_material, location_collection,
                             library_building, shelf_number, library_section, book_condition,
-                            total_copies, available_copies, borrowed_copies, lost_copies,
+                            total_copies, available_copies, borrowed_copies, lost_copies, damaged_copies,
                             book_status, is_archived
                      FROM books WHERE book_id = ? LIMIT 1'
                 );
@@ -615,6 +622,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 $available = (int)$oldBook['available_copies'];
                 $borrowed = (int)$oldBook['borrowed_copies'];
+                $total = (int)$oldBook['total_copies'];
+                $affectedCopies = (int)($_POST['affected_copies'] ?? 0);
 
                 if ($new_status === 'available' && $available <= 0) {
                     throw new Exception('Status cannot be Available because there are no available copies.');
@@ -624,19 +633,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     throw new Exception('Status cannot be Out of Stock while available copies remain.');
                 }
 
+                $lostCopies = 0;
+                $damagedCopies = 0;
+                if (in_array($new_status, ['lost', 'damaged'], true)) {
+                    $maxAffectedCopies = max(0, $total - $borrowed);
+                    if ($affectedCopies < 1 || $affectedCopies > $maxAffectedCopies) {
+                        throw new Exception('Affected copies must be between 1 and ' . $maxAffectedCopies . '.');
+                    }
+
+                    $available = $maxAffectedCopies - $affectedCopies;
+                    if ($new_status === 'lost') {
+                        $lostCopies = $affectedCopies;
+                    } else {
+                        $damagedCopies = $affectedCopies;
+                    }
+                } elseif ($new_status === 'available') {
+                    $available = max(0, $total - $borrowed);
+                } else {
+                    $available = 0;
+                }
+
                 $update = $conn->prepare(
                     'UPDATE books SET
                         title = ?, author = ?, co_authors = ?, place_of_publication = ?,
                         publication_date = ?, book_number = ?, book_pages = ?,
                         source_of_funds = ?, cost_price = ?, publisher = ?, edition = ?,
                         volumes = ?, class = ?, type_of_material = ?, location_collection = ?, book_condition = ?,
-                        library_building = ?, shelf_number = ?, library_section = ?,
-                        book_status = ?
+                                library_building = ?, shelf_number = ?, library_section = ?,
+                                book_status = ?, available_copies = ?, lost_copies = ?, damaged_copies = ?
                      WHERE book_id = ?'
                 );
 
                 $update->bind_param(
-                    'ssssssisdsssssssssssi',
+                    'ssssssisd' . str_repeat('s', 11) . 'iiii',
                     $title,
                     $author,
                     $coAuthors,
@@ -657,6 +686,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $shelf,
                     $section,
                     $new_status,
+                    $available,
+                    $lostCopies,
+                    $damagedCopies,
                     $book_id
                 );
 
@@ -684,7 +716,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'library_building' => $building,
                     'shelf_number' => $shelf,
                     'library_section' => $section,
-                    'book_status' => $new_status
+                    'book_status' => $new_status,
+                    'available_copies' => $available,
+                    'lost_copies' => $lostCopies,
+                    'damaged_copies' => $damagedCopies
                 ];
 
                 auditRecordChange(
@@ -961,7 +996,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $message !== '') {
 
 $stats = ['total_titles' => 0, 'total_copies' => 0, 'available_copies' => 0, 'borrowed_copies' => 0, 'lost_copies' => 0];
 try {
-    $stats_result = $conn->query('SELECT COUNT(*) AS total_titles, COALESCE(SUM(total_copies),0) AS total_copies, COALESCE(SUM(available_copies),0) AS available_copies, COALESCE(SUM(borrowed_copies),0) AS borrowed_copies, COALESCE(SUM(lost_copies),0) AS lost_copies FROM books WHERE is_archived = 0');
+    $stats_result = $conn->query("SELECT COUNT(*) AS total_titles, COALESCE(SUM(total_copies),0) AS total_copies, COALESCE(SUM(available_copies),0) AS available_copies, COALESCE(SUM(borrowed_copies),0) AS borrowed_copies, COALESCE(SUM(CASE WHEN book_status = 'lost' THEN CASE WHEN lost_copies > 0 THEN lost_copies ELSE total_copies END WHEN book_status = 'damaged' THEN CASE WHEN damaged_copies > 0 THEN damaged_copies ELSE total_copies END ELSE lost_copies + damaged_copies END),0) AS lost_copies FROM books WHERE is_archived = 0");
     if ($stats_result) {
         $stats = $stats_result->fetch_assoc();
     }
@@ -987,7 +1022,7 @@ $archive_where = $archive_filter === 'archived' ? 'WHERE is_archived = 1' : ($ar
 
 $all_books = [];
 try {
-    $books_result = $conn->query("SELECT book_id, title, author, co_authors, place_of_publication, publication_date, book_number, book_pages, source_of_funds, cost_price, publisher, edition, volumes, class, type_of_material, location_collection, library_building, shelf_number, library_section, book_condition, qr_code, total_copies, available_copies, borrowed_copies, lost_copies, book_status, is_archived, archived_at, created_at FROM books {$archive_where} ORDER BY title ASC");
+    $books_result = $conn->query("SELECT book_id, title, author, co_authors, place_of_publication, publication_date, book_number, book_pages, source_of_funds, cost_price, publisher, edition, volumes, class, type_of_material, location_collection, library_building, shelf_number, library_section, book_condition, qr_code, total_copies, available_copies, borrowed_copies, lost_copies, damaged_copies, book_status, is_archived, archived_at, created_at FROM books {$archive_where} ORDER BY title ASC");
     if ($books_result) {
         while ($row = $books_result->fetch_assoc()) {
             $all_books[] = $row;
@@ -1498,21 +1533,18 @@ try {
                         oninput="filterTable()"
                         class="search-input"
                     >
-                    <select
-                        id="statusFilter"
-                        onchange="filterTable()"
-                        class="filter-select"
-                    >
+                    <select id="statusConditionFilter" class="filter-select" onchange="filterTable()">
                         <option value="">All Status</option>
-                        <option value="available">Available</option>
-                        <option value="out_of_stock">Out of Stock</option>
-                        <option value="damaged">Damaged</option>
-                        <option value="lost">Lost</option>
-                    </select>
-                    <select id="conditionFilter" class="filter-select" onchange="filterTable()">
-                        <option value="">All Conditions</option>
-                        <option value="New">New</option>
-                        <option value="Old">Old</option>
+                        <optgroup label="Status">
+                            <option value="status:available">Available</option>
+                            <option value="status:out_of_stock">Out of Stock</option>
+                            <option value="status:damaged">Damaged</option>
+                            <option value="status:lost">Lost</option>
+                        </optgroup>
+                        <optgroup label="Condition">
+                            <option value="condition:New">New</option>
+                            <option value="condition:Old">Old</option>
+                        </optgroup>
                     </select>
                     <select id="classFilter" class="filter-select" onchange="filterTable()">
                         <option value="">All Classes</option>
@@ -1617,7 +1649,7 @@ try {
                                     <td><strong><?php echo (int)$book['available_copies']; ?></strong></td>
                                     <td><?php echo (int)$book['borrowed_copies']; ?></td>
                                     <td><?php echo (int)$book['lost_copies']; ?></td>
-                                    <td><?php echo (int)$book['is_archived'] === 1 ? '<span class="badge badge-danger">Archived</span>' : getStatusBadge($book['available_copies'], $book['total_copies']); ?></td>
+                                    <td><?php echo (int)$book['is_archived'] === 1 ? '<span class="badge badge-danger">Archived</span>' : getStatusBadge($book['available_copies'], $book['total_copies'], $book['book_status']); ?></td>
                                     <td>
                                         <?php
                                             $book_modal_data = [
@@ -1646,6 +1678,7 @@ try {
                                                 'available_copies' => (int)$book['available_copies'],
                                                 'borrowed_copies' => (int)$book['borrowed_copies'],
                                                 'lost_copies' => (int)$book['lost_copies'],
+                                                'damaged_copies' => (int)$book['damaged_copies'],
                                                 'book_status' => $book['book_status'],
                                                 'is_archived' => (int)$book['is_archived'],
                                                 'archived_at' => $book['archived_at'],
@@ -2013,6 +2046,10 @@ try {
                     <div class="book-detail-value" id="detailLostCopies">—</div>
                 </div>
                 <div class="book-detail-item">
+                    <div class="book-detail-label">Damaged Copies</div>
+                    <div class="book-detail-value" id="detailDamagedCopies">—</div>
+                </div>
+                <div class="book-detail-item">
                     <div class="book-detail-label">Status</div>
                     <div class="book-detail-value" id="detailStatus">—</div>
                 </div>
@@ -2137,12 +2174,17 @@ try {
                     </div>
                     <div class="form-group">
                         <label for="editStatus">Status *</label>
-                        <select id="editStatus" name="book_status" required>
+                        <select id="editStatus" name="book_status" required onchange="toggleAffectedCopiesField()">
                             <option value="available">Available</option>
                             <option value="out_of_stock">Out of Stock</option>
                             <option value="damaged">Damaged</option>
                             <option value="lost">Lost</option>
                         </select>
+                    </div>
+                    <div class="form-group" id="editAffectedCopiesGroup" style="display:none;">
+                        <label for="editAffectedCopies">Lost/Damaged Copies *</label>
+                        <input type="number" id="editAffectedCopies" name="affected_copies" min="1" required>
+                        <div class="help-text">Choose how many copies are lost or damaged. Borrowed copies cannot be included.</div>
                     </div>
                 </div>
 
@@ -2255,17 +2297,18 @@ try {
         /* ── Search & Filter ── */
         function filterTable() {
             const search = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-            const status = document.getElementById('statusFilter')?.value || '';
-            const condition = document.getElementById('conditionFilter')?.value || '';
+            const statusCondition = document.getElementById('statusConditionFilter')?.value || '';
             const classValue = document.getElementById('classFilter')?.value || '';
             const sectionValue = document.getElementById('sectionFilter')?.value || '';
+
+            const [filterType, filterValue] = statusCondition.split(':');
 
             const rows = document.querySelectorAll('tbody tr[data-search]');
             rows.forEach(row => {
                 const rowSearch = (row.dataset.search || '').toLowerCase();
                 const matchSearch = !search || rowSearch.includes(search);
-                const matchStatus = !status || row.dataset.status === status;
-                const matchCondition = !condition || row.dataset.condition === condition;
+                const matchStatus = filterType !== 'status' || row.dataset.status === filterValue;
+                const matchCondition = filterType !== 'condition' || row.dataset.condition === filterValue;
                 const matchClass = !classValue || row.dataset.class === classValue;
                 const matchSection = !sectionValue || row.dataset.section === sectionValue;
 
@@ -2496,7 +2539,14 @@ try {
             document.getElementById('detailAvailableCopies').textContent = detailText(book.available_copies);
             document.getElementById('detailBorrowedCopies').textContent = detailText(book.borrowed_copies);
             document.getElementById('detailLostCopies').textContent = detailText(book.lost_copies);
-            document.getElementById('detailStatus').textContent = Number(book.available_copies || 0) > 0 ? 'Available' : 'Not Available';
+            document.getElementById('detailDamagedCopies').textContent = detailText(book.damaged_copies);
+            const statusLabels = {
+                available: 'Available',
+                out_of_stock: 'Out of Stock',
+                damaged: 'Damaged',
+                lost: 'Lost'
+            };
+            document.getElementById('detailStatus').textContent = statusLabels[book.book_status] || 'Not Available';
             document.getElementById('detailCreatedAt').textContent = detailText(book.created_at);
             document.getElementById('detailQrCode').textContent = detailText(book.qr_code);
             document.getElementById('detailQrImage').src = '/LibraryBorrowingSystem/qr_codes/' + encodeURIComponent(book.qr_code) + '.png';
@@ -2558,6 +2608,7 @@ try {
             setEditValue('editBookCondition', book.book_condition || 'New');
             setEditValue('editLocation', book.location_collection);
             setEditValue('editBookCondition', book.book_condition || 'New');
+            setEditValue('editAffectedCopies', 0);
             setEditValue('editBuilding', book.library_building);
             setEditValue('editShelf', book.shelf_number);
             setEditValue('editLibrarySection', book.library_section);
@@ -2565,6 +2616,14 @@ try {
             const status = document.getElementById('editStatus');
             if (status) {
                 status.value = book.book_status || (Number(book.available_copies || 0) > 0 ? 'available' : 'out_of_stock');
+                const affectedInput = document.getElementById('editAffectedCopies');
+                if (affectedInput) {
+                    affectedInput.max = Math.max(1, Number(book.total_copies || 0) - Number(book.borrowed_copies || 0));
+                    affectedInput.value = status.value === 'lost'
+                        ? Number(book.lost_copies || 0)
+                        : (status.value === 'damaged' ? Number(book.damaged_copies || 0) : 0);
+                }
+                toggleAffectedCopiesField();
             }
 
             document.getElementById('editBookModal').classList.add('active');
@@ -2572,6 +2631,19 @@ try {
 
         function closeEditBookModal() {
             document.getElementById('editBookModal').classList.remove('active');
+        }
+
+        function toggleAffectedCopiesField() {
+            const status = document.getElementById('editStatus')?.value || '';
+            const group = document.getElementById('editAffectedCopiesGroup');
+            const input = document.getElementById('editAffectedCopies');
+            const isAffectedStatus = status === 'lost' || status === 'damaged';
+
+            if (group) group.style.display = isAffectedStatus ? '' : 'none';
+            if (input) {
+                input.required = isAffectedStatus;
+                if (!isAffectedStatus) input.value = '0';
+            }
         }
 
         document.getElementById('editBookModal').addEventListener('click', function(e) {

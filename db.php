@@ -16,7 +16,7 @@ define('DB_NAME', 'library_borrowing_system');
 define('DB_PORT', 3306);
 
 // Error handling configuration
-define('SHOW_ERRORS', false); // Keep database details hidden from users
+define('SHOW_ERRORS', true); // Keep database details hidden from users
 define('LOG_ERRORS', true);
 define('ERROR_LOG_FILE', __DIR__ . '/logs/error.log');
 

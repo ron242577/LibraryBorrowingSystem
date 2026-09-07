@@ -285,9 +285,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             display: flex;
             gap: 10px;
             margin-top: 20px;
+            
         }
         
-        button {
+        .btn {
             padding: 12px 24px;
             background: #141F52;
             color: white;
@@ -558,8 +559,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 
                 <div class="button-group">
-                    <button type="submit">Create Staff Account</button>
-                    <button type="reset">Clear</button>
+                    <button type="submit" class="btn">Create Staff Account</button>
+                    <button type="reset" class="btn">Clear</button>
                 </div>
             </form>
         </div>
