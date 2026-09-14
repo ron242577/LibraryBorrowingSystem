@@ -1,4 +1,6 @@
 <?php
+date_default_timezone_set('Asia/Manila');
+
 require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/includes/audit_logger.php';
 startSecureSession();
@@ -40,6 +42,17 @@ try {
         throw new Exception('Error loading character set utf8mb4: ' . $conn->error);
     }
 
+    // Teacher reservations share the existing reservation workflow.
+    $reservationColumn = $conn->query("SHOW COLUMNS FROM book_reservations LIKE 'teacher_id'");
+    if ($reservationColumn && $reservationColumn->num_rows === 0) {
+        $conn->query("ALTER TABLE book_reservations ADD COLUMN teacher_id INT NULL AFTER student_id");
+        $conn->query("ALTER TABLE book_reservations ADD KEY idx_reservations_teacher (teacher_id)");
+    }
+    $studentReservationColumn = $conn->query("SHOW COLUMNS FROM book_reservations LIKE 'student_id'");
+    if ($studentReservationColumn && ($studentReservationDefinition = $studentReservationColumn->fetch_assoc()) && strtoupper((string)$studentReservationDefinition['Null']) === 'NO') {
+        $conn->query("ALTER TABLE book_reservations MODIFY student_id INT NULL");
+    }
+
     // Security table used for login throttling. This does not change any password.
     $conn->query("CREATE TABLE IF NOT EXISTS login_security (
         login_security_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -54,6 +67,33 @@ try {
         UNIQUE KEY uq_login_security (context, identifier_hash, ip_address),
         KEY idx_login_locked_until (locked_until)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $conn->query("CREATE TABLE IF NOT EXISTS library_attendance (
+        attendance_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        student_id INT NULL,
+        teacher_id INT NULL,
+        visit_date DATE NOT NULL,
+        time_in DATETIME NOT NULL,
+        time_out DATETIME NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (attendance_id),
+        KEY idx_attendance_student_date (student_id, visit_date),
+        KEY idx_attendance_teacher_date (teacher_id, visit_date),
+        KEY idx_attendance_time_in (time_in),
+        CONSTRAINT fk_attendance_student FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+        CONSTRAINT fk_attendance_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $attendanceTeacherColumn = $conn->query("SHOW COLUMNS FROM library_attendance LIKE 'teacher_id'");
+    if ($attendanceTeacherColumn && $attendanceTeacherColumn->num_rows === 0) {
+        $conn->query("ALTER TABLE library_attendance ADD COLUMN teacher_id INT NULL AFTER student_id");
+        $conn->query("ALTER TABLE library_attendance ADD KEY idx_attendance_teacher_date (teacher_id, visit_date)");
+    }
+    $conn->query("ALTER TABLE library_attendance MODIFY student_id INT NULL");
+    $attendanceTeacherConstraint = $conn->query("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'library_attendance' AND CONSTRAINT_NAME = 'fk_attendance_teacher'");
+    if ($attendanceTeacherConstraint && $attendanceTeacherConstraint->num_rows === 0) {
+        $conn->query("ALTER TABLE library_attendance ADD CONSTRAINT fk_attendance_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE");
+    }
     
     // Register one sanitized database audit entry for every application request/process.
     registerAuditRequestLogger($conn);

@@ -3,8 +3,12 @@
  * Student Book QR Download
  * Downloads a valid book QR selected from the student borrowing page.
  */
-require_once __DIR__ . '/../includes/student_session.php';
 require_once __DIR__ . '/../db.php';
+
+if (!isset($_SESSION['student_id']) && !isset($_SESSION['teacher_id'])) {
+    header('Location: /LibraryBorrowingSystem/login.php');
+    exit();
+}
 
 $bookId = (int)($_GET['book_id'] ?? 0);
 

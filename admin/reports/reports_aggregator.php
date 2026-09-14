@@ -19,6 +19,7 @@ class ReportsAggregator {
             'borrowing_by_month' => $this->getBorrowingByMonth($start_date, $end_date),
             'borrowing_by_day' => $this->getBorrowingByDay($start_date, $end_date),
             'borrowing_by_student' => $this->getBorrowingByStudent($start_date, $end_date),
+            'borrowing_by_borrower' => $this->getBorrowingByBorrower($start_date, $end_date),
             'total_borrows' => $this->getTotalBorrows($start_date, $end_date),
             'total_returns' => $this->getTotalReturns($start_date, $end_date),
         ];
@@ -93,6 +94,28 @@ class ReportsAggregator {
                                       GROUP BY s.student_id, s.full_name
                                       HAVING borrow_count > 0
                                       ORDER BY borrow_count DESC, s.full_name ASC
+                                      LIMIT 10");
+        $stmt->bind_param('ss', $start_date, $end_exclusive);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($row = $result->fetch_assoc()) $rows[] = $row;
+        $stmt->close();
+        return $rows;
+    }
+
+    private function getBorrowingByBorrower($start_date, $end_date) {
+        $end_exclusive = $this->dateRangeEnd($end_date);
+        $stmt = $this->conn->prepare("SELECT COALESCE(s.full_name, te.full_name) AS borrower_name,
+                                             CASE WHEN t.student_id IS NULL THEN 'Teacher' ELSE 'Student' END AS borrower_type,
+                                             COUNT(t.transaction_id) AS borrow_count,
+                                             SUM(CASE WHEN t.status = 'returned' THEN 1 ELSE 0 END) AS return_count
+                                      FROM transactions t
+                                      LEFT JOIN students s ON s.student_id = t.student_id
+                                      LEFT JOIN teachers te ON te.teacher_id = t.teacher_id
+                                      WHERE t.date_borrowed >= ? AND t.date_borrowed < ?
+                                      GROUP BY borrower_name, borrower_type
+                                      ORDER BY borrow_count DESC, borrower_name ASC
                                       LIMIT 10");
         $stmt->bind_param('ss', $start_date, $end_exclusive);
         $stmt->execute();

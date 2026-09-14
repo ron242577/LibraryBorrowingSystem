@@ -9,6 +9,61 @@
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
 
+if ($conn->query("SHOW COLUMNS FROM transactions LIKE 'teacher_id'")->num_rows === 0) {
+    $conn->query('ALTER TABLE transactions MODIFY student_id INT NULL');
+    $conn->query('ALTER TABLE transactions ADD COLUMN teacher_id INT NULL AFTER student_id');
+}
+
+$conn->query("CREATE TABLE IF NOT EXISTS teachers (
+    teacher_id INT NOT NULL AUTO_INCREMENT,
+    teacher_no VARCHAR(100) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    teaching_grades TEXT NOT NULL,
+    teaching_strands TEXT NULL,
+    contact_number VARCHAR(20) NULL,
+    email VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    qr_code VARCHAR(255) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    is_archived TINYINT(1) NOT NULL DEFAULT 0,
+    archived_at DATETIME NULL,
+    archived_by INT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (teacher_id),
+    UNIQUE KEY uq_teachers_teacher_no (teacher_no),
+    UNIQUE KEY uq_teachers_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+foreach ([
+    'teacher_no' => "ALTER TABLE teachers ADD COLUMN teacher_no VARCHAR(100) NULL AFTER teacher_id",
+    'teaching_grades' => "ALTER TABLE teachers ADD COLUMN teaching_grades TEXT NULL AFTER full_name",
+    'teaching_strands' => "ALTER TABLE teachers ADD COLUMN teaching_strands TEXT NULL AFTER teaching_grades",
+    'contact_number' => "ALTER TABLE teachers ADD COLUMN contact_number VARCHAR(20) NULL AFTER teaching_strands",
+    'email' => "ALTER TABLE teachers ADD COLUMN email VARCHAR(255) NULL AFTER teaching_strands",
+    'password' => "ALTER TABLE teachers ADD COLUMN password VARCHAR(255) NOT NULL DEFAULT '' AFTER email",
+    'qr_code' => "ALTER TABLE teachers ADD COLUMN qr_code VARCHAR(255) NULL AFTER password",
+    'status' => "ALTER TABLE teachers ADD COLUMN status ENUM('active','inactive') NOT NULL DEFAULT 'active' AFTER password",
+    'is_archived' => "ALTER TABLE teachers ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status",
+    'archived_at' => "ALTER TABLE teachers ADD COLUMN archived_at DATETIME NULL AFTER is_archived",
+    'archived_by' => "ALTER TABLE teachers ADD COLUMN archived_by INT NULL AFTER archived_at",
+    'updated_at' => "ALTER TABLE teachers ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+] as $column => $alterSql) {
+    $columnCheck = $conn->query("SHOW COLUMNS FROM teachers LIKE '" . $conn->real_escape_string($column) . "'");
+    if ($columnCheck && $columnCheck->num_rows === 0) $conn->query($alterSql);
+}
+$conn->query("UPDATE teachers SET teacher_no = COALESCE(NULLIF(teacher_no, ''), id_number), teaching_grades = COALESCE(NULLIF(teaching_grades, ''), grades), teaching_strands = COALESCE(NULLIF(teaching_strands, ''), strands)");
+$existingTeachers = $conn->query("SELECT teacher_id FROM teachers WHERE qr_code IS NULL OR qr_code = ''");
+if ($existingTeachers) {
+    while ($existingTeacher = $existingTeachers->fetch_assoc()) {
+        $teacherQr = 'TCH-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+        $qrUpdate = $conn->prepare('UPDATE teachers SET qr_code=? WHERE teacher_id=?');
+        $qrUpdate->bind_param('si', $teacherQr, $existingTeacher['teacher_id']);
+        $qrUpdate->execute();
+        $qrUpdate->close();
+    }
+}
+
 // ── Access control ──────────────────────────────────────────────────────────
 if (!isAdmin()) {
     header('Location: /LibraryBorrowingSystem/login.php');
@@ -484,11 +539,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['archive_student','restore_student'], true)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['archive_student','restore_student','archive_teacher','restore_teacher'], true)) {
     try { requireValidCsrf($_POST['csrf_token'] ?? ''); } catch (Throwable $e) { $message = $e->getMessage(); $message_type = 'error'; $_POST['action'] = ''; }
     $action = $_POST['action'] ?? '';
     $sid = (int)($_POST['student_id'] ?? 0);
-    if ($message_type !== 'error' && $sid <= 0) { $message='Invalid student ID.'; $message_type='error'; }
+    $tid = (int)($_POST['teacher_id'] ?? 0);
+    if ($message_type !== 'error' && in_array($action, ['archive_teacher', 'restore_teacher'], true)) {
+        if ($tid <= 0) { $message = 'Invalid teacher ID.'; $message_type = 'error'; }
+        else {
+            $q = $conn->prepare('SELECT full_name, is_archived FROM teachers WHERE teacher_id=? LIMIT 1');
+            $q->bind_param('i', $tid); $q->execute(); $teacher = $q->get_result()->fetch_assoc(); $q->close();
+            if (!$teacher) { $message = 'Teacher not found.'; $message_type = 'error'; }
+            elseif ($action === 'archive_teacher' && (int)$teacher['is_archived'] === 1) { $message = 'Teacher is already archived.'; $message_type = 'error'; }
+            elseif ($action === 'restore_teacher' && (int)$teacher['is_archived'] === 0) { $message = 'Teacher is already active.'; $message_type = 'error'; }
+            else {
+                if ($action === 'archive_teacher') {
+                    $u = $conn->prepare("UPDATE teachers SET is_archived=1, status='inactive', archived_at=NOW(), archived_by=? WHERE teacher_id=?");
+                } else {
+                    $u = $conn->prepare("UPDATE teachers SET is_archived=0, status='active', archived_at=NULL, archived_by=NULL WHERE teacher_id=?");
+                }
+                if ($action === 'archive_teacher') { $uid=(int)($_SESSION['user_id']??0); $u->bind_param('ii',$uid,$tid); }
+                else $u->bind_param('i',$tid);
+                $u->execute(); $u->close();
+                $message = $action === 'archive_teacher' ? 'Teacher archived successfully.' : 'Teacher restored successfully.';
+                $message_type = 'success';
+            }
+        }
+    }
+    if ($message_type === 'error' || in_array($action, ['archive_teacher', 'restore_teacher'], true)) {
+        // Teacher actions are complete; do not run student archive logic.
+    } elseif ($message_type !== 'error' && $sid <= 0) { $message='Invalid student ID.'; $message_type='error'; }
     if ($message_type !== 'error' && $action === 'archive_student') {
         try {
             $q=$conn->prepare("SELECT full_name, status, is_archived, currently_borrowed FROM (SELECT s.full_name,s.status,s.is_archived, SUM(CASE WHEN t.status='borrowed' THEN 1 ELSE 0 END) AS currently_borrowed FROM students s LEFT JOIN transactions t ON s.student_id=t.student_id WHERE s.student_id=? GROUP BY s.student_id,s.full_name,s.status,s.is_archived) x");
@@ -573,6 +653,25 @@ if ($res) {
     while ($row = $res->fetch_assoc()) $students_paginated[] = $row;
 }
 
+$teacher_where = 'WHERE 1=1';
+if ($archive_filter === 'active') $teacher_where .= ' AND COALESCE(t.is_archived,0) = 0';
+elseif ($archive_filter === 'archived') $teacher_where .= ' AND COALESCE(t.is_archived,0) = 1';
+if (!empty($search_rec)) {
+    $teacher_search = '%' . $conn->real_escape_string($search_rec) . '%';
+    $teacher_where .= " AND (t.full_name LIKE '$teacher_search' OR t.teacher_no LIKE '$teacher_search' OR t.teaching_grades LIKE '$teacher_search' OR t.teaching_strands LIKE '$teacher_search' OR t.contact_number LIKE '$teacher_search' OR t.email LIKE '$teacher_search' OR t.qr_code LIKE '$teacher_search')";
+}
+if (!empty($status_filter)) {
+    $teacher_status = $conn->real_escape_string($status_filter);
+    $teacher_where .= " AND t.status = '$teacher_status'";
+}
+$teacher_count_result = $conn->query("SELECT COUNT(*) AS total FROM teachers t $teacher_where");
+$total_teachers = $teacher_count_result ? (int)$teacher_count_result->fetch_assoc()['total'] : 0;
+$teachers = [];
+$teacher_result = $conn->query("SELECT teacher_id, teacher_no, full_name, teaching_grades, teaching_strands, contact_number, email, qr_code, status, is_archived, created_at FROM teachers t $teacher_where ORDER BY t.full_name ASC");
+if ($teacher_result) {
+    while ($row = $teacher_result->fetch_assoc()) $teachers[] = $row;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    AJAX – fetch single student detail for modal (JSON)
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -606,6 +705,22 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
 
     header('Content-Type: application/json');
     echo json_encode($out);
+    exit();
+}
+
+if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
+    $tid = intval($_GET['ajax_teacher']);
+    $teacherDetail = $conn->prepare('SELECT teacher_id, teacher_no, full_name, teaching_grades, teaching_strands, contact_number, email, qr_code, status, is_archived, created_at FROM teachers WHERE teacher_id=? LIMIT 1');
+    $teacherDetail->bind_param('i', $tid); $teacherDetail->execute();
+    $teacherData = $teacherDetail->get_result()->fetch_assoc(); $teacherDetail->close();
+    header('Content-Type: application/json');
+    $teacherTransactions = [];
+    $history = $conn->prepare('SELECT t.transaction_id, t.date_borrowed, t.due_date, t.return_date, t.status, t.borrow_condition, t.return_condition, b.title, b.author FROM transactions t JOIN books b ON t.book_id=b.book_id WHERE t.teacher_id=? ORDER BY t.date_borrowed DESC');
+    $history->bind_param('i', $tid); $history->execute();
+    $historyResult = $history->get_result();
+    while ($row = $historyResult->fetch_assoc()) $teacherTransactions[] = $row;
+    $history->close();
+    echo json_encode(['teacher' => $teacherData, 'transactions' => $teacherTransactions]);
     exit();
 }
 ?>
@@ -1070,7 +1185,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     <div class="container">
 
         <div class="page-header">
-            <h1>Student Records</h1>
+            <h1>User Management</h1>
         </div>
 
         <?php if (!empty($message)): ?>
@@ -1097,13 +1212,19 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 </div>
             </div>
             <div class="stat-card">
-                <h4>Inactive Students</h4>
+                <h4>Inactive Users</h4>
                 <div class="value">
                     <?php
-                    $ir = $conn->query("SELECT COUNT(*) AS c FROM students WHERE status='inactive' AND is_archived=0");
+                    $ir = $conn->query("SELECT
+                        (SELECT COUNT(*) FROM students WHERE status='inactive') +
+                        (SELECT COUNT(*) FROM teachers WHERE status='inactive') AS c");
                     echo number_format($ir ? $ir->fetch_assoc()['c'] : 0);
                     ?>
                 </div>
+            </div>
+            <div class="stat-card">
+                <h4>Total Teachers</h4>
+                <div class="value"><?php echo number_format($total_teachers); ?></div>
             </div>
         </div>
 
@@ -1113,9 +1234,9 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             <form method="GET" id="filterForm">
                 <div class="filter-grid">
                     <div class="filter-group">
-                        <label>Search by student information</label>
+                           <label>Search students and teachers</label>
                         <input type="text" name="search"
-                               placeholder="Enter student no, name, section, grade level, or contact number…"
+                               placeholder="Name, ID number, grade level, strand, section, or email…"
                                value="<?php echo htmlspecialchars($search_rec); ?>">
                     </div>
                     <div class="filter-group">
@@ -1377,8 +1498,42 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
                 <?php endif; ?>
             <?php endif; ?>
         </div>
-
-        
+        <!-- Teacher Records -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>Teacher Information</h3>
+                <span><?php echo number_format($total_teachers); ?> teacher<?php echo $total_teachers !== 1 ? 's' : ''; ?> found</span>
+            </div>
+            <?php if (empty($teachers)): ?>
+                <div class="no-data">No teacher records found<?php echo !empty($search_rec) ? '. Try adjusting your search.' : '.'; ?></div>
+            <?php else: ?>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Teacher ID Number</th><th>Full Name</th><th>Grade Levels Teaching</th><th>Senior High Strand(s)</th><th>Contact Number</th><th>Status</th><th>Archive</th><th>Date Added</th><th>Action</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($teachers as $teacher): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($teacher['teacher_no']); ?></td>
+                                    <td><strong><?php echo htmlspecialchars($teacher['full_name']); ?></strong></td>
+                                    <td><?php echo htmlspecialchars(implode(', ', (array)json_decode($teacher['teaching_grades'], true))); ?></td>
+                                    <td><?php echo htmlspecialchars(implode(', ', (array)json_decode($teacher['teaching_strands'] ?: '[]', true)) ?: 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($teacher['contact_number'] ?: 'N/A'); ?></td>
+                                    <td><span class="badge badge-<?php echo htmlspecialchars($teacher['status']); ?>"><?php echo htmlspecialchars($teacher['status']); ?></span></td>
+                                    <td>
+                                        <form method="POST" data-confirm-title="<?php echo (int)$teacher['is_archived'] === 1 ? 'Restore Teacher' : 'Archive Teacher'; ?>" data-confirm-message="<?php echo (int)$teacher['is_archived'] === 1 ? 'Restore this teacher record?' : 'Archive this teacher record?'; ?>" data-confirm-text="<?php echo (int)$teacher['is_archived'] === 1 ? 'Restore Teacher' : 'Archive Teacher'; ?>" data-confirm-danger="<?php echo (int)$teacher['is_archived'] === 1 ? '0' : '1'; ?>">
+                                            <?php echo csrfField(); ?><input type="hidden" name="action" value="<?php echo (int)$teacher['is_archived'] === 1 ? 'restore_teacher' : 'archive_teacher'; ?>"><input type="hidden" name="teacher_id" value="<?php echo (int)$teacher['teacher_id']; ?>">
+                                            <button type="submit" class="btn <?php echo (int)$teacher['is_archived'] === 1 ? 'btn-primary' : 'btn-reset'; ?>"><?php echo (int)$teacher['is_archived'] === 1 ? 'Restore' : 'Archive'; ?></button>
+                                        </form>
+                                    </td>
+                                    <td><?php echo date('M d, Y', strtotime($teacher['created_at'])); ?></td>
+                                    <td><button class="btn-view" onclick="openTeacherModal(<?php echo (int)$teacher['teacher_id']; ?>)">View</button></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
 
 
     </div><!-- /container -->
@@ -1505,6 +1660,42 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     <?php endif; ?>
 
     /* ── Student Detail Modal ── */
+    function openTeacherModal(teacherId) {
+        document.getElementById('modalTitle').textContent = 'Teacher Details';
+        document.getElementById('modalBody').innerHTML = '<div class="modal-loading"><div class="spinner"></div><span>Loading teacher details...</span></div>';
+        document.getElementById('studentModal').classList.add('show');
+        fetch('?ajax_teacher=' + teacherId)
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                const t = data.teacher;
+                if (!t) throw new Error('Teacher not found.');
+                const fmtDate = function (str) {
+                    if (!str) return '—';
+                    const d = new Date(str);
+                    return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: '2-digit' });
+                };
+                const grades = (JSON.parse(t.teaching_grades || '[]') || []).join(', ');
+                const strands = (JSON.parse(t.teaching_strands || '[]') || []).join(', ') || 'N/A';
+                const transactions = data.transactions || [];
+                const transactionRows = transactions.length ? transactions.map(function (transaction) {
+                    return `<tr><td><strong>${escHtml(transaction.title)}</strong><br><small style="color:#999;">${escHtml(transaction.author)}</small></td><td>${fmtDate(transaction.date_borrowed)}</td><td>${fmtDate(transaction.due_date)}</td><td>${fmtDate(transaction.return_date)}</td><td>${escHtml(transaction.status)}</td></tr>`;
+                }).join('') : '<tr><td colspan="5" class="empty-tx">No borrowing history yet.</td></tr>';
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="stu-header"><h3>${escHtml(t.full_name)}</h3><p>Teacher Since: ${fmtDate(t.created_at)}</p></div>
+                    <div class="stu-info-grid">
+                        <div class="stu-info-item"><div class="stu-info-label">Teacher ID Number</div><div class="stu-info-value">${escHtml(t.teacher_no || 'N/A')}</div></div>
+                        <div class="stu-info-item"><div class="stu-info-label">Contact Number</div><div class="stu-info-value">${escHtml(t.contact_number || 'N/A')}</div></div>
+                        <div class="stu-info-item"><div class="stu-info-label">Email</div><div class="stu-info-value">${escHtml(t.email || 'N/A')}</div></div>
+                        <div class="stu-info-item"><div class="stu-info-label">Grade Levels</div><div class="stu-info-value">${escHtml(grades || 'N/A')}</div></div>
+                        <div class="stu-info-item"><div class="stu-info-label">Senior High Strands</div><div class="stu-info-value">${escHtml(strands)}</div></div>
+                        <div class="stu-info-item"><div class="stu-info-label">Status</div><div class="stu-info-value" style="color:${t.status === 'active' ? '#567D1F' : '#c0392b'};">${t.is_archived == 1 ? 'Archived' : (t.status === 'active' ? 'Active' : 'Inactive')}</div></div>
+                    </div>
+                    <div class="stu-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(t.qr_code || '')}" alt="Teacher QR Code" style="cursor:pointer;" onclick="openQRModal('${escHtml(t.qr_code || '')}', 'teacher')"><div class="stu-qr-info"><h4>QR Code ID</h4><div class="stu-qr-code">${escHtml(t.qr_code || 'N/A')}</div></div></div>
+                    <div class="stu-tx"><h3>Borrowing History (${transactions.length})</h3><div class="stu-tx-table"><table><thead><tr><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr></thead><tbody>${transactionRows}</tbody></table></div></div>`;
+            })
+            .catch(function (error) { document.getElementById('modalBody').innerHTML = '<div class="empty-tx">' + escHtml(error.message) + '</div>'; });
+    }
+
     function openStudentModal(studentId) {
         document.getElementById('modalTitle').textContent = 'Student Details';
         document.getElementById('modalBody').innerHTML =
@@ -1696,13 +1887,13 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     });
 
     /* ── QR Enlarge Modal ── */
-    function openQRModal(qrCode) {
+    function openQRModal(qrCode, type) {
         const qrPath = '/LibraryBorrowingSystem/qr_codes/' + qrCode + '.png';
         document.getElementById('qrCodeLabel').textContent = 'ID: ' + qrCode;
         document.getElementById('qrImage').src = qrPath;
         const downloadBtn = document.getElementById('downloadQrBtn');
         if (downloadBtn) {
-            downloadBtn.href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(qrCode) + '&type=student';
+            downloadBtn.href = '/LibraryBorrowingSystem/download_qr.php?code=' + encodeURIComponent(qrCode) + '&type=' + encodeURIComponent(type || 'student');
             downloadBtn.removeAttribute('download');
         }
         document.getElementById('qrModal').classList.add('show');

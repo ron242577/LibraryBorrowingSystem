@@ -29,6 +29,7 @@ if ($start_date > $end_date) [$start_date, $end_date] = [$end_date, $start_date]
 $borrowing_trends = [];
 $system_metrics = [];
 $inventory_status = [];
+$attendance_metrics = ['visits' => 0, 'students' => 0, 'inside' => 0];
 try {
     $aggregator = new ReportsAggregator($conn);
     if ($report_type === 'dashboard' || $report_type === 'borrowing_trends') {
@@ -38,6 +39,12 @@ try {
         $system_metrics = $aggregator->getSystemMetrics($start_date, $end_date);
         $inventory_status = $aggregator->getInventoryStatus();
     }
+
+    $attendanceStmt = $conn->prepare("SELECT COUNT(*) AS visits, COUNT(DISTINCT CASE WHEN student_id IS NOT NULL THEN CONCAT('student:', student_id) ELSE CONCAT('teacher:', teacher_id) END) AS visitors, SUM(time_out IS NULL) AS inside FROM library_attendance WHERE visit_date BETWEEN ? AND ?");
+    $attendanceStmt->bind_param('ss', $start_date, $end_date);
+    $attendanceStmt->execute();
+    $attendance_metrics = $attendanceStmt->get_result()->fetch_assoc() ?: $attendance_metrics;
+    $attendanceStmt->close();
 } catch (Exception $e) {
     logError('Report generation error: ' . $e->getMessage());
 }
@@ -127,6 +134,7 @@ try {
         <a class="<?php echo $report_type==='dashboard'?'active':''; ?>" href="?report=dashboard&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Dashboard</a>
         <a class="<?php echo $report_type==='borrowing_trends'?'active':''; ?>" href="?report=borrowing_trends&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Borrowing Trends</a>
         <a class="<?php echo $report_type==='system_metrics'?'active':''; ?>" href="?report=system_metrics&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">System Metrics</a>
+        <a href="attendance.php?report=1&date=<?php echo h($end_date); ?>" target="_blank">Print Attendance</a>
     </nav>
 
     <?php if ($report_type === 'dashboard' || $report_type === 'borrowing_trends'): ?>
@@ -150,10 +158,10 @@ try {
         </section>
 
         <section class="table-card">
-            <h3>Top Student Borrowers</h3>
-            <?php if (empty($borrowing_trends['borrowing_by_student'])): ?><div class="empty">No student borrowing data for this period.</div><?php else: ?>
-            <div class="table-wrapper"><table><thead><tr><th>Student</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
-            <?php foreach ($borrowing_trends['borrowing_by_student'] as $student): ?><tr><td><?php echo h($student['full_name']); ?></td><td><?php echo (int)$student['borrow_count']; ?></td><td><?php echo (int)$student['return_count']; ?></td></tr><?php endforeach; ?>
+            <h3>Top Borrowers This Month</h3>
+            <?php if (empty($borrowing_trends['borrowing_by_borrower'])): ?><div class="empty">No borrowing data for this period.</div><?php else: ?>
+            <div class="table-wrapper"><table><thead><tr><th>Borrower</th><th>Type</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
+            <?php foreach ($borrowing_trends['borrowing_by_borrower'] as $borrower): ?><tr><td><?php echo h($borrower['borrower_name'] ?: 'Unknown borrower'); ?></td><td><?php echo h($borrower['borrower_type']); ?></td><td><?php echo (int)$borrower['borrow_count']; ?></td><td><?php echo (int)$borrower['return_count']; ?></td></tr><?php endforeach; ?>
             </tbody></table></div><?php endif; ?>
         </section>
     <?php endif; ?>
@@ -164,6 +172,9 @@ try {
             <div class="metric-card"><div class="label">Total Book Copies</div><div class="value"><?php echo (int)($system_metrics['total_books'] ?? 0); ?></div></div>
             <div class="metric-card"><div class="label">Available Copies</div><div class="value"><?php echo (int)($system_metrics['available_books'] ?? 0); ?></div></div>
             <div class="metric-card"><div class="label">Currently Borrowed</div><div class="value"><?php echo (int)($system_metrics['borrowed_books'] ?? 0); ?></div></div>
+            <div class="metric-card"><div class="label">Library Visits</div><div class="value"><?php echo (int)($attendance_metrics['visits'] ?? 0); ?></div></div>
+            <div class="metric-card"><div class="label">Unique Visitors</div><div class="value"><?php echo (int)($attendance_metrics['visitors'] ?? 0); ?></div></div>
+            <div class="metric-card"><div class="label">Currently Inside</div><div class="value"><?php echo (int)($attendance_metrics['inside'] ?? 0); ?></div></div>
         </div>
 
         <section class="table-card">

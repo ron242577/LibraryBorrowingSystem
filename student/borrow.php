@@ -1327,6 +1327,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .student-header-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
         .student-notification-wrap{margin:0!important;}
         @media(max-width:700px){.page-header{height:60px;padding:0 16px;}.student-header-actions{gap:4px;}}
+        .theme-switch{display:block;width:calc(100% - 36px);margin:8px 18px;padding:9px 12px;border:1px solid #D2E2F6;border-radius:8px;background:#fff;color:#202A44;cursor:pointer;font-weight:700;text-align:left}
+        body.dark{background:#0d132d;color:#f4f7ff}body.dark .page-header,body.dark .search-section,body.dark .student-info-section,body.dark .results-section,body.dark .book-details,body.dark .modal-content{background:#18213f;color:#f4f7ff}body.dark .header h1,body.dark .results-section h2,body.dark .student-info-section h2,body.dark .book-details h3,body.dark .book-title,body.dark .detail-value{color:#f4f7ff}body.dark .header p,body.dark .book-author,body.dark .info-label,body.dark .detail-label{color:#b7c5e2}body.dark .book-item,body.dark .info-item,body.dark .detail-item{background:#222d4d;color:#f4f7ff;border-color:#3c4b72}
         </style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
@@ -1359,6 +1361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <a href="/LibraryBorrowingSystem/student/profile.php">Profile</a>
                 <?php endif; ?>
                 <a href="/LibraryBorrowingSystem/student/borrow.php" class="active">Search Books</a>
+                <button type="button" class="theme-switch" id="studentThemeToggle">Dark theme</button>
                 <div class="dropdown-divider"></div>
                 <a href="/LibraryBorrowingSystem/student/portal.php?logout=1">Logout</a>
             </div>
@@ -1930,6 +1933,17 @@ function escapeHtml(text) {
 <?php endif; ?>
 
     <script>
+        const studentThemeToggle = document.getElementById('studentThemeToggle');
+        function applyStudentTheme() {
+            const dark = localStorage.getItem('jas-theme') === 'dark';
+            document.body.classList.toggle('dark', dark);
+            if (studentThemeToggle) studentThemeToggle.textContent = dark ? 'Light theme' : 'Dark theme';
+        }
+        applyStudentTheme();
+        if (studentThemeToggle) studentThemeToggle.addEventListener('click', function () {
+            localStorage.setItem('jas-theme', document.body.classList.contains('dark') ? 'light' : 'dark');
+            applyStudentTheme();
+        });
         const studentMenuToggle = document.getElementById('studentMenuToggle');
         const studentDropdown = document.getElementById('studentDropdown');
 

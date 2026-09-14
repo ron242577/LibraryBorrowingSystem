@@ -7,6 +7,56 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/gmail_smtp.php';
 
+$conn->query("CREATE TABLE IF NOT EXISTS teachers (
+    teacher_id INT NOT NULL AUTO_INCREMENT,
+    teacher_no VARCHAR(100) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    teaching_grades TEXT NOT NULL,
+    teaching_strands TEXT NULL,
+    contact_number VARCHAR(20) NULL,
+    email VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    qr_code VARCHAR(255) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    is_archived TINYINT(1) NOT NULL DEFAULT 0,
+    archived_at DATETIME NULL,
+    archived_by INT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (teacher_id),
+    UNIQUE KEY uq_teachers_teacher_no (teacher_no),
+    UNIQUE KEY uq_teachers_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+foreach ([
+    'teacher_no' => "ALTER TABLE teachers ADD COLUMN teacher_no VARCHAR(100) NULL AFTER teacher_id",
+    'teaching_grades' => "ALTER TABLE teachers ADD COLUMN teaching_grades TEXT NULL AFTER full_name",
+    'teaching_strands' => "ALTER TABLE teachers ADD COLUMN teaching_strands TEXT NULL AFTER teaching_grades",
+    'contact_number' => "ALTER TABLE teachers ADD COLUMN contact_number VARCHAR(20) NULL AFTER teaching_strands",
+    'email' => "ALTER TABLE teachers ADD COLUMN email VARCHAR(255) NULL AFTER teaching_strands",
+    'password' => "ALTER TABLE teachers ADD COLUMN password VARCHAR(255) NOT NULL DEFAULT '' AFTER email",
+    'qr_code' => "ALTER TABLE teachers ADD COLUMN qr_code VARCHAR(255) NULL AFTER password",
+    'status' => "ALTER TABLE teachers ADD COLUMN status ENUM('active','inactive') NOT NULL DEFAULT 'active' AFTER password",
+    'is_archived' => "ALTER TABLE teachers ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status",
+    'archived_at' => "ALTER TABLE teachers ADD COLUMN archived_at DATETIME NULL AFTER is_archived",
+    'archived_by' => "ALTER TABLE teachers ADD COLUMN archived_by INT NULL AFTER archived_at",
+    'updated_at' => "ALTER TABLE teachers ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+] as $column => $alterSql) {
+    $columnCheck = $conn->query("SHOW COLUMNS FROM teachers LIKE '" . $conn->real_escape_string($column) . "'");
+    if ($columnCheck && $columnCheck->num_rows === 0) $conn->query($alterSql);
+}
+$conn->query("UPDATE teachers SET teacher_no = COALESCE(NULLIF(teacher_no, ''), id_number), teaching_grades = COALESCE(NULLIF(teaching_grades, ''), grades), teaching_strands = COALESCE(NULLIF(teaching_strands, ''), strands)");
+$existingTeachers = $conn->query("SELECT teacher_id FROM teachers WHERE qr_code IS NULL OR qr_code = ''");
+if ($existingTeachers) {
+    while ($existingTeacher = $existingTeachers->fetch_assoc()) {
+        $teacherQr = 'TCH-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+        $qrUpdate = $conn->prepare('UPDATE teachers SET qr_code=? WHERE teacher_id=?');
+        $qrUpdate->bind_param('si', $teacherQr, $existingTeacher['teacher_id']);
+        $qrUpdate->execute();
+        $qrUpdate->close();
+    }
+}
+
 function clearPendingRegistration(): void {
     unset(
         $_SESSION['registration_pending_data'],
@@ -34,9 +84,25 @@ function generateUniqueRegistrationQr(mysqli $conn): string {
     return $qrCode;
 }
 
+function generateUniqueTeacherQr(mysqli $conn): string {
+    do {
+        $qrCode = 'TCH-' . date('Ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+        $stmt = $conn->prepare('SELECT teacher_id FROM teachers WHERE qr_code = ? LIMIT 1');
+        if (!$stmt) throw new RuntimeException('Unable to generate a teacher QR code right now.');
+        $stmt->bind_param('s', $qrCode);
+        $stmt->execute();
+        $exists = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+    } while ($exists);
+    return $qrCode;
+}
+
 $errors = [];
 $success = false;
 $new_student_no = null;
+$new_teacher_no = null;
+$new_teacher_qr = null;
+$registration_success_role = 'student';
 $generated_qr = null;
 $verification_pending = false;
 $pending_masked_email = '';
@@ -45,7 +111,10 @@ if (isset($_GET['completed']) && !empty($_SESSION['registration_success']) && is
     $successData = $_SESSION['registration_success'];
     unset($_SESSION['registration_success']);
     $success = true;
+    $registration_success_role = $successData['registration_role'] ?? 'student';
     $new_student_no = $successData['student_id'] ?? null;
+    $new_teacher_no = $successData['teacher_no'] ?? null;
+    $new_teacher_qr = $successData['qr_code'] ?? null;
     $generated_qr = $successData['qr_code'] ?? null;
 }
 
@@ -83,17 +152,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api'])) {
                 throw new RuntimeException('Incorrect verification code.');
             }
 
-            $check = $conn->prepare('SELECT student_id FROM students WHERE student_no = ? OR email = ? LIMIT 1');
+            $pendingIdentifier = ($pending['registration_role'] ?? 'student') === 'teacher' ? $pending['teacher_no'] : $pending['student_no'];
+            if (($pending['registration_role'] ?? 'student') === 'teacher') {
+                $check = $conn->prepare('SELECT teacher_id FROM teachers WHERE teacher_no = ? OR email = ? OR contact_number = ? LIMIT 1');
+            } else {
+                $check = $conn->prepare('SELECT student_id FROM students WHERE student_no = ? OR email = ? OR contact_number = ? LIMIT 1');
+            }
             if (!$check) {
                 throw new RuntimeException('Unable to finish registration right now.');
             }
-            $check->bind_param('ss', $pending['student_no'], $pending['email']);
+            $check->bind_param('sss', $pendingIdentifier, $pending['email'], $pending['contact_number']);
             $check->execute();
             $duplicate = $check->get_result()->num_rows > 0;
             $check->close();
             if ($duplicate) {
                 clearPendingRegistration();
-                throw new RuntimeException('Student Number or Email is already registered.');
+                throw new RuntimeException(($pending['registration_role'] ?? 'student') === 'teacher' ? 'Teacher ID Number or Email is already registered.' : 'Student Number or Email is already registered.');
+            }
+
+            $crossCheck = $conn->prepare('SELECT student_id FROM students WHERE email = ? OR contact_number = ? LIMIT 1');
+            $crossCheck->bind_param('ss', $pending['email'], $pending['contact_number']);
+            $crossCheck->execute();
+            if ($crossCheck->get_result()->num_rows > 0) {
+                $crossCheck->close();
+                clearPendingRegistration();
+                throw new RuntimeException('Email or Contact Number is already registered to another user.');
+            }
+            $crossCheck->close();
+
+            $teacherCrossCheck = $conn->prepare('SELECT teacher_id FROM teachers WHERE email = ? OR contact_number = ? LIMIT 1');
+            $teacherCrossCheck->bind_param('ss', $pending['email'], $pending['contact_number']);
+            $teacherCrossCheck->execute();
+            $teacherDuplicate = $teacherCrossCheck->get_result()->num_rows > 0;
+            $teacherCrossCheck->close();
+            if ($teacherDuplicate) {
+                clearPendingRegistration();
+                throw new RuntimeException('Email or Contact Number is already registered to another user.');
+            }
+
+            if (($pending['registration_role'] ?? 'student') === 'teacher') {
+                $status = 'active';
+                $qrCode = generateUniqueTeacherQr($conn);
+                $stmt = $conn->prepare(
+                    'INSERT INTO teachers (teacher_no, full_name, teaching_grades, teaching_strands, contact_number, email, password, qr_code, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                if (!$stmt) {
+                    throw new RuntimeException('Unable to create the teacher account right now.');
+                }
+                $stmt->bind_param('sssssssss', $pending['teacher_no'], $pending['full_name'], $pending['teaching_grades'], $pending['teaching_strands'], $pending['contact_number'], $pending['email'], $pending['password_hash'], $qrCode, $status);
+                if (!$stmt->execute()) {
+                    $message = $stmt->error;
+                    $stmt->close();
+                    logError('Teacher registration insert error after verification: ' . $message);
+                    throw new RuntimeException('Registration could not be completed. Please try again.');
+                }
+                $teacherId = (int)$conn->insert_id;
+                $stmt->close();
+                $_SESSION['registration_success'] = ['registration_role' => 'teacher', 'teacher_id' => $teacherId, 'teacher_no' => $pending['teacher_no'], 'qr_code' => $qrCode];
+                clearPendingRegistration();
+                echo json_encode(['success' => true, 'message' => 'Email verified. Your teacher account has been created.', 'redirect' => '/LibraryBorrowingSystem/student/register.php?completed=1']);
+                exit();
             }
 
             $qrCode = generateUniqueRegistrationQr($conn);
@@ -193,6 +311,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['api'])) {
         $errors[] = $e->getMessage();
     }
 
+    $registration_role = ($_POST['registration_role'] ?? 'student') === 'teacher' ? 'teacher' : 'student';
     $full_name = trim($_POST['full_name'] ?? '');
     $student_no = trim($_POST['student_no'] ?? '');
     $student_group = trim($_POST['student_group'] ?? '');
@@ -202,6 +321,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['api'])) {
     $email = trim($_POST['email'] ?? '');
     $password = (string)($_POST['password'] ?? '');
     $confirm_password = (string)($_POST['confirm_password'] ?? '');
+
+    if ($registration_role === 'teacher') {
+        $teacher_no = trim($_POST['teacher_no'] ?? '');
+        $teaching_grades = array_values(array_intersect(['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'], (array)($_POST['teaching_grades'] ?? [])));
+        $valid_strands = ['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'Arts and Design', 'Sports'];
+        $teaching_strands = array_values(array_intersect($valid_strands, (array)($_POST['teaching_strands'] ?? [])));
+        $teaches_senior_high = (bool)array_intersect($teaching_grades, ['Grade 11', 'Grade 12']);
+        if (!$teaches_senior_high) $teaching_strands = [];
+
+        if ($full_name === '' || strlen($full_name) < 3) $errors[] = 'Full name must be at least 3 characters long.';
+        if ($teacher_no === '' || !preg_match('/^[A-Za-z0-9\-]+$/', $teacher_no)) $errors[] = 'A valid Teacher ID Number is required.';
+        if (empty($teaching_grades)) $errors[] = 'Select at least one grade level.';
+        if (array_intersect($teaching_grades, ['Grade 11', 'Grade 12']) && empty($teaching_strands)) $errors[] = 'Select at least one Senior High School strand.';
+        if ($contact_number === '') $errors[] = 'Contact Number is required.';
+        elseif (!preg_match('/^[0-9\+\-\s\(\)]+$/', $contact_number)) $errors[] = 'Contact Number contains invalid characters.';
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Please provide a valid email address.';
+        if ($password === '') $errors[] = 'Password is required.';
+        else {
+            $password_errors = passwordPolicyErrors($password);
+            if (!empty($password_errors)) $errors[] = strongPasswordMessage($password_errors);
+        }
+        if ($password !== $confirm_password) $errors[] = 'Password confirmation does not match.';
+
+        if (empty($errors)) {
+            $check_stmt = $conn->prepare('SELECT teacher_id FROM teachers WHERE teacher_no = ? OR email = ? OR contact_number = ? LIMIT 1');
+            $check_stmt->bind_param('sss', $teacher_no, $email, $contact_number);
+            $check_stmt->execute();
+            if ($check_stmt->get_result()->num_rows > 0) $errors[] = 'Teacher ID Number, Email, or Contact Number is already registered. Please use different information.';
+            $check_stmt->close();
+        }
+        if (empty($errors)) {
+            $crossCheck = $conn->prepare('SELECT student_id FROM students WHERE email = ? OR contact_number = ? LIMIT 1');
+            $crossCheck->bind_param('ss', $email, $contact_number);
+            $crossCheck->execute();
+            if ($crossCheck->get_result()->num_rows > 0) $errors[] = 'Email or Contact Number is already registered to another user. Please use different information.';
+            $crossCheck->close();
+        }
+        if (empty($errors)) {
+            try {
+                $code = generateOtpCode();
+                sendStudentRegistrationVerificationEmail($email, $full_name, $code);
+                clearPendingRegistration();
+                $_SESSION['registration_pending_data'] = [
+                    'registration_role' => 'teacher', 'full_name' => $full_name, 'teacher_no' => $teacher_no,
+                    'teaching_grades' => json_encode($teaching_grades), 'teaching_strands' => json_encode($teaching_strands),
+                    'contact_number' => $contact_number,
+                    'email' => $email, 'password_hash' => password_hash($password, PASSWORD_DEFAULT)
+                ];
+                $_SESSION['registration_pending_expires'] = time() + 900;
+                $_SESSION['registration_otp_hash'] = password_hash($code, PASSWORD_DEFAULT);
+                $_SESSION['registration_otp_expires'] = time() + 300;
+                $_SESSION['registration_otp_attempts'] = 0;
+                $_SESSION['registration_otp_last_sent'] = time();
+                $verification_pending = true;
+                $pending_masked_email = maskEmail($email);
+            } catch (Throwable $e) {
+                clearPendingRegistration();
+                $errors[] = 'Unable to send the registration verification code. Please try again.';
+                logError('Teacher registration email verification error: ' . $e->getMessage());
+            }
+        }
+    }
+
+    if ($registration_role !== 'teacher') {
 
     $valid_year_levels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
     $senior_high_grades = ['Grade 11', 'Grade 12'];
@@ -263,16 +446,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['api'])) {
 
     if (empty($errors)) {
         try {
-            $check_stmt = $conn->prepare('SELECT student_id FROM students WHERE student_no = ? OR email = ? LIMIT 1');
+            $check_stmt = $conn->prepare('SELECT student_id FROM students WHERE student_no = ? OR email = ? OR contact_number = ? LIMIT 1');
             if (!$check_stmt) {
                 throw new RuntimeException('Unable to validate the registration right now.');
             }
-            $check_stmt->bind_param('ss', $student_no, $email);
+            $check_stmt->bind_param('sss', $student_no, $email, $contact_number);
             $check_stmt->execute();
             if ($check_stmt->get_result()->num_rows > 0) {
-                $errors[] = 'Student Number or Email already registered.';
+                $errors[] = 'Student Number, Email, or Contact Number is already registered. Please use different information.';
             }
             $check_stmt->close();
+            $crossCheck = $conn->prepare('SELECT teacher_id FROM teachers WHERE email = ? OR contact_number = ? LIMIT 1');
+            $crossCheck->bind_param('ss', $email, $contact_number);
+            $crossCheck->execute();
+            if ($crossCheck->get_result()->num_rows > 0) $errors[] = 'Email or Contact Number is already registered to another user. Please use different information.';
+            $crossCheck->close();
         } catch (Throwable $e) {
             $errors[] = 'Database error during validation.';
             logError('Student registration validation error: ' . $e->getMessage());
@@ -309,6 +497,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['api'])) {
             $errors[] = 'Unable to send the registration verification code. Please try again or ask the administrator to check the Gmail setup.';
             logError('Student registration email verification error: ' . $e->getMessage());
         }
+    }
+
     }
 }
 
@@ -856,6 +1046,14 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
             outline-offset: 2px;
         }
 
+        .registration-type-picker { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:24px; padding:14px; background:#F3F7FC; border-radius:10px; color:#202A44; }
+        .registration-type-btn { padding:10px 20px; border:2px solid #D2E2F6; border-radius:8px; background:white; color:#202A44; font-weight:700; cursor:pointer; }
+        .registration-type-btn.active { background:#141F52; border-color:#141F52; color:white; }
+        .checkbox-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; padding:12px 14px; background:#F7F9FC; border:2px solid #E7EEF7; border-radius:10px; }
+        .checkbox-grid label { margin:0; text-transform:none; letter-spacing:0; font-size:14px; font-weight:600; color:#202A44; }
+        .checkbox-grid input { accent-color:#141F52; margin-right:5px; }
+        .checkbox-group { grid-column:1 / -1; }
+
         @media (max-width: 480px) {
             .show-password-btn {
                 min-width: 58px !important;
@@ -869,7 +1067,7 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
 </head>
 <body class="student-register-page">
     <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
-    <?php if ($success && $new_student_no): ?>
+    <?php if ($success && ($new_student_no || $new_teacher_no)): ?>
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 showToast('Student registration completed. QR code created and your password was securely saved.', 'success', 4200, 'Registration Successful');
@@ -890,40 +1088,51 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
     <?php endif; ?>
     <div class="container">
         <div class="header">
-            <h1>Student Registration</h1>
-            <p>Register to access the library borrowing system</p>
+            <h1>Registration</h1>
+            <p>Register as a student or teacher to access the library borrowing system</p>
         </div>
 
         <div class="registration-card">
             <div class="card-header">
                 <span>📝</span>
-                <span>Create Your Student Account</span>
+                <span><?php if ($success && $registration_success_role === 'teacher'): ?>Teacher Registration Complete<?php else: ?>Create Your <span id="accountTypeLabel"><?php echo $registration_success_role === 'teacher' ? 'Teacher' : 'Student'; ?></span> Account<?php endif; ?></span>
             </div>
 
             <div class="card-body">
-                <?php if ($success && $new_student_no): ?>
+                <?php if ($success && ($new_student_no || $new_teacher_no)): ?>
                     <!-- Success Message -->
-                    <div class="alert alert-success">
+                    <div class="alert alert-success<?php echo $registration_success_role === 'teacher' ? ' teacher-success' : ''; ?>">
                         <div class="alert-icon">✓</div>
                         <div class="success-content">
                             <h3>Registration Successful!</h3>
-                            <p>Your student account has been created. You can now access the student portal.</p>
-                            <p><strong>Student ID:</strong> <?php echo str_pad($new_student_no, 4, '0', STR_PAD_LEFT); ?></p>
+                            <?php if ($registration_success_role === 'teacher'): ?>
+                                <p>Your teacher account has been created.</p>
+                                <p><strong>Teacher ID Number:</strong> <?php echo htmlspecialchars($new_teacher_no); ?></p>
+                            <?php else: ?>
+                                <p>Your student account has been created. You can now access the student portal.</p>
+                                <p><strong>Student ID:</strong> <?php echo str_pad($new_student_no, 4, '0', STR_PAD_LEFT); ?></p>
+                            <?php endif; ?>
                             
-                            <div class="success-qr">
+                            <?php if ($registration_success_role === 'student'): ?><div class="success-qr">
                                 <h4>Your Student QR Code</h4>
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?php echo urlencode($generated_qr); ?>" 
                                      alt="Student QR Code">
                                 <div class="success-qr-code"><?php echo htmlspecialchars($generated_qr); ?></div>
                                 <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($generated_qr); ?>&type=student">Download QR Code</a>
-                            </div>
+                            </div><?php endif; ?>
+                            <?php if ($registration_success_role === 'teacher'): ?><div class="success-qr">
+                                <h4>Your Teacher QR Code</h4>
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?php echo urlencode($new_teacher_qr); ?>" alt="Teacher QR Code">
+                                <div class="success-qr-code"><?php echo htmlspecialchars($new_teacher_qr); ?></div>
+                                <a class="qr-download-btn" href="/LibraryBorrowingSystem/download_qr.php?code=<?php echo urlencode($new_teacher_qr); ?>&type=teacher">Download QR Code</a>
+                            </div><?php endif; ?>
 
                             <p style="color: #52618D; font-size: 13px; margin-top: 16px;">
-                                Save your QR code and keep your password private. Email verification is required only when creating a new student account.
+                                Keep your password private. Email verification is required before the account is created.
                             </p>
 
                             <div class="success-actions">
-                                <a href="/LibraryBorrowingSystem/student/portal.php">Go to Student Portal</a>
+                                <a href="/LibraryBorrowingSystem/student/portal.php">Go to Login</a>
                             </div>
                         </div>
                     </div>
@@ -947,6 +1156,13 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                     <!-- Registration Form -->
                     <form method="POST" novalidate>
                         <?php echo csrfField(); ?>
+                        <div class="registration-type-picker">
+                            <strong>Register as</strong>
+                            <button type="button" class="registration-type-btn active" data-registration-role="student">Student</button>
+                            <button type="button" class="registration-type-btn" data-registration-role="teacher">Teacher</button>
+                        </div>
+                        <input type="hidden" name="registration_role" id="registration_role" value="<?php echo htmlspecialchars($_POST['registration_role'] ?? 'student'); ?>">
+                        <div id="studentFields">
                         <!-- Personal Information Section -->
                         <h3 style="color: #202A44; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #E7EEF7; padding-bottom: 12px;">
                             Personal Information
@@ -1002,6 +1218,22 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                                 </select>
                                 <div class="helper-text">Shown only for Grade 11 and Grade 12 students</div>
                             </div>
+                        </div>
+
+                        </div>
+
+                        <div id="teacherFields" style="display:none;">
+                            <h3 style="color: #202A44; margin: 24px 0 16px; font-size: 16px; font-weight: 600; border-bottom: 2px solid #E7EEF7; padding-bottom: 12px;">Teacher Personal Information</h3>
+                            <div class="form-grid">
+                                <div class="form-group"><label>Full Name <span class="required">*</span></label><input type="text" name="full_name" id="teacher_full_name" placeholder="Enter your full name" value="<?php echo htmlspecialchars(($_POST['registration_role'] ?? '') === 'teacher' ? ($_POST['full_name'] ?? '') : ''); ?>"></div>
+                                <div class="form-group"><label>Teacher ID Number <span class="required">*</span></label><input type="text" name="teacher_no" id="teacher_no" placeholder="e.g., TCH-001" value="<?php echo htmlspecialchars($_POST['teacher_no'] ?? ''); ?>"></div>
+                            </div>
+                            <div class="form-group checkbox-group"><label>Grade Levels Teaching <span class="required">*</span></label><div class="checkbox-grid">
+                                <?php foreach (['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'] as $grade): ?><label><input type="checkbox" name="teaching_grades[]" value="<?php echo $grade; ?>" <?php echo in_array($grade, (array)($_POST['teaching_grades'] ?? []), true) ? 'checked' : ''; ?>> <?php echo $grade; ?></label><?php endforeach; ?>
+                            </div></div>
+                            <div class="form-group checkbox-group" id="teacherStrandsGroup"><label>Senior High School Strand(s)</label><div class="checkbox-grid">
+                                <?php foreach (['STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'Arts and Design', 'Sports'] as $strand): ?><label><input type="checkbox" name="teaching_strands[]" value="<?php echo $strand; ?>" <?php echo in_array($strand, (array)($_POST['teaching_strands'] ?? []), true) ? 'checked' : ''; ?>> <?php echo $strand; ?></label><?php endforeach; ?>
+                            </div><div class="helper-text">Select strands only when teaching Grade 11 or Grade 12.</div></div>
                         </div>
 
                         <!-- Contact Information Section -->
@@ -1062,7 +1294,7 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
 
                         <!-- Footer Links -->
                         <div class="form-footer">
-                            Already have an account? <a href="/LibraryBorrowingSystem/student/portal.php">Go to Student Portal</a>
+                            Already have an account? <a href="/LibraryBorrowingSystem/student/portal.php">Go back to Login.</a>
                         </div>
                     </form>
                 <?php endif; ?>
@@ -1100,9 +1332,60 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
 
 <script>
     (function () {
+        const roleInput = document.getElementById('registration_role');
+        const studentFields = document.getElementById('studentFields');
+        const teacherFields = document.getElementById('teacherFields');
+        const accountTypeLabel = document.getElementById('accountTypeLabel');
+        const roleButtons = document.querySelectorAll('[data-registration-role]');
+
+        function setFieldState(container, enabled) {
+            if (!container) return;
+            container.querySelectorAll('input, select, textarea').forEach(function (field) {
+                field.disabled = !enabled;
+                if (field.dataset.originalRequired === undefined) field.dataset.originalRequired = field.required ? '1' : '0';
+                field.required = enabled && field.dataset.originalRequired === '1';
+            });
+        }
+
+        function toggleRegistrationRole(role) {
+            const isTeacher = role === 'teacher';
+            if (roleInput) roleInput.value = isTeacher ? 'teacher' : 'student';
+            if (studentFields) studentFields.style.display = isTeacher ? 'none' : 'block';
+            if (teacherFields) teacherFields.style.display = isTeacher ? 'block' : 'none';
+            if (accountTypeLabel) accountTypeLabel.textContent = isTeacher ? 'Teacher' : 'Student';
+            setFieldState(studentFields, !isTeacher);
+            setFieldState(teacherFields, isTeacher);
+            const contactNumber = document.querySelector('[name="contact_number"]');
+            if (contactNumber) {
+                contactNumber.disabled = false;
+                contactNumber.required = true;
+            }
+            roleButtons.forEach(function (button) { button.classList.toggle('active', button.dataset.registrationRole === (isTeacher ? 'teacher' : 'student')); });
+        }
+
+        roleButtons.forEach(function (button) { button.addEventListener('click', function () { toggleRegistrationRole(button.dataset.registrationRole); }); });
+        toggleRegistrationRole(roleInput && roleInput.value === 'teacher' ? 'teacher' : 'student');
+
         const gradeSelect = document.getElementById('year_level');
         const departmentGroup = document.getElementById('department_group');
         const departmentSelect = document.getElementById('department');
+        const teacherStrandsGroup = document.getElementById('teacherStrandsGroup');
+        const teacherGradeCheckboxes = document.querySelectorAll('input[name="teaching_grades[]"]');
+        const teacherStrandCheckboxes = document.querySelectorAll('input[name="teaching_strands[]"]');
+
+        function toggleTeacherStrands() {
+            const teachesSeniorHigh = Array.from(teacherGradeCheckboxes).some(function (checkbox) {
+                return checkbox.checked && (checkbox.value === 'Grade 11' || checkbox.value === 'Grade 12');
+            });
+            if (teacherStrandsGroup) teacherStrandsGroup.style.display = teachesSeniorHigh ? 'flex' : 'none';
+            teacherStrandCheckboxes.forEach(function (checkbox) {
+                checkbox.disabled = !teachesSeniorHigh;
+                if (!teachesSeniorHigh) checkbox.checked = false;
+            });
+        }
+
+        teacherGradeCheckboxes.forEach(function (checkbox) { checkbox.addEventListener('change', toggleTeacherStrands); });
+        toggleTeacherStrands();
 
         function toggleDepartment() {
             if (!gradeSelect || !departmentGroup || !departmentSelect) return;

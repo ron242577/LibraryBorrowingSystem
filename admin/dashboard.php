@@ -15,9 +15,11 @@ if (!isAdmin()) {
 }
 
 // Get statistics from database
-$total_staff = 0;
+$total_teachers = 0;
 $total_students = 0;
 $total_books = 0;
+$today_attendance = 0;
+$visitors_inside = 0;
 $backup_message = '';
 
 try {
@@ -39,6 +41,13 @@ try {
         if (!$exists) createNotification($conn,'admin',$chiefLibrarianId,$title,$msg,'/LibraryBorrowingSystem/admin/inventory.php');
     }
 
+    $attendanceDate = $conn->real_escape_string(date('Y-m-d'));
+    $attendanceStats = $conn->query("SELECT COUNT(*) AS visits, SUM(time_out IS NULL) AS inside FROM library_attendance WHERE visit_date = '{$attendanceDate}'");
+    if ($attendanceStats && ($attendanceRow = $attendanceStats->fetch_assoc())) {
+        $today_attendance = (int)($attendanceRow['visits'] ?? 0);
+        $visitors_inside = (int)($attendanceRow['inside'] ?? 0);
+    }
+
     if ($chiefLibrarianId > 0 && $conn->query("SHOW TABLES LIKE 'book_reservations'")->num_rows > 0) {
         $pending = $conn->query("SELECT COUNT(*) AS total FROM book_reservations WHERE status='pending'");
         $pendingCount = $pending ? (int)$pending->fetch_assoc()['total'] : 0;
@@ -55,10 +64,10 @@ try {
 }
 
 try {
-    // Get total active staff accounts
-    $result = $conn->query("SELECT COUNT(*) as count FROM users WHERE status = 'active'");
+    // Get all registered teacher accounts
+    $result = $conn->query("SELECT COUNT(*) as count FROM teachers");
     if ($result && $row = $result->fetch_assoc()) {
-        $total_staff = $row['count'];
+        $total_teachers = $row['count'];
     }
     
     // Get total students
@@ -394,18 +403,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         </div>
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Total Staff</div>
-                <div class="stat-number"><?php echo $total_staff; ?></div>
+                <div class="stat-label">Total Registered Teachers</div>
+                <div class="stat-number"><?php echo $total_teachers; ?></div>
             </div>
             
             <div class="stat-card">
-                <div class="stat-label">Total Students</div>
+                <div class="stat-label">Total Registered Students</div>
                 <div class="stat-number"><?php echo $total_students; ?></div>
             </div>
             
             <div class="stat-card">
                 <div class="stat-label">Total Books</div>
                 <div class="stat-number"><?php echo $total_books; ?></div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">Today's Library Visits</div>
+                <div class="stat-number"><?php echo $today_attendance; ?></div>
             </div>
         </div>
         <div class="dashboard-grid">
@@ -462,6 +476,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class="card">
                     <h2>Transactions</h2>
                     <p>View all borrowing and return transactions with detailed information.</p>
+                </div>
+            </a>
+
+            <a href="/LibraryBorrowingSystem/admin/attendance.php" class="card-link">
+                <div class="card">
+                    <h2>Library Attendance</h2>
+                    <p><?php echo $visitors_inside; ?> visitor(s) currently inside. Record time in/out and print attendance reports.</p>
                 </div>
             </a>
 
