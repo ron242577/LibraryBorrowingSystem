@@ -19,7 +19,7 @@ function isActiveNavAny($paths) {
     return '';
 }
 
-$books_nav_paths = ['/admin/qr_transaction.php', '/admin/inventory.php'];
+$books_nav_paths = ['/admin/qr_transaction.php', '/admin/attendance.php'];
 $books_open = isActiveNavAny($books_nav_paths) === 'active';
 ?>
 <style>
@@ -119,6 +119,7 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
     .dropdown-toggle {
         justify-content: space-between;
         text-align: left;
+        font-weight: 600;
     }
 
     .dropdown-icon {
@@ -141,6 +142,7 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
         padding: 10px 18px 10px 42px;
         color: var(--jas-light);
         font-size: 13px;
+        font-weight: 600;
         border-left: 4px solid transparent;
     }
 
@@ -256,28 +258,31 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
             <a href="/LibraryBorrowingSystem/admin/dashboard.php" class="sidebar-link <?php echo isActiveNav('/admin/dashboard.php'); ?>">Dashboard</a>
         </li>
         <li class="sidebar-item">
-            <a href="/LibraryBorrowingSystem/admin/staff_management.php" class="sidebar-link <?php echo isActiveNav('/admin/staff_management.php'); ?>">Staff Management</a>
-        </li>
-        <li class="sidebar-item">
             <a href="/LibraryBorrowingSystem/admin/reports.php" class="sidebar-link <?php echo isActiveNav('/admin/reports.php'); ?>">Reports &amp; Analytics</a>
         </li>
         <li class="sidebar-item">
-            <a href="/LibraryBorrowingSystem/admin/student_records.php" class="sidebar-link <?php echo isActiveNav('/admin/student_records.php'); ?>">Student Records</a>
+            <a href="/LibraryBorrowingSystem/admin/student_records.php" class="sidebar-link <?php echo isActiveNav('/admin/student_records.php'); ?>">User Management</a>
         </li>
         <li class="sidebar-item dropdown <?php echo $books_open ? 'open' : ''; ?>">
             <button type="button" class="sidebar-link dropdown-toggle" aria-expanded="<?php echo $books_open ? 'true' : 'false'; ?>">
                 <span>Circulation</span><span class="dropdown-icon">▼</span>
             </button>
             <ul class="dropdown-menu">
-                <li><a href="/LibraryBorrowingSystem/admin/qr_transaction.php" class="dropdown-link <?php echo isActiveNav('/admin/qr_transaction.php'); ?>">QR Transactions</a></li>
-                <li><a href="/LibraryBorrowingSystem/admin/inventory.php" class="dropdown-link <?php echo isActiveNav('/admin/inventory.php'); ?>">Cataloging</a></li>
+                <li><a href="/LibraryBorrowingSystem/admin/qr_transaction.php" class="dropdown-link <?php echo isActiveNav('/admin/qr_transaction.php'); ?>">Borrow/Return Books</a></li>
+                <li><a href="/LibraryBorrowingSystem/admin/attendance.php" class="dropdown-link <?php echo isActiveNav('/admin/attendance.php'); ?>">Library Attendance</a></li>
             </ul>
+        </li>
+        <li class="sidebar-item">
+            <a href="/LibraryBorrowingSystem/admin/inventory.php" class="sidebar-link <?php echo isActiveNav('/admin/inventory.php'); ?>">Catalogue</a>
         </li>
         <li class="sidebar-item">
             <a href="/LibraryBorrowingSystem/admin/transactions.php" class="sidebar-link <?php echo isActiveNav('/admin/transactions.php'); ?>">Transaction Records</a>
         </li>
         <li class="sidebar-item">
             <a href="/LibraryBorrowingSystem/admin/reservations.php" class="sidebar-link <?php echo isActiveNav('/admin/reservations.php'); ?>">Reservations</a>
+        </li>
+        <li class="sidebar-item">
+            <a href="/LibraryBorrowingSystem/admin/staff_management.php" class="sidebar-link <?php echo isActiveNav('/admin/staff_management.php'); ?>">Staff Management</a>
         </li>
         <li class="sidebar-item">
             <a href="/LibraryBorrowingSystem/admin/backup_management.php" class="sidebar-link <?php echo isActiveNav('/admin/backup_management.php'); ?>">Backup &amp; Restore</a>

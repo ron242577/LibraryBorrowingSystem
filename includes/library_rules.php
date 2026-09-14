@@ -108,7 +108,7 @@ function getReadyReservationForBook(mysqli $conn, int $bookId): ?array
     if (!$tableCheck || $tableCheck->num_rows === 0) return null;
 
     $stmt = $conn->prepare("
-        SELECT reservation_id, student_id, status, reserved_at
+        SELECT reservation_id, student_id, teacher_id, status, reserved_at
         FROM book_reservations
         WHERE book_id=? AND status='ready'
         ORDER BY reserved_at ASC
@@ -127,7 +127,7 @@ function promoteOldestReservation(mysqli $conn, int $bookId): ?array
     if (!$tableCheck || $tableCheck->num_rows === 0) return null;
 
     $stmt = $conn->prepare("
-        SELECT reservation_id, student_id
+        SELECT reservation_id, student_id, teacher_id
         FROM book_reservations
         WHERE book_id=? AND status='pending'
         ORDER BY reserved_at ASC
@@ -160,12 +160,18 @@ function promoteOldestReservation(mysqli $conn, int $bookId): ?array
     if ($affected <= 0) return null;
 
     if (function_exists('createNotification')) {
+        $borrowerType = !empty($reservation['teacher_id']) ? 'teacher' : 'student';
+        $borrowerId = (int)($reservation['teacher_id'] ?: $reservation['student_id']);
+        $targetUrl = $borrowerType === 'teacher'
+            ? '/LibraryBorrowingSystem/teacher/dashboard.php#reservations'
+            : '/LibraryBorrowingSystem/student/profile.php#reservations';
         createNotification(
             $conn,
-            'student',
-            (int)$reservation['student_id'],
+            $borrowerType,
+            $borrowerId,
             'Reserved Book Available',
-            'A copy of "' . $book['title'] . '" is now available. Your reservation is ready.'
+            'A copy of "' . $book['title'] . '" is now available. Your reservation is ready.',
+            $targetUrl
         );
     }
 

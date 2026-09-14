@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'mark_ready') {
             $lookup=$conn->prepare("
-                SELECT r.student_id, r.book_id, r.status, r.reserved_at, b.title, b.available_copies
+                SELECT r.student_id, r.teacher_id, r.book_id, r.status, r.reserved_at, b.title, b.available_copies
                 FROM book_reservations r
                 INNER JOIN books b ON r.book_id=b.book_id
                 WHERE r.reservation_id=? LIMIT 1
@@ -105,8 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->affected_rows===0) throw new Exception('Reservation could not be updated.');
             $stmt->close();
 
-            createNotification($conn,'student',(int)$reservation['student_id'],'Reserved Book Available','A copy of "' . $reservation['title'] . '" is now available. Your reservation is ready.','/LibraryBorrowingSystem/student/profile.php#reservations');
-            $message='Reservation marked as ready and the student was notified.';
+            $borrowerType = !empty($reservation['teacher_id']) ? 'teacher' : 'student';
+            $borrowerId = (int)($reservation['teacher_id'] ?: $reservation['student_id']);
+            $targetUrl = $borrowerType === 'teacher' ? '/LibraryBorrowingSystem/teacher/dashboard.php#reservations' : '/LibraryBorrowingSystem/student/profile.php#reservations';
+            createNotification($conn,$borrowerType,$borrowerId,'Reserved Book Available','A copy of "' . $reservation['title'] . '" is now available. Your reservation is ready.',$targetUrl);
+            $message='Reservation marked as ready and the borrower was notified.';
             $message_type='success';
         } elseif ($action === 'cancel') {
             $stmt=$conn->prepare("UPDATE book_reservations SET status='cancelled', cancelled_at=NOW() WHERE reservation_id=? AND status IN ('pending','ready')");
@@ -115,12 +118,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->affected_rows===0) throw new Exception('Reservation is already closed.');
             $stmt->close();
 
-            $lookup=$conn->prepare("SELECT student_id, book_id FROM book_reservations WHERE reservation_id=? LIMIT 1");
+            $lookup=$conn->prepare("SELECT student_id, teacher_id, book_id FROM book_reservations WHERE reservation_id=? LIMIT 1");
             $lookup->bind_param('i',$reservation_id); $lookup->execute(); $reservation=$lookup->get_result()->fetch_assoc(); $lookup->close();
             if ($reservation) {
                 $bookStmt=$conn->prepare("SELECT title FROM books WHERE book_id=? LIMIT 1");
                 $bookStmt->bind_param('i',$reservation['book_id']); $bookStmt->execute(); $book=$bookStmt->get_result()->fetch_assoc(); $bookStmt->close();
-                if ($book) createNotification($conn,'student',(int)$reservation['student_id'],'Reservation Cancelled','Your reservation for "' . $book['title'] . '" was cancelled.','/LibraryBorrowingSystem/student/profile.php#reservations');
+                if ($book) {
+                    $borrowerType = !empty($reservation['teacher_id']) ? 'teacher' : 'student';
+                    $borrowerId = (int)($reservation['teacher_id'] ?: $reservation['student_id']);
+                    $targetUrl = $borrowerType === 'teacher' ? '/LibraryBorrowingSystem/teacher/dashboard.php#reservations' : '/LibraryBorrowingSystem/student/profile.php#reservations';
+                    createNotification($conn,$borrowerType,$borrowerId,'Reservation Cancelled','Your reservation for "' . $book['title'] . '" was cancelled.',$targetUrl);
+                }
             }
 
             $message='Reservation cancelled and the student was notified.';
@@ -144,10 +152,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $reservations=[];
 $sql="SELECT r.reservation_id, r.status, r.reserved_at, r.ready_at,
-             s.student_no, s.full_name, s.email,
-             b.title, b.book_number, b.available_copies
+                  COALESCE(s.student_no, t.teacher_no) AS borrower_no,
+                  COALESCE(s.full_name, t.full_name) AS full_name,
+                  COALESCE(s.email, t.email) AS email,
+                  CASE WHEN r.teacher_id IS NULL THEN 'Student' ELSE 'Teacher' END AS borrower_type,
+                  b.title, b.book_number, b.available_copies
       FROM book_reservations r
-      JOIN students s ON s.student_id=r.student_id
+              LEFT JOIN students s ON s.student_id=r.student_id
+              LEFT JOIN teachers t ON t.teacher_id=r.teacher_id
       JOIN books b ON b.book_id=r.book_id
       ORDER BY FIELD(r.status,'ready','pending','fulfilled','cancelled'), r.reserved_at ASC";
 $result=$conn->query($sql);
@@ -220,7 +232,7 @@ h1{margin:0 0 8px}.muted{color:#52618D;font-size:13px;margin-bottom:20px}
 <tbody>
 <?php foreach($reservations as $r): ?>
 <tr>
-<td><?php echo h($r['full_name']); ?><br><small><?php echo h($r['student_no']); ?></small></td>
+<td><?php echo h($r['full_name']); ?><br><small><?php echo h($r['borrower_no']); ?></small></td>
 <td><?php echo h($r['title']); ?><br><small><?php echo h($r['book_number']); ?></small></td>
 <td><?php echo h(date('M d, Y h:i A',strtotime($r['reserved_at']))); ?></td>
 <td><span class="badge <?php echo h($r['status']); ?>"><?php echo h(ucfirst($r['status'])); ?></span></td>

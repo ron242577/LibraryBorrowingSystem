@@ -64,9 +64,9 @@ $data = $type === 'borrowing_trends'
         <table><thead><tr><th>Title</th><th>Author</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
         <?php foreach ($data['most_borrowed_books'] as $book): ?><tr><td><?php echo h($book['title']); ?></td><td><?php echo h($book['author']); ?></td><td><?php echo (int)$book['borrow_count']; ?></td><td><?php echo (int)$book['return_count']; ?></td></tr><?php endforeach; ?>
         </tbody></table>
-        <h2>Top Student Borrowers</h2>
-        <table><thead><tr><th>Student</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
-        <?php foreach ($data['borrowing_by_student'] as $student): ?><tr><td><?php echo h($student['full_name']); ?></td><td><?php echo (int)$student['borrow_count']; ?></td><td><?php echo (int)$student['return_count']; ?></td></tr><?php endforeach; ?>
+        <h2>Top Borrowers This Month</h2>
+        <table><thead><tr><th>Borrower</th><th>Type</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
+        <?php foreach ($data['borrowing_by_borrower'] as $borrower): ?><tr><td><?php echo h($borrower['borrower_name'] ?: 'Unknown borrower'); ?></td><td><?php echo h($borrower['borrower_type']); ?></td><td><?php echo (int)$borrower['borrow_count']; ?></td><td><?php echo (int)$borrower['return_count']; ?></td></tr><?php endforeach; ?>
         </tbody></table>
     <?php else: ?>
         <div class="summary">

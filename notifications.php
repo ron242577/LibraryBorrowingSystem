@@ -10,6 +10,9 @@ $userId = 0;
 if (isset($_SESSION['student_id'])) {
     $userType = 'student';
     $userId = (int)$_SESSION['student_id'];
+} elseif (isset($_SESSION['teacher_id'])) {
+    $userType = 'teacher';
+    $userId = (int)$_SESSION['teacher_id'];
 } elseif (isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'admin') {
     $userType = 'admin';
     $userId = (int)$_SESSION['user_id'];

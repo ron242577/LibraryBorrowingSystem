@@ -29,7 +29,7 @@ if ($filter_status !== 'all') {
 }
 if ($search !== '') {
     $term = $conn->real_escape_string($search);
-    $where[] = "(s.full_name LIKE '%$term%' OR s.student_no LIKE '%$term%' OR b.title LIKE '%$term%' OR b.author LIKE '%$term%' OR b.book_number LIKE '%$term%' OR CAST(t.transaction_id AS CHAR) LIKE '%$term%')";
+    $where[] = "(COALESCE(s.full_name, te.full_name) LIKE '%$term%' OR COALESCE(s.student_no, te.teacher_no) LIKE '%$term%' OR b.title LIKE '%$term%' OR b.author LIKE '%$term%' OR b.book_number LIKE '%$term%' OR CAST(t.transaction_id AS CHAR) LIKE '%$term%')";
 }
 $where_sql = implode(' AND ', $where);
 
@@ -41,13 +41,14 @@ try {
                 t.due_date,
                 t.return_date,
                 t.status,
-                s.student_no,
-                s.full_name AS student_name,
+                COALESCE(s.student_no, te.teacher_no) AS borrower_no,
+                COALESCE(s.full_name, te.full_name) AS borrower_name,
                 b.book_number,
                 b.title AS book_title,
                 b.author AS book_author
               FROM transactions t
-              INNER JOIN students s ON t.student_id = s.student_id
+              LEFT JOIN students s ON t.student_id = s.student_id
+              LEFT JOIN teachers te ON t.teacher_id = te.teacher_id
               INNER JOIN books b ON t.book_id = b.book_id
               WHERE $where_sql
               ORDER BY t.date_borrowed DESC";
@@ -226,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="toolbar">
             <form method="GET">
                 <input type="hidden" name="status" value="<?php echo h($filter_status); ?>">
-                <input type="text" name="search" value="<?php echo h($search); ?>" placeholder="Search student, book, book number, or transaction ID">
+                <input type="text" name="search" value="<?php echo h($search); ?>" placeholder="Search borrower, book, book number, or transaction ID">
                 <button class="btn auto-search-submit" type="submit">Search</button>
                 <?php if ($search !== ''): ?><a class="btn secondary" href="?status=<?php echo h($filter_status); ?>">Clear</a><?php endif; ?>
             </form>
@@ -240,13 +241,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="table-wrapper">
                     <table>
                         <thead>
-                            <tr><th>ID</th><th>Student</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr>
+                            <tr><th>ID</th><th>Borrower</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr>
                         </thead>
                         <tbody>
                         <?php foreach ($transactions as $t): ?>
                             <tr>
                                 <td>#<?php echo (int)$t['transaction_id']; ?></td>
-                                <td><strong><?php echo h($t['student_name']); ?></strong><br><small><?php echo h($t['student_no']); ?></small></td>
+                                <td><strong><?php echo h($t['borrower_name']); ?></strong><br><small><?php echo h($t['borrower_no']); ?></small></td>
                                 <td><strong><?php echo h($t['book_title']); ?></strong><br><small><?php echo h($t['book_author']); ?> · <?php echo h($t['book_number']); ?></small></td>
                                 <td><?php echo h(date('M d, Y h:i A', strtotime($t['date_borrowed']))); ?></td>
                                 <td><?php echo h(date('M d, Y', strtotime($t['due_date']))); ?><br><small>Same-day return</small></td>

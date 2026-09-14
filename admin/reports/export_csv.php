@@ -38,10 +38,10 @@ try {
         }
         fputcsv($output, []);
 
-        fputcsv($output, ['TOP STUDENT BORROWERS']);
-        fputcsv($output, ['Student', 'Borrow Count', 'Return Count']);
-        foreach ($data['borrowing_by_student'] as $student) {
-            fputcsv($output, [$student['full_name'], $student['borrow_count'], $student['return_count']]);
+        fputcsv($output, ['TOP BORROWERS']);
+        fputcsv($output, ['Borrower', 'Type', 'Borrow Count', 'Return Count']);
+        foreach ($data['borrowing_by_borrower'] as $borrower) {
+            fputcsv($output, [$borrower['borrower_name'], $borrower['borrower_type'], $borrower['borrow_count'], $borrower['return_count']]);
         }
     } else {
         $m = $aggregator->getSystemMetrics($start_date, $end_date);

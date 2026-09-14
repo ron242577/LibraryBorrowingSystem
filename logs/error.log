@@ -122,3 +122,91 @@
 [2026-09-07 16:03:34] Unknown database 'library_borrowing_system'
 [2026-09-07 16:07:54] Unknown database 'library_borrowing_system'
 [2026-09-07 16:08:10] Unknown database 'library_borrowing_system'
+[2026-09-13 09:52:16] Login attempt: Username/email/contact number and password are required, including CAPTCHA verification.
+[2026-09-13 10:05:08] Login attempt: Incorrect CAPTCHA. Solve the new challenge and try again.
+[2026-09-13 10:38:08] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:38:54] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:38:55] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:38:57] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:40:16] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:41:08] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:41:22] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:12] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:20] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:21] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:29] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:44] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:51] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:58] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:58] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:58] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:59] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:59] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:42:59] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:43:06] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:43:21] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:43:38] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:13] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:28] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:40] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:41] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:41] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:48] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:57] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:44:57] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:45:05] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:45:15] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:45:25] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:46:24] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:46:40] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:46:47] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:46:52] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:47:34] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:48:00] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:48:03] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-13 10:49:04] Login attempt: Invalid login credentials or inactive account.
+[2026-09-13 11:49:13] Login attempt: Invalid login credentials or inactive account.
+[2026-09-13 12:05:27] Login attempt: Invalid login credentials.
+[2026-09-13 12:05:37] Login attempt: Invalid login credentials.
+[2026-09-13 12:07:00] Login attempt: Invalid login credentials.
+[2026-09-13 12:07:18] Login attempt: Invalid student credentials or inactive account.
+[2026-09-13 12:08:57] Login attempt: Invalid login credentials.
+[2026-09-13 12:09:04] Login attempt: Invalid login credentials.
+[2026-09-13 12:09:13] Login attempt: Invalid login credentials.
+[2026-09-13 12:44:20] Login attempt: Invalid teacher credentials or inactive account.
+[2026-09-14 17:30:59] Login attempt: Invalid teacher credentials or inactive account.
+[2026-09-14 17:44:44] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:45] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:45] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:46] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:46] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:50] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:51] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:51] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:51] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:51] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:55] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:57] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:57] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:44:57] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:06] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:06] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:07] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:07] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:07] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:07] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:07] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:07] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:55] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:55] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:45:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
+[2026-09-14 17:48:20] Unified QR transaction error: Data truncated for column 'borrow_condition' at row 1
+[2026-09-14 18:15:26] Attendance error: Active student not found. Check the QR code or student ID number.

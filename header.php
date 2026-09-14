@@ -11,9 +11,12 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
         position: sticky;
         top: 0;
         z-index: 900;
-        width: calc(100vw - 260px);
+        width: 100%;
+        margin-left: 0;
         min-height: 78px;
-        margin: 0 0 24px 0;
+        margin-top: 0;
+        margin-right: 0;
+        margin-bottom: 24px;
         padding: 12px 20px;
         box-sizing: border-box;
         background: #141F52;
@@ -181,6 +184,7 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
     @media (max-width: 768px) {
         .jashs-header {
             width: 100vw;
+            margin-left: 0;
             min-height: 64px;
             padding: 10px 14px;
             margin-bottom: 16px;

@@ -16,7 +16,7 @@ if ($code === '' || strlen($code) > 120 || !preg_match('/^[A-Za-z0-9_-]+$/', $co
     exit('Invalid QR code.');
 }
 
-if (!in_array($type, ['auto', 'book', 'student'], true)) {
+if (!in_array($type, ['auto', 'book', 'student', 'teacher'], true)) {
     $type = 'auto';
 }
 
@@ -59,9 +59,21 @@ if (!$record && ($type === 'book' || $type === 'auto')) {
     }
 }
 
+if (!$record && ($type === 'teacher' || $type === 'auto')) {
+    $stmt = $conn->prepare("SELECT teacher_id, qr_code, COALESCE(is_archived,0) AS is_archived, status FROM teachers WHERE qr_code = ? LIMIT 1");
+    $stmt->bind_param('s', $code);
+    $stmt->execute();
+    $teacher = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($teacher && (int)$teacher['is_archived'] === 0 && $teacher['status'] === 'active') {
+        $record = $teacher;
+        $resolvedType = 'teacher';
+    }
+}
+
 $actorType = function_exists('isAdmin') && isAdmin()
     ? 'admin'
-    : (isset($_SESSION['student_id']) ? 'student' : 'guest');
+    : (isset($_SESSION['student_id']) ? 'student' : (isset($_SESSION['teacher_id']) ? 'teacher' : 'guest'));
 
 if (!$record) {
     qrSecurityLog(
@@ -80,7 +92,7 @@ if (!$record) {
 
 $targetId = $resolvedType === 'student'
     ? (int)$record['student_id']
-    : (int)$record['book_id'];
+    : ($resolvedType === 'teacher' ? (int)$record['teacher_id'] : (int)$record['book_id']);
 
 qrSecurityLog(
     $conn,
