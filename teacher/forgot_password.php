@@ -1,7 +1,7 @@
 <?php
 /**
- * Student Password Recovery - Jose Abad Santos High School
- * Email verification is used only to reset an existing student's password.
+ * Teacher Password Recovery - Jose Abad Santos High School
+ * Email verification is used only to reset an existing teacher's password.
  */
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/gmail_smtp.php';
@@ -14,7 +14,7 @@ $cooldown = 0;
 
 if (isset($_GET['cancel'])) {
     unset(
-        $_SESSION['password_reset_student_id'],
+        $_SESSION['password_reset_teacher_id'],
         $_SESSION['password_reset_email'],
         $_SESSION['password_reset_name'],
         $_SESSION['password_reset_code_hash'],
@@ -35,24 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'request_code') {
             $email = strtolower(trim((string)($_POST['email'] ?? '')));
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                throw new RuntimeException('Enter a valid registered student email.');
+                throw new RuntimeException('Enter a valid registered teacher email.');
             }
 
-            $lock = isLoginLocked($conn, 'student_password_reset', $email);
+            $lock = isLoginLocked($conn, 'teacher_password_reset', $email);
             if ($lock['locked']) {
                 $minutes = max(1, (int)ceil($lock['seconds'] / 60));
                 throw new RuntimeException("Too many requests. Try again in about {$minutes} minute(s).");
             }
 
-            $stmt = $conn->prepare("SELECT student_id, full_name, email, status FROM students WHERE LOWER(email) = ? AND status = 'active' AND COALESCE(is_archived,0) = 0 LIMIT 1");
+            $stmt = $conn->prepare("SELECT teacher_id, full_name, email, status FROM teachers WHERE LOWER(email) = ? AND status = 'active' AND COALESCE(is_archived,0) = 0 LIMIT 1");
             $stmt->bind_param('s', $email);
             $stmt->execute();
-            $student = $stmt->get_result()->fetch_assoc();
+            $teacher = $stmt->get_result()->fetch_assoc();
             $stmt->close();
 
             // Do not reveal whether the email exists to unauthenticated users.
-            if (!$student) {
-                recordFailedLogin($conn, 'student_password_reset', $email);
+            if (!$teacher) {
+                recordFailedLogin($conn, 'teacher_password_reset', $email);
                 throw new RuntimeException('If that email is registered, a verification code will be sent.');
             }
 
@@ -63,30 +63,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $code = generateOtpCode();
-            sendStudentPasswordResetEmail($student['email'], $student['full_name'], $code);
+            sendTeacherPasswordResetEmail($teacher['email'], $teacher['full_name'], $code);
 
-            $_SESSION['password_reset_student_id'] = (int)$student['student_id'];
-            $_SESSION['password_reset_email'] = $student['email'];
-            $_SESSION['password_reset_name'] = $student['full_name'];
+            $_SESSION['password_reset_teacher_id'] = (int)$teacher['teacher_id'];
+            $_SESSION['password_reset_email'] = $teacher['email'];
+            $_SESSION['password_reset_name'] = $teacher['full_name'];
             $_SESSION['password_reset_code_hash'] = password_hash($code, PASSWORD_DEFAULT);
             $_SESSION['password_reset_code_expires'] = time() + 300;
             $_SESSION['password_reset_attempts'] = 0;
             $_SESSION['password_reset_last_sent'] = time();
             $_SESSION['password_reset_step'] = 'verify';
 
-            clearFailedLogins($conn, 'student_password_reset', $email);
-            $message = 'A 6-digit verification code has been sent to ' . maskEmail($student['email']) . '.';
+            clearFailedLogins($conn, 'teacher_password_reset', $email);
+            $message = 'A 6-digit verification code has been sent to ' . maskEmail($teacher['email']) . '.';
             $message_type = 'success';
-            $masked_email = maskEmail($student['email']);
+            $masked_email = maskEmail($teacher['email']);
             $step = 'verify';
         }
 
         if ($action === 'verify_code') {
-            $studentId = (int)($_SESSION['password_reset_student_id'] ?? 0);
+            $teacherId = (int)($_SESSION['password_reset_teacher_id'] ?? 0);
             $email = (string)($_SESSION['password_reset_email'] ?? '');
             $code = preg_replace('/\D+/', '', (string)($_POST['code'] ?? ''));
 
-            if ($studentId <= 0 || !filter_var($email, FILTER_VALIDATE_EMAIL) || empty($_SESSION['password_reset_code_hash'])) {
+            if ($teacherId <= 0 || !filter_var($email, FILTER_VALIDATE_EMAIL) || empty($_SESSION['password_reset_code_hash'])) {
                 throw new RuntimeException('Your password recovery session has expired. Start again.');
             }
             if (time() > (int)($_SESSION['password_reset_code_expires'])) {
@@ -111,12 +111,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'reset_password') {
-            $studentId = (int)($_SESSION['password_reset_student_id'] ?? 0);
+            $teacherId = (int)($_SESSION['password_reset_teacher_id'] ?? 0);
             $verifiedUntil = (int)($_SESSION['password_reset_verified_until'] ?? 0);
             $newPassword = (string)($_POST['new_password'] ?? '');
             $confirmPassword = (string)($_POST['confirm_password'] ?? '');
 
-            if ($studentId <= 0 || $verifiedUntil < time()) {
+            if ($teacherId <= 0 || $verifiedUntil < time()) {
                 throw new RuntimeException('Your password reset authorization expired. Start again.');
             }
 
@@ -129,8 +129,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $hash = password_hash($newPassword, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE students SET password = ? WHERE student_id = ? AND status = 'active' AND COALESCE(is_archived,0) = 0");
-            $stmt->bind_param('si', $hash, $studentId);
+            $stmt = $conn->prepare("UPDATE teachers SET password = ? WHERE teacher_id = ? AND status = 'active' AND COALESCE(is_archived,0) = 0");
+            $stmt->bind_param('si', $hash, $teacherId);
             if (!$stmt->execute() || $stmt->affected_rows < 1) {
                 $stmt->close();
                 throw new RuntimeException('Unable to update your password. Please try again.');
@@ -138,11 +138,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
 
             $email = (string)($_SESSION['password_reset_email'] ?? '');
-            clearFailedLogins($conn, 'student_password_reset', $email);
+            clearFailedLogins($conn, 'teacher_password_reset', $email);
             session_regenerate_id(true);
 
             unset(
-                $_SESSION['password_reset_student_id'],
+                $_SESSION['password_reset_teacher_id'],
                 $_SESSION['password_reset_email'],
                 $_SESSION['password_reset_name'],
                 $_SESSION['password_reset_code_hash'],
@@ -176,7 +176,7 @@ if (!$masked_email && !empty($_SESSION['password_reset_email'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Student Password Recovery - JASHS Library</title>
+<title>Teacher Password Recovery - JASHS Library</title>
 <style>
 :root{--navy:#141F52;--blue:#52618D;--sky:#91B0E0;--light:#D2E2F6;--yellow:#F4F916;--white:#FEFEF9;--text:#202A44}
 *{box-sizing:border-box}
@@ -210,7 +210,7 @@ h1{margin:0 0 8px;text-align:center;color:var(--navy);font-size:24px}p.desc{text
     <input type="hidden" name="action" value="request_code">
     <div class="group">
         <label for="email">Registered Email</label>
-        <input type="email" id="email" name="email" required autocomplete="email" placeholder="student@gmail.com">
+        <input type="email" id="email" name="email" required autocomplete="email" placeholder="teacher@gmail.com">
     </div>
     <button class="btn" type="submit">Send Verification Code</button>
     <a class="btn secondary" href="/LibraryBorrowingSystem/login.php" style="display:block;text-align:center;text-decoration:none;">Back to Login</a>

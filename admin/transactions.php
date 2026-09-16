@@ -123,7 +123,7 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
     <table>
         <thead>
             <tr>
-                <th>ID</th><th>Student</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th>
+                <th>ID</th><th>Borrower</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th>
             </tr>
         </thead>
         <tbody>
@@ -132,7 +132,7 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
         <?php else: foreach ($transactions as $t): ?>
             <tr>
                 <td>#<?php echo (int)$t['transaction_id']; ?></td>
-                <td><?php echo h($t['student_name']); ?><br><small><?php echo h($t['student_no']); ?></small></td>
+                <td><?php echo h($t['borrower_name']); ?><br><small><?php echo h($t['borrower_no']); ?></small></td>
                 <td><?php echo h($t['book_title']); ?><br><small><?php echo h($t['book_number']); ?></small></td>
                 <td><?php echo h(date('M d, Y h:i A', strtotime($t['date_borrowed']))); ?></td>
                 <td><?php echo h(date('M d, Y', strtotime($t['due_date']))); ?> (same day)</td>

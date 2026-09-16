@@ -210,3 +210,5 @@
 [2026-09-14 17:45:56] Borrower QR lookup failed: Illegal mix of collations for operation 'UNION'
 [2026-09-14 17:48:20] Unified QR transaction error: Data truncated for column 'borrow_condition' at row 1
 [2026-09-14 18:15:26] Attendance error: Active student not found. Check the QR code or student ID number.
+[2026-09-15 14:38:36] Student profile error: Unknown column 'teacher_id' in 'field list'
+[2026-09-16 19:17:15] Login attempt: Invalid login credentials or inactive account.

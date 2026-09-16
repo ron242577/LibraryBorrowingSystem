@@ -303,7 +303,9 @@ try {
         @media(max-width:700px){.page-header{height:60px;padding:0 16px;}.student-header-actions{gap:4px;}}
         .theme-switch{display:block;width:calc(100% - 36px);margin:8px 18px;padding:9px 12px;border:1px solid #D2E2F6;border-radius:8px;background:#fff;color:#202A44;cursor:pointer;font-weight:700;text-align:left}
         body.dark{background:#0d132d;color:#f4f7ff}body.dark .page-header,body.dark .card{background:#18213f;color:#f4f7ff}body.dark .page-title h1,body.dark .card-header,body.dark .profile-name h2,body.dark .info-value,body.dark .book-title{color:#f4f7ff}body.dark .page-title p,body.dark .profile-name p,body.dark .info-label,body.dark .book-meta{color:#b7c5e2}body.dark .info-item,body.dark .book-row,body.dark .qr-box,body.dark .student-dropdown{background:#222d4d;color:#f4f7ff;border-color:#3c4b72} 
-        </style>
+        
+body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .card,body.dark .teacher-dropdown{background:#18213f!important;color:#f4f7ff;border-color:#33456f}body.dark .card-header,body.dark .page-title h1,body.dark .profile-name h2,body.dark .info-value,body.dark .book-title{color:#fff}body.dark .page-title p,body.dark .profile-name p,body.dark .info-label,body.dark .book-meta{color:#c4d1ea}body.dark .info-item,body.dark .book-row,body.dark .qr-box{background:#222d4d;border-color:#3b4d78}body.dark a{color:#fff}
+</style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
 <body class="student-app student-profile-page">
