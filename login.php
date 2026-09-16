@@ -430,7 +430,7 @@ $csrf = csrfToken();
             color:transparent;
             animation:shimmer 5s linear infinite;
         }
-        .brand-middle p { font-size:14.5px; line-height:1.65; color:var(--light); opacity:.95; }
+        .brand-middle p { font-size:14.5px; line-height:1.65; color:var(--white); opacity:.95; }
 
         .brand-bottom { display:flex; flex-wrap:wrap; gap:clamp(10px, 2vw, 26px); animation:fadeSlideUp .7s ease-out .2s both; }
         .brand-stat {
@@ -736,14 +736,9 @@ $csrf = csrfToken();
             <div class="brand-middle">
                 <span class="brand-pill"><span class="dot"></span>Proud to be Abadians</span>
                 <h2>Welcome back to the <em>JASHS Library</em>.</h2>
-                <p>Sign in to borrow books, track due dates, and manage your library account — anytime, anywhere on campus.</p>
+                <p>Sign in to borrow books, track due dates, and manage your library account anytime, anywhere on campus.</p>
             </div>
 
-            <div class="brand-bottom">
-                <div class="brand-stat"><strong>24/7</strong><span>Online catalog access</span></div>
-                <div class="brand-stat"><strong>Secure</strong><span>Rate-limited logins</span></div>
-                <div class="brand-stat"><strong>Fast</strong><span>Borrow &amp; return tracking</span></div>
-            </div>
         </div>
     </div>
 
@@ -780,7 +775,7 @@ $csrf = csrfToken();
                         <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
                     </div>
                     <div class="forgot-password-row">
-                        <a class="forgot-password-link" href="/LibraryBorrowingSystem/student/forgot_password.php">Forgot Password?</a>
+                        <a class="forgot-password-link" href="/LibraryBorrowingSystem/forgot_password.php">Forgot Password?</a>
                     </div>
                 </div>
                 <button type="submit">

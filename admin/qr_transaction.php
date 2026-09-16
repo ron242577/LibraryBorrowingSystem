@@ -227,6 +227,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                     $transaction_details = [
                         'mode' => 'Return',
                         'transaction_id' => $transaction_id,
+                        'borrower_name' => $book['borrower_name'] ?? 'Unknown',
+                        'borrower_no' => $book['borrower_no'] ?? 'N/A',
                         'student_name' => $book['borrower_name'] ?? 'Unknown',
                         'student_no' => $book['borrower_no'] ?? 'N/A',
                         'borrower_type' => $book['borrower_type'] ?? 'student',
@@ -363,6 +365,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                                         $transaction_details = [
                                             'mode' => 'Borrow',
                                             'transaction_id' => $transaction_id,
+                                            'borrower_name' => $student['full_name'],
+                                            'borrower_no' => $student['borrower_no'] ?? 'N/A',
                                             'student_name' => $student['full_name'],
                                             'student_no' => $student['borrower_no'] ?? 'N/A',
                                             'borrower_type' => $student['borrower_type'],
@@ -500,7 +504,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 <h3><?php echo h($transaction_details['mode']); ?> Transaction Details</h3>
                 <div class="summary-grid">
                     <div class="summary-item"><div class="summary-label">Transaction ID</div><div class="summary-value">#<?php echo h($transaction_details['transaction_id']); ?></div></div>
-                    <div class="summary-item"><div class="summary-label">Borrower</div><div class="summary-value"><?php echo h($transaction_details['student_name']); ?> (<?php echo h($transaction_details['student_no']); ?>)</div></div>
+                    <div class="summary-item"><div class="summary-label">Borrower</div><div class="summary-value"><?php echo h($transaction_details['borrower_name'] ?? $transaction_details['student_name'] ?? 'N/A'); ?> (<?php echo h($transaction_details['borrower_no'] ?? $transaction_details['student_no'] ?? 'N/A'); ?>)</div></div>
                     <div class="summary-item"><div class="summary-label">Book</div><div class="summary-value"><?php echo h($transaction_details['book_title']); ?></div></div>
                     <div class="summary-item"><div class="summary-label">Author</div><div class="summary-value"><?php echo h($transaction_details['book_author']); ?></div></div>
                     <div class="summary-item"><div class="summary-label">Borrowed</div><div class="summary-value"><?php echo h(date('M d, Y', strtotime($transaction_details['date_borrowed']))); ?></div></div>
