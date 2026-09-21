@@ -102,7 +102,7 @@ h1{text-align:center;color:var(--navy);font-size:24px;margin:0 0 8px}.desc{text-
 
 <?php if($step==='request'): ?>
 <form method="post"><?=csrfField()?><input type="hidden" name="action" value="request">
-<div class="group"><label>Registered Email</label><input type="email" name="email" placeholder="student@gmail.com or teacher@gmail.com" required></div>
+<div class="group"><label>Registered Email</label><input type="email" name="email" placeholder="student@gmail.com" required></div>
 <button class="btn">Send Verification Code</button>
 <a class="btn secondary" href="/LibraryBorrowingSystem/login.php">Back to Login</a></form>
 

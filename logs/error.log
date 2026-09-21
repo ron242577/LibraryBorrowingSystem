@@ -212,3 +212,9 @@
 [2026-09-14 18:15:26] Attendance error: Active student not found. Check the QR code or student ID number.
 [2026-09-15 14:38:36] Student profile error: Unknown column 'teacher_id' in 'field list'
 [2026-09-16 19:17:15] Login attempt: Invalid login credentials or inactive account.
+[2026-09-17 12:34:29] Login attempt: Invalid login credentials or inactive account.
+[2026-09-17 12:38:09] Login attempt: Invalid login credentials or inactive account.
+[2026-09-17 12:51:54] Login attempt: Invalid login credentials or inactive account.
+[2026-09-21 11:28:28] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-21 11:29:04] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-21 11:29:05] Table 'library_borrowing_system.book_reservations' doesn't exist

@@ -1560,19 +1560,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <a id="selectedBookQRDownload" class="qr-download-btn" href="#">Download Book QR</a>
             </div>
             
-            <!-- Reservation Button -->
-            <div id="reservationActions" style="display:none;margin-top:20px;">
-                <div class="modal-note" style="margin-bottom:12px;">
-                    This book is currently unavailable. Reserve it to be notified when a copy is returned.
-                </div>
-                <form method="POST" id="reservationForm">
-                    <?php echo csrfField(); ?>
-                    <input type="hidden" name="action" value="create_reservation">
-                    <input type="hidden" name="book_id" id="reserveBookId" value="">
-                    <button type="submit" class="borrow-btn reserve-button" id="reserveBookButton">Reserve This Book</button>
-                </form>
-            </div>
-
             <!-- Borrow Button -->
             <form method="POST" id="borrowForm" style="margin-top: 20px;">
                 <?php echo csrfField(); ?>
