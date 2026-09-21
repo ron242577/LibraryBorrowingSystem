@@ -486,13 +486,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
             </a>
 
-            <a href="/LibraryBorrowingSystem/admin/reservations.php" class="card-link">
-                <div class="card">
-                    <h2>Reservations</h2>
-                    <p>Manage student book reservations, waiting lists, ready reservations, and cancellations.</p>
-                </div>
-            </a>
-
             <a href="/LibraryBorrowingSystem/admin/backup_management.php" class="card-link">
                 <div class="card">
                     <h2>Backup & Restore</h2>

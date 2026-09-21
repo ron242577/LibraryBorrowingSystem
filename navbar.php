@@ -279,9 +279,6 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
             <a href="/LibraryBorrowingSystem/admin/transactions.php" class="sidebar-link <?php echo isActiveNav('/admin/transactions.php'); ?>">Transaction Records</a>
         </li>
         <li class="sidebar-item">
-            <a href="/LibraryBorrowingSystem/admin/reservations.php" class="sidebar-link <?php echo isActiveNav('/admin/reservations.php'); ?>">Reservations</a>
-        </li>
-        <li class="sidebar-item">
             <a href="/LibraryBorrowingSystem/admin/staff_management.php" class="sidebar-link <?php echo isActiveNav('/admin/staff_management.php'); ?>">Staff Management</a>
         </li>
         <li class="sidebar-item">

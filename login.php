@@ -284,168 +284,134 @@ $csrf = csrfToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Library Login - Jose Abad Santos High School</title>
+    <!-- Literata (a typeface made for reading books) + Public Sans. Falls back to Georgia / Segoe UI if offline. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500..700&family=Public+Sans:wght@400..700&display=swap" rel="stylesheet">
     <style>
-        :root { --navy:#141F52; --blue:#52618D; --sky:#91B0E0; --light:#D2E2F6; --yellow:#F4F916; --white:#FEFEF9; --text:#202A44; }
+        :root {
+            --navy:#141F52; --blue:#52618D; --sky:#91B0E0; --light:#D2E2F6; --yellow:#F4F916; --white:#FEFEF9; --text:#202A44;
+            --paper:#ECF2FA;
+            --muted:#414D73;
+            --field-border:#8090B0;
+
+            /* Frosted-glass surfaces. One place to retune how see-through the card is. */
+            --glass:rgba(254,254,249,.74);
+            --glass-strong:rgba(255,255,255,.86);
+            --glass-field:rgba(255,255,255,.62);
+            --glass-field-focus:rgba(255,255,255,.92);
+            --glass-border:rgba(255,255,255,.55);
+            --glass-line:rgba(32,42,68,.16);
+            --blur:blur(22px) saturate(140%);
+            --serif:'Literata', Georgia, 'Times New Roman', serif;
+            --sans:'Public Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
         * { margin:0; padding:0; box-sizing:border-box; }
         html, body { height:100%; }
         body {
-            font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+            font-family:var(--sans);
             color:var(--text);
             min-height:100vh;
-            background:
-                radial-gradient(1100px 700px at 12% -10%, rgba(145,176,224,.35), transparent 60%),
-                radial-gradient(900px 600px at 100% 100%, rgba(20,31,82,.10), transparent 55%),
-                var(--light);
+            background:#0d1533;
             overflow-x:hidden;
+            -webkit-font-smoothing:antialiased;
         }
 
-        @keyframes fadeSlideUp {
-            from { opacity:0; transform:translateY(18px); }
-            to   { opacity:1; transform:translateY(0); }
-        }
-        @keyframes fadeSlideLeft {
-            from { opacity:0; transform:translateX(-16px); }
-            to   { opacity:1; transform:translateX(0); }
-        }
-        @keyframes shimmer {
-            0%   { background-position:0% 50%; }
-            100% { background-position:200% 50%; }
-        }
+        /* One slow settle on the photos when the page loads. Nothing else animates on its own. */
         @keyframes gentleZoom {
-            from { transform:scale(1.06); }
+            from { transform:scale(1.05); }
             to   { transform:scale(1); }
         }
+        @keyframes spin { to { transform:rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration:0.001ms !important; animation-iteration-count:1 !important; }
+            *, *::before, *::after { animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
         }
 
+        /* ---------- Full-page photo background ---------- */
+        .bg {
+            position:fixed;
+            inset:0;
+            z-index:0;
+            overflow:hidden;
+            background:#0d1533;
+            animation:gentleZoom 14s ease-out forwards;
+        }
+        .bg-photo { position:absolute; top:0; height:100%; width:58%; overflow:hidden; }
+        .bg-photo img { display:block; width:100%; height:100%; object-fit:cover; }
+        /* Two photos meet on a slanted seam; the thin dark gap between them is the .bg colour. */
+        .bg-a { left:0;  z-index:1; clip-path:polygon(0 0, 100% 0, 83% 100%, 0 100%); }
+        .bg-b { right:0;            clip-path:polygon(28.6% 0, 100% 0, 100% 100%, 11.6% 100%); }
+        .bg-a img { object-position:center 40%; }
+        .bg-b img { object-position:60% 50%; }
+        /* Dark only where text sits (top row, bottom copy); the right side stays light enough to see the room. */
+        .bg::after {
+            content:"";
+            position:absolute;
+            inset:0;
+            z-index:2;
+            background:
+                linear-gradient(180deg, rgba(13,21,51,.62) 0%, rgba(13,21,51,.10) 20%, rgba(13,21,51,.10) 52%, rgba(13,21,51,.80) 100%),
+                linear-gradient(90deg, rgba(13,21,51,0) 46%, rgba(13,21,51,.42) 100%);
+        }
+
+        /* ---------- Layout on top of the photos ---------- */
         .page-shell {
+            position:relative;
+            z-index:1;
             min-height:100vh;
             min-height:100dvh;
             display:grid;
-            grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr);
+            grid-template-columns: minmax(0, 1.15fr) minmax(400px, 1fr);
         }
-
         @media(min-width:1600px){
-            .page-shell { grid-template-columns: minmax(0, 1.35fr) minmax(460px, 1fr); }
+            .page-shell { grid-template-columns: minmax(0, 1.35fr) minmax(500px, 1fr); }
         }
         @media(min-width:981px) and (max-width:1180px){
             .page-shell { grid-template-columns: 1fr 1fr; }
         }
 
-        /* ---------- Left: campus photo panel ---------- */
         .brand-panel {
-            position:relative;
-            min-height:100vh;
-            overflow:hidden;
-            background:#0d1533;
-            clip-path: polygon(0 0, 100% 0, 92% 100%, 0% 100%);
-        }
-        .brand-panel img {
-            position:absolute;
-            inset:0;
-            width:100%;
-            height:100%;
-            object-fit:cover;
-            object-position:center 35%;
-            filter:saturate(1.05) contrast(1.02);
-            animation:gentleZoom 16s ease-out forwards;
-        }
-        .brand-panel::before {
-            content:"";
-            position:absolute;
-            inset:0;
-            background:
-                linear-gradient(180deg, rgba(20,31,82,.62) 0%, rgba(20,31,82,.32) 38%, rgba(13,21,51,.85) 100%),
-                linear-gradient(90deg, rgba(20,31,82,.25) 0%, rgba(20,31,82,0) 42%);
-        }
-        .brand-panel::after {
-            content:"";
-            position:absolute;
-            right:-90px; top:-90px;
-            width:280px; height:280px;
-            border-radius:50%;
-            background:rgba(244,249,22,.14);
-        }
-        .brand-texture {
-            position:absolute;
-            inset:0;
-            z-index:1;
-            opacity:.5;
-            background-image: radial-gradient(rgba(254,254,249,.14) 1px, transparent 1px);
-            background-size:22px 22px;
-            mix-blend-mode:overlay;
-            pointer-events:none;
-        }
-        .brand-content {
-            position:relative;
-            z-index:2;
-            height:100%;
             display:flex;
             flex-direction:column;
             justify-content:space-between;
-            padding:clamp(28px, 4vw, 44px) clamp(32px, 6vw, 66px) clamp(28px, 4vw, 44px) clamp(24px, 4vw, 46px);
+            min-height:100vh;
+            min-height:100dvh;
+            padding:clamp(28px, 4vw, 44px) clamp(28px, 5vw, 64px) clamp(32px, 5vw, 56px) clamp(28px, 4vw, 48px);
             color:var(--white);
+            text-shadow:0 1px 14px rgba(8,14,40,.55);
         }
-        .brand-top {
-            display:flex; align-items:center; gap:14px;
-            animation:fadeSlideLeft .6s ease-out both;
-        }
-        .brand-top img.brand-logo {
-            height:54px; width:54px; object-fit:contain;
+        .brand-top { display:flex; align-items:center; gap:14px; }
+        .brand-logo {
+            height:56px; width:56px; flex-shrink:0; object-fit:contain;
             background:var(--white);
-            border-radius:10px;
-            padding:6px;
-            box-shadow:0 6px 16px rgba(0,0,0,.25);
+            border-radius:50%;
+            padding:4px;
+            box-shadow:0 4px 14px rgba(0,0,0,.28);
         }
-        .brand-top .brand-name { margin-left: 70px; margin-top: 9px; font-size:13px; font-weight:700; letter-spacing:.04em; line-height:1.4; opacity:.92; }
-        .brand-top .brand-name strong { display:block; font-size:15px; letter-spacing:.02em; }
-        .logo{display:flex;justify-content:center;margin-bottom:18px}.logo img{width:78px;height:78px;object-fit:cover;border-radius:50%;border:3px solid var(--yellow)}
-        .brand-middle { max-width:420px; animation:fadeSlideUp .7s ease-out .1s both; }
-        .brand-pill {
-            display:inline-flex; align-items:center; gap:8px;
-            background:rgba(244,249,22,.16);
-            border:1px solid rgba(244,249,22,.45);
+        .brand-name { font-size:13px; font-weight:500; line-height:1.4; }
+        .brand-name strong { display:block; font-size:16px; font-weight:700; }
+
+        .brand-middle { max-width:30rem; }
+        .brand-middle h2 {
+            font-family:var(--serif);
+            font-size:clamp(28px, 3vw, 42px);
+            line-height:1.16;
+            font-weight:600;
+            letter-spacing:-.015em;
+            margin-bottom:14px;
+            text-wrap:balance;
+        }
+        .brand-middle p { font-size:15.5px; line-height:1.6; color:var(--white); opacity:.94; max-width:28rem; }
+        .brand-middle .brand-motto {
+            margin-top:22px;
+            font-family:var(--serif);
+            font-style:italic;
+            font-size:15px;
             color:var(--yellow);
-            padding:6px 13px;
-            border-radius:999px;
-            font-size:11.5px;
-            font-weight:800;
-            letter-spacing:.06em;
-            text-transform:uppercase;
-            margin-bottom:18px;
+            opacity:1;
         }
-        .brand-pill .dot {
-            width:6px; height:6px; border-radius:50%;
-            background:var(--yellow);
-            box-shadow:0 0 0 3px rgba(244,249,22,.25);
-        }
-        .brand-middle h2 { font-size:clamp(21px, 2.4vw, 33px); line-height:1.26; margin-bottom:14px; font-weight:800; letter-spacing:-.01em; }
-        .brand-middle h2 em {
-            font-style:normal;
-            background:linear-gradient(90deg, var(--yellow), #fff8a8, var(--yellow));
-            background-size:220% auto;
-            -webkit-background-clip:text;
-            background-clip:text;
-            color:transparent;
-            animation:shimmer 5s linear infinite;
-        }
-        .brand-middle p { font-size:14.5px; line-height:1.65; color:var(--white); opacity:.95; }
 
-        .brand-bottom { display:flex; flex-wrap:wrap; gap:clamp(10px, 2vw, 26px); animation:fadeSlideUp .7s ease-out .2s both; }
-        .brand-stat {
-            padding:14px 16px;
-            border-radius:12px;
-            background:rgba(254,254,249,.07);
-            border:1px solid rgba(254,254,249,.14);
-            backdrop-filter:blur(6px);
-            flex:1 1 120px;
-        }
-        .brand-stat strong { display:block; font-size:19px; color:var(--yellow); font-weight:800; }
-        .brand-stat span { font-size:11px; color:var(--light); opacity:.9; }
-
-
-        /* ---------- Right: form panel ---------- */
+        /* ---------- Form ---------- */
         .form-panel {
             display:flex;
             align-items:center;
@@ -454,291 +420,289 @@ $csrf = csrfToken();
             padding-left: max(24px, env(safe-area-inset-left));
             padding-right: max(24px, env(safe-area-inset-right));
             padding-bottom: max(40px, env(safe-area-inset-bottom));
-            background:var(--light);
-            position:relative;
         }
         .login-container {
-            background:var(--white);
-            padding:40px 38px;
-            border:1px solid var(--sky);
-            border-radius:18px;
-            box-shadow:0 24px 48px rgba(20,31,82,.18), 0 2px 8px rgba(20,31,82,.06);
-            width:100%;
-            max-width:410px;
             position:relative;
-            animation:fadeSlideUp .55s ease-out both;
-            transition:box-shadow .25s ease, transform .25s ease;
+            background:var(--glass);
+            -webkit-backdrop-filter:var(--blur);
+            backdrop-filter:var(--blur);
+            padding:40px 38px 32px;
+            border:1px solid var(--glass-border);
+            border-radius:18px;
+            box-shadow:
+                0 28px 70px rgba(8,14,40,.42),
+                0 2px 8px rgba(8,14,40,.14),
+                inset 0 1px 0 rgba(255,255,255,.7);
+            width:100%;
+            max-width:420px;
         }
-        .login-container:hover {
-            box-shadow:0 28px 56px rgba(20,31,82,.22), 0 2px 10px rgba(20,31,82,.08);
-        }
+        /* A faint sheen along the top edge, so the panel reads as glass rather than a flat wash. */
         .login-container::before {
             content:"";
             position:absolute;
-            top:0; left:24px; right:24px;
-            height:4px;
-            border-radius:0 0 6px 6px;
-            background:linear-gradient(90deg, var(--navy), var(--blue), var(--yellow), var(--blue), var(--navy));
-            background-size:220% auto;
-            animation:shimmer 6s linear infinite;
+            inset:0;
+            border-radius:inherit;
+            pointer-events:none;
+            background:linear-gradient(170deg, rgba(255,255,255,.34) 0%, rgba(255,255,255,0) 42%);
         }
-        .logo-container { text-align:center; margin-bottom:14px; }
-        .logo-container img {
-            height:78px; width:auto; max-width:100%; object-fit:contain;
-            filter:drop-shadow(0 6px 12px rgba(20,31,82,.18));
+        .login-container > * { position:relative; }
+
+        /* Without blur support, lean opaque instead: legibility wins over the effect. */
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            .login-container { background:rgba(254,254,249,.95); }
+            input { background:rgba(255,255,255,.96); }
         }
-        .login-header { text-align:center; margin-bottom:26px; }
-        .login-header h1 { color:var(--navy); margin-bottom:6px; font-size:25px; font-weight:800; letter-spacing:-.01em; }
-        .login-header p { color:var(--blue); font-size:13.5px; line-height:1.5; }
-        .account-note { margin:0 0 20px; padding:12px; border-radius:7px; background:#EDF3FA; color:var(--blue); font-size:12px; line-height:1.5; text-align:center; }
+        /* Respect a reader who has asked the OS for less transparency. */
+        @media (prefers-reduced-transparency: reduce) {
+            .login-container { background:var(--white); backdrop-filter:none; -webkit-backdrop-filter:none; }
+            .login-container::before { display:none; }
+            input { background:#FBFDFF; }
+        }
+        .logo { display:none; justify-content:center; margin-bottom:12px; }
+        .logo img { width:56px; height:56px; object-fit:cover; border-radius:50%; border:2px solid var(--navy); }
+
+        .login-header { margin-bottom:26px; }
+        .login-header h1 {
+            font-family:var(--serif);
+            color:var(--navy);
+            font-size:30px;
+            line-height:1.15;
+            font-weight:700;
+            letter-spacing:-.015em;
+            margin-bottom:8px;
+        }
+        .login-header p { color:var(--muted); font-size:14px; line-height:1.55; text-wrap:pretty; }
 
         .form-group { margin-bottom:18px; }
-        label { display:block; margin-bottom:7px; color:var(--text); font-weight:700; font-size:13px; }
+        label { display:block; margin-bottom:7px; color:var(--text); font-weight:600; font-size:14px; }
+        .label-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:7px; }
+        .label-row label { margin-bottom:0; }
+        .field-hint { margin-top:7px; color:var(--muted); font-size:12.5px; line-height:1.5; }
+        .caps-hint { color:#8A4B00; font-weight:600; }
 
         .input-icon-wrap { position:relative; }
         .input-icon-wrap svg {
             position:absolute;
-            left:13px; top:50%;
+            left:14px; top:50%;
             transform:translateY(-50%);
-            width:17px; height:17px;
-            stroke:var(--blue);
+            width:18px; height:18px;
+            stroke:var(--muted);
             pointer-events:none;
             transition:stroke .15s;
         }
-        .input-icon-wrap input { padding-left:40px; }
-        .input-icon-wrap input:focus + svg,
+        .input-icon-wrap input { padding-left:42px; }
         .input-icon-wrap:focus-within svg { stroke:var(--navy); }
 
         input {
             width:100%;
+            height:48px;
             padding:12px 14px;
-            border:1.5px solid var(--sky);
-            border-radius:9px;
+            border:1.5px solid var(--field-border);
+            border-radius:10px;
+            font-family:inherit;
             font-size:16px;
-            background:#FBFDFF;
+            color:var(--text);
+            background:var(--glass-field);
             transition:border-color .15s, box-shadow .15s, background .15s;
         }
-        input::placeholder { color:#9BAAC7; }
-        input:hover { border-color:var(--blue); }
-        input:focus { outline:none; border-color:var(--navy); background:var(--white); box-shadow:0 0 0 4px rgba(20,31,82,.10); }
+        input::placeholder { color:#5E6B92; }
+        input:hover { border-color:var(--blue); background:rgba(255,255,255,.76); }
+        input:focus {
+            outline:none;
+            border-color:var(--navy);
+            background:var(--glass-field-focus);
+            box-shadow:0 0 0 4px rgba(20,31,82,.20);
+        }
 
         button[type="submit"] {
             width:100%;
-            padding:13px;
-            background:var(--navy);
-            color:white;
+            height:50px;
+            margin-top:6px;
+            background:linear-gradient(180deg, #23316E 0%, var(--navy) 100%);
+            color:#fff;
             border:0;
-            border-radius:9px;
-            font-size:15px;
-            font-weight:800;
+            border-radius:10px;
+            font-family:inherit;
+            font-size:16px;
+            font-weight:700;
             letter-spacing:.01em;
             cursor:pointer;
-            transition:.2s;
-            box-shadow:0 8px 18px rgba(20,31,82,.28);
-            display:flex; align-items:center; justify-content:center; gap:8px;
+            box-shadow:0 8px 20px rgba(20,31,82,.34), inset 0 1px 0 rgba(255,255,255,.16);
+            transition:background .15s, box-shadow .15s, transform .12s;
+            display:flex; align-items:center; justify-content:center; gap:10px;
         }
-        button[type="submit"] svg { width:16px; height:16px; transition:transform .2s; }
-        button[type="submit"]:hover { background:var(--blue); transform:translateY(-1px); box-shadow:0 10px 22px rgba(20,31,82,.32); }
-        button[type="submit"]:hover svg { transform:translateX(3px); }
-        button[type="submit"]:active { transform:translateY(0); }
-
-        .links { display:grid; gap:10px; margin-top:18px; }
-        .links a { display:block; padding:11px 16px; border-radius:9px; text-align:center; text-decoration:none; font-size:13px; font-weight:700; transition:.15s; }
-        .register-link { background:#E7EEF7; color:var(--navy); }
-        .register-link:hover { background:#D2E2F6; transform:translateY(-1px); }
+        button[type="submit"]:hover { background:linear-gradient(180deg, #2B3A80 0%, #1B2864 100%); box-shadow:0 12px 26px rgba(20,31,82,.42), inset 0 1px 0 rgba(255,255,255,.2); }
+        button[type="submit"]:active { transform:translateY(1px); box-shadow:0 5px 14px rgba(20,31,82,.32); }
+        button[type="submit"]:focus-visible { outline:3px solid var(--sky); outline-offset:3px; }
+        button[type="submit"]:disabled { cursor:progress; background:var(--blue); box-shadow:none; transform:none; }
+        .btn-spinner {
+            display:none;
+            width:16px; height:16px;
+            border:2px solid rgba(255,255,255,.4);
+            border-top-color:#fff;
+            border-radius:50%;
+            animation:spin .7s linear infinite;
+        }
+        button[type="submit"].is-loading .btn-spinner { display:inline-block; }
 
         .divider {
             display:flex; align-items:center; gap:12px;
-            margin:22px 0 6px;
-            color:var(--blue);
-            font-size:11px;
-            font-weight:700;
-            text-transform:uppercase;
-            letter-spacing:.06em;
+            margin:24px 0 14px;
+            color:var(--muted);
+            font-size:13px;
         }
-        .divider::before, .divider::after { content:""; flex:1; height:1px; background:var(--sky); opacity:.6; }
+        .divider::before, .divider::after { content:""; flex:1; height:1px; background:var(--glass-line); }
+
+        .links { display:grid; }
+        .links a {
+            display:block; padding:12px 16px;
+            border:1.5px solid rgba(20,31,82,.55);
+            border-radius:10px;
+            background:rgba(255,255,255,.34);
+            text-align:center; text-decoration:none;
+            font-size:14.5px; font-weight:700;
+            color:var(--navy);
+            transition:background .15s, border-color .15s;
+        }
+        .links a:hover { background:rgba(255,255,255,.78); border-color:var(--navy); }
+        .links a:focus-visible, .forgot-password-link:focus-visible { outline:3px solid var(--sky); outline-offset:2px; }
 
         .security-note {
-            margin-top:14px; padding:12px; border-radius:9px; background:#F7F9FC;
-            color:var(--blue); font-size:11px; line-height:1.5; text-align:center;
-            display:flex; align-items:center; justify-content:center; gap:7px;
+            margin-top:20px;
+            color:var(--muted); font-size:12px; line-height:1.5; text-align:center;
+            text-wrap:pretty;
         }
-        .security-note svg { width:13px; height:13px; flex-shrink:0; stroke:var(--blue); }
+        .security-note svg { display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:-2px; stroke:var(--muted); }
 
-        .password-field {
-            position: relative;
-            width: 100%;
-        }
-
+        .password-field { position:relative; width:100%; }
         .password-field > input[type="password"],
-        .password-field > input[type="text"] {
-            width: 100%;
-            padding-right: 78px !important;
-        }
+        .password-field > input[type="text"] { width:100%; padding-right:78px !important; }
 
         .show-password-btn {
-            position: absolute;
-            top: 50%;
-            right: 8px;
-            transform: translateY(-50%) !important;
-            min-width: 62px !important;
-            width: auto !important;
-            min-height: 34px !important;
-            height: 34px !important;
-            padding: 5px 9px !important;
-            border: 1px solid #D2E2F6 !important;
-            border-radius: 6px !important;
-            background: #F7F9FC !important;
-            color: #52618D !important;
-            box-shadow: none !important;
-            font-size: 11px !important;
-            font-weight: 700 !important;
-            line-height: 1 !important;
-            cursor: pointer;
-            z-index: 2;
+            position:absolute;
+            top:50%;
+            right:8px;
+            transform:translateY(-50%) !important;
+            min-width:62px !important;
+            width:auto !important;
+            min-height:34px !important;
+            height:34px !important;
+            padding:5px 9px !important;
+            border:1px solid rgba(20,31,82,.20) !important;
+            border-radius:7px !important;
+            background:rgba(255,255,255,.72) !important;
+            color:var(--navy) !important;
+            box-shadow:none !important;
+            font-family:inherit !important;
+            font-size:12px !important;
+            font-weight:600 !important;
+            line-height:1 !important;
+            cursor:pointer;
+            z-index:2;
         }
+        .show-password-btn:hover { background:rgba(228,236,248,.95) !important; transform:translateY(-50%) !important; box-shadow:none !important; }
+        .show-password-btn:focus-visible { outline:3px solid var(--sky); outline-offset:1px; }
 
-        .show-password-btn:hover {
-            background: #E7EEF7 !important;
-            color: #141F52 !important;
-            transform: translateY(-50%) !important;
-            box-shadow: none !important;
-        }
+        .forgot-password-link { color:var(--navy); font-size:13px; font-weight:600; text-decoration:none; }
+        .forgot-password-link:hover { text-decoration:underline; }
 
-        .show-password-btn:focus-visible {
-            outline: 2px solid #141F52;
-            outline-offset: 2px;
-        }
-
-        .forgot-password-link {
-            color: #141F52;
-            font-size: 13px;
-            font-weight: 700;
-            text-decoration: none;
-        }
-        .forgot-password-link:hover { text-decoration: underline; }
-
-        .forgot-password-row {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 7px;
-            margin-bottom: 4px;
-        }
-
-        /* ---------- Responsive: tablets & below (stacked layout) ---------- */
-        @media(max-width:980px){
+        /* ---------- Tablets and phones (portrait): photos stack behind a headline banner, card below ---------- */
+        @media(max-width:980px) and (min-height:561px){
             .page-shell { grid-template-columns:1fr; }
-            .brand-panel {
-                min-height:clamp(200px, 34vh, 320px);
-                clip-path: polygon(0 0, 100% 0, 100% 92%, 0 100%);
-            }
-            .brand-panel img { animation:none; }
-            .brand-content { padding:24px clamp(20px, 5vw, 32px); }
-            .brand-bottom { display:none; }
+            .bg { animation:none; }
+            .bg-photo { width:100%; }
+            .bg-a { height:46%; clip-path:polygon(0 0, 100% 0, 100% 90%, 0 100%); }
+            .bg-b { clip-path:none; height:100%; }
+            .bg::after { background:linear-gradient(180deg, rgba(13,21,51,.70) 0%, rgba(13,21,51,.62) 38%, rgba(13,21,51,.42) 100%); }
+            .brand-panel { min-height:clamp(230px, 36vh, 320px); padding:22px clamp(20px, 5vw, 32px) 26px; }
+            .brand-motto { display:none; }
             .form-panel {
-                padding:clamp(24px, 5vw, 32px) 20px 40px;
+                align-items:flex-start;
+                padding:8px 20px 40px;
                 padding-left: max(20px, env(safe-area-inset-left));
                 padding-right: max(20px, env(safe-area-inset-right));
             }
-            .login-container { max-width:460px; }
+            .login-container { max-width:460px; --glass:rgba(254,254,249,.82); }
         }
 
         /* ---------- Small phones ---------- */
         @media(max-width:480px){
-            .login-container { padding:28px 20px; border-radius:16px; }
-            .brand-panel { min-height:190px; clip-path:polygon(0 0, 100% 0, 100% 90%, 0 100%); }
-            .brand-content { padding:18px 20px; }
-            .brand-top .brand-name { display:none; }
-            .brand-top img.brand-logo { height:46px; width:46px; }
+            .login-container { padding:28px 20px 24px; border-radius:16px; --glass:rgba(254,254,249,.86); --blur:blur(16px) saturate(130%); }
+            .brand-panel { min-height:200px; padding:16px 20px 22px; }
+            .brand-name { display:none; }
+            .brand-logo { height:46px; width:46px; }
             .brand-middle p { display:none; }
-            .brand-pill { margin-bottom:8px; font-size:10.5px; padding:5px 11px; }
-            .brand-middle h2 { margin-bottom:0; }
-            .logo-container img { height:60px; }
+            .brand-middle h2 { font-size:24px; margin-bottom:0; }
             .login-header { margin-bottom:20px; }
-            .login-header h1 { font-size:21px; }
-            .form-group { margin-bottom:15px; }
-            .show-password-btn { min-width:58px !important; font-size:10px !important; right:6px; }
-            .forgot-password-row { justify-content:center; }
-            .forgot-password-link { font-size:12px; }
+            .login-header h1 { font-size:26px; }
+            .form-group { margin-bottom:16px; }
+            .show-password-btn { min-width:58px !important; font-size:11px !important; right:6px; }
         }
-
-        /* ---------- Very small phones ---------- */
         @media(max-width:360px){
-            .login-container { padding:24px 16px; }
-            .brand-panel { min-height:150px; }
-            .brand-content { padding:14px 16px; }
-            .brand-middle h2 { font-size:19px; }
-            .input-icon-wrap input { padding-left:36px; }
-            .input-icon-wrap svg { left:11px; width:15px; height:15px; }
+            .login-container { padding:24px 16px 20px; }
+            .brand-middle h2 { font-size:21px; }
+            .input-icon-wrap input { padding-left:38px; }
+            .input-icon-wrap svg { left:12px; width:16px; height:16px; }
             .password-field > input[type="password"],
             .password-field > input[type="text"] { padding-right:66px !important; }
-            .show-password-btn { min-width:50px !important; font-size:9.5px !important; right:5px; padding:4px 7px !important; }
+            .show-password-btn { min-width:50px !important; font-size:10.5px !important; right:5px; padding:4px 7px !important; }
         }
 
-        /* ---------- Short viewports / landscape phones: prioritize the form ---------- */
+        /* ---------- Short landscape phones: prioritize the form ---------- */
         @media(max-height:560px) and (orientation:landscape){
             .page-shell { grid-template-columns: 38vw 1fr; }
-            .brand-panel {
-                min-height:100vh;
-                clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%);
-            }
-            .brand-content { padding:18px 24px 18px 18px; justify-content:flex-end; }
-            .brand-top, .brand-bottom { display:none; }
-            .brand-middle p { display:none; }
-            .brand-middle h2 { font-size:17px; margin-bottom:0; }
-            .brand-pill { display:none; }
-            .form-panel {
-                padding:16px 16px;
-                padding-left: max(16px, env(safe-area-inset-left));
-                padding-right: max(16px, env(safe-area-inset-right));
-                padding-bottom: max(16px, env(safe-area-inset-bottom));
-                align-items:flex-start;
-            }
+            .brand-panel { justify-content:flex-end; padding:18px 24px 18px 18px; }
+            .brand-top, .brand-motto, .brand-middle p { display:none; }
+            .brand-middle h2 { font-size:19px; margin-bottom:0; }
+            .form-panel { padding:16px; align-items:flex-start;
+                padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right)); padding-bottom:max(16px, env(safe-area-inset-bottom)); }
             .login-container { padding:22px 24px; margin:auto 0; }
-            .logo-container { margin-bottom:8px; }
-            .logo-container img { height:48px; }
+            .logo { display:flex; margin-bottom:8px; }
             .login-header { margin-bottom:14px; }
             .form-group { margin-bottom:12px; }
         }
 
-        /* ---------- Large desktops: keep the form column from stretching too wide ---------- */
         @media(min-width:1440px){
             .form-panel { padding:40px; }
         }
 
         /* ---------- Touch devices: comfortable tap targets ---------- */
         @media(hover:none) and (pointer:coarse){
-            button[type="submit"], .links a, .forgot-password-link {
-                min-height:44px;
-            }
-            .links a, button[type="submit"] { padding-top:13px; padding-bottom:13px; }
+            button[type="submit"], .links a { min-height:48px; }
+            .forgot-password-link { display:inline-block; padding:8px 0; }
             .show-password-btn { min-height:38px !important; padding:8px 10px !important; }
         }
-</style>
+    </style>
     <?php require_once __DIR__ . '/includes/responsive.php'; ?>
 </head>
 <body class="admin-login-page">
 <?php require_once __DIR__ . '/includes/ui_feedback.php'; ?>
+
+<!-- Full-page photo background -->
+<div class="bg">
+    <div class="bg-photo bg-a">
+        <img src="/LibraryBorrowingSystem/Img/Main_entrance_JASHS.png" alt="Jose Abad Santos High School main entrance" fetchpriority="high" decoding="async">
+    </div>
+    <div class="bg-photo bg-b">
+        <img src="/LibraryBorrowingSystem/Img/library1.png" alt="Students studying at the long reading tables of the school library" decoding="async">
+    </div>
+</div>
+
 <div class="page-shell">
 
     <div class="brand-panel">
-        <img src="/LibraryBorrowingSystem/Img/Main_entrance_JASHS.png" alt="Jose Abad Santos High School main entrance">
-        <div class="brand-texture"></div>
-        <div class="brand-content">
-            <div class="brand-top">
-                <img class="brand-logo" src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
-                <div class="brand-name">
-                    <strong>Jose Abad Santos High School</strong>
-                    Library Borrowing System
-                </div>
+        <div class="brand-top">
+            <img class="brand-logo" src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
+            <div class="brand-name">
+                <strong>Jose Abad Santos High School</strong>
+                Library Borrowing System
             </div>
+        </div>
 
-            <div class="brand-middle">
-                <span class="brand-pill"><span class="dot"></span>Proud to be Abadians</span>
-                <h2>Welcome back to the <em>JASHS Library</em>.</h2>
-                <p>Sign in to borrow books, track due dates, and manage your library account anytime, anywhere on campus.</p>
-            </div>
-
+        <div class="brand-middle">
+            <h2>Welcome back to the JASHS Library.</h2>
+            <p>Log in to borrow books, check due dates, and manage your library account.</p>
+            <p class="brand-motto">Proud to be Abadians</p>
         </div>
     </div>
 
@@ -747,7 +711,7 @@ $csrf = csrfToken();
             <div class="logo"><img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School"></div>
             <div class="login-header">
                 <h1>Library Login</h1>
-                <p>Jose Abad Santos High School Library Borrowing System</p>
+                <p>Students, teachers, and the Chief Librarian all log in here.</p>
             </div>
 
 
@@ -758,39 +722,41 @@ $csrf = csrfToken();
             <script>document.addEventListener('DOMContentLoaded',()=>showToast(<?php echo json_encode($success); ?>,'success',3500));</script>
             <?php endif; ?>
 
-            <form method="POST" autocomplete="off" novalidate>
+            <form id="login-form" method="POST" autocomplete="off" novalidate>
                 <?php echo csrfField(); ?>
                 <div class="form-group">
-                    <label for="identifier">Username</label>
+                    <label for="identifier">Username or ID number</label>
                     <div class="input-icon-wrap">
-                        <input type="text" id="identifier" name="identifier" required maxlength="150" autocomplete="username" value="<?php echo htmlspecialchars($_POST['identifier'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" placeholder="Enter your login identifier">
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        <input type="text" id="identifier" name="identifier" required maxlength="150" autocomplete="username" aria-describedby="identifier-hint" value="<?php echo htmlspecialchars($_POST['identifier'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" placeholder="Username or ID number">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     </div>
+                    <p class="field-hint" id="identifier-hint">Students and teachers can also use their email, contact number, or QR code.</p>
                 </div>
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <div class="label-row">
+                        <label for="password">Password</label>
+                        <a class="forgot-password-link" href="/LibraryBorrowingSystem/forgot_password.php">Forgot password?</a>
+                    </div>
                     <div class="password-field input-icon-wrap">
                         <input type="password" id="password" name="password" required maxlength="128" autocomplete="current-password" placeholder="Enter your password">
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
                     </div>
-                    <div class="forgot-password-row">
-                        <a class="forgot-password-link" href="/LibraryBorrowingSystem/forgot_password.php">Forgot Password?</a>
-                    </div>
+                    <p class="field-hint caps-hint" id="caps-hint" role="status" hidden>Caps Lock is on.</p>
                 </div>
                 <button type="submit">
-                    Login
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+                    <span class="btn-spinner" aria-hidden="true"></span>
+                    <span class="btn-label">Log in</span>
                 </button>
             </form>
 
-            <div class="divider">New here?</div>
+            <div class="divider">Don't have an account?</div>
             <div class="links">
                 <a class="register-link" href="/LibraryBorrowingSystem/student/register.php">Register</a>
             </div>
             <div class="security-note">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                Secure sessions and login rate-limiting help protect access to the library system.
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                After too many failed attempts, login is paused for a few minutes.
             </div>
         </div>
     </div>
@@ -817,12 +783,59 @@ $csrf = csrfToken();
         });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
-            initPasswordToggles();
+    // Warn when Caps Lock is on while typing the password.
+    function initCapsLockHint() {
+        var pw = document.getElementById('password');
+        var hint = document.getElementById('caps-hint');
+        if (!pw || !hint) return;
+        function check(e) {
+            if (e.getModifierState) hint.hidden = !e.getModifierState('CapsLock');
+        }
+        pw.addEventListener('keydown', check);
+        pw.addEventListener('keyup', check);
+        pw.addEventListener('blur', function () { hint.hidden = true; });
+    }
+
+    // On desktop, start in the right field (password if the ID was kept after a failed attempt).
+    // Skipped on touch devices so the keyboard doesn't cover the page on load.
+    function initAutofocus() {
+        if (!window.matchMedia || !window.matchMedia('(hover:hover) and (pointer:fine)').matches) return;
+        var id = document.getElementById('identifier');
+        var pw = document.getElementById('password');
+        var target = (id && id.value) ? pw : id;
+        if (target) target.focus({preventScroll: true});
+    }
+
+    // Show progress and block double-submits while the login request is running.
+    function initSubmitState() {
+        var form = document.getElementById('login-form');
+        if (!form) return;
+        var btn = form.querySelector('button[type="submit"]');
+        var label = btn && btn.querySelector('.btn-label');
+        if (!btn || !label) return;
+
+        function reset() {
+            btn.disabled = false;
+            btn.classList.remove('is-loading');
+            label.textContent = 'Log in';
+        }
+        form.addEventListener('submit', function () {
+            // Deferred so the browser still sends the form before the button is disabled.
+            setTimeout(function () {
+                btn.disabled = true;
+                btn.classList.add('is-loading');
+                label.textContent = 'Logging in\u2026';
+            }, 0);
         });
+        // Coming back with the Back button should not leave the button stuck.
+        window.addEventListener('pageshow', function (e) { if (e.persisted) reset(); });
+    }
+
+    function init() { initPasswordToggles(); initCapsLockHint(); initAutofocus(); initSubmitState(); }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        initPasswordToggles();
+        init();
     }
 })();
 </script>

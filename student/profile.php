@@ -435,31 +435,6 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
                 </div>
             </section>
         <?php endif; ?>
-        <section class="card" id="reservations">
-            <div class="card-header">My Reservations</div>
-            <div class="card-body">
-                <?php if (empty($reservations)): ?>
-                    <div class="empty">You do not have any active reservations.</div>
-                <?php else: ?>
-                    <div style="display:grid;gap:10px;">
-                        <?php foreach ($reservations as $reservation): ?>
-                            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:13px;background:#F7F9FC;border:1px solid #D2E2F6;border-radius:9px;">
-                                <div>
-                                    <strong style="color:#202A44;"><?php echo htmlspecialchars($reservation['title']); ?></strong>
-                                    <div style="font-size:12px;color:#52618D;margin-top:4px;">
-                                        Book No: <?php echo htmlspecialchars($reservation['book_number']); ?> ·
-                                        Reserved: <?php echo htmlspecialchars(date('M d, Y h:i A', strtotime($reservation['reserved_at']))); ?>
-                                    </div>
-                                </div>
-                                <span class="badge <?php echo $reservation['status']==='ready' ? 'returned' : 'borrowed'; ?>">
-                                    <?php echo htmlspecialchars(ucfirst($reservation['status'])); ?>
-                                </span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </section>
 
     </main>
 
