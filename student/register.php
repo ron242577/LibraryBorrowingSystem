@@ -894,7 +894,7 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
 
             .btn-submit,
             .btn-back {
-                width: 100%;
+                text-align: center;
             }
         }
 

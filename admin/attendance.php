@@ -102,14 +102,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggl
 }
 
 $attendance = [];
-$reportDate = $_GET['date'] ?? date('Y-m-d');
-$reportDateObject = DateTime::createFromFormat('Y-m-d', $reportDate);
-if (!$reportDateObject || $reportDateObject->format('Y-m-d') !== $reportDate) {
-    $reportDate = date('Y-m-d');
-    $reportDateObject = new DateTime($reportDate);
+$start_date = $_GET['start_date'] ?? ($_GET['date'] ?? date('Y-m-d'));
+$end_date = $_GET['end_date'] ?? $start_date;
+foreach (['start_date','end_date'] as $d) {
+    if (!DateTime::createFromFormat('Y-m-d', ${$d}) || DateTime::createFromFormat('Y-m-d', ${$d})->format('Y-m-d') !== ${$d}) {
+        ${$d} = date('Y-m-d');
+    }
 }
-$listStmt = $conn->prepare("SELECT a.time_in, a.time_out, COALESCE(s.student_no, t.teacher_no) COLLATE utf8mb4_unicode_ci AS borrower_no, COALESCE(s.full_name, t.full_name) COLLATE utf8mb4_unicode_ci AS full_name, CASE WHEN a.student_id IS NULL THEN 'Teacher' ELSE 'Student' END AS borrower_type FROM library_attendance a LEFT JOIN students s ON s.student_id = a.student_id LEFT JOIN teachers t ON t.teacher_id = a.teacher_id WHERE a.visit_date = ? ORDER BY a.time_in DESC");
-$listStmt->bind_param('s', $reportDate);
+$reportDateObject = new DateTime($start_date);
+$listStmt = $conn->prepare("SELECT a.time_in, a.time_out, COALESCE(s.student_no, t.teacher_no) COLLATE utf8mb4_unicode_ci AS borrower_no, COALESCE(s.full_name, t.full_name) COLLATE utf8mb4_unicode_ci AS full_name, CASE WHEN a.student_id IS NULL THEN 'Teacher' ELSE 'Student' END AS borrower_type FROM library_attendance a LEFT JOIN students s ON s.student_id = a.student_id LEFT JOIN teachers t ON t.teacher_id = a.teacher_id WHERE a.visit_date BETWEEN ? AND ? ORDER BY a.time_in DESC");
+$listStmt->bind_param('ss', $start_date, $end_date);
 $listStmt->execute();
 $listResult = $listStmt->get_result();
 while ($row = $listResult->fetch_assoc()) {
@@ -122,7 +124,7 @@ $completedVisits = count(array_filter($attendance, static fn($row) => !empty($ro
 $openVisits = $totalVisits - $completedVisits;
 
 if (($_GET['report'] ?? '') === '1'):
-    $reportTitleDate = $reportDateObject->format('F d, Y');
+    $reportTitleDate = $start_date . ' to ' . $end_date;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -156,7 +158,7 @@ if (($_GET['report'] ?? '') === '1'):
         <?php if (!$attendance): ?><tr><td colspan="7" style="text-align:center">No attendance recorded for this date.</td></tr><?php endif; ?>
         </tbody>
     </table>
-    <div class="report-actions"><button type="button" onclick="window.print()">Print Report</button><a href="attendance.php?date=<?php echo h($reportDate); ?>">Back to Attendance</a></div>
+    <div class="report-actions"><button type="button" onclick="window.print()">Print Report</button><a href="attendance.php?start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Back to Attendance</a></div>
 </main>
 </body>
 </html>
@@ -203,10 +205,11 @@ if (($_GET['report'] ?? '') === '1'):
         <div class="attendance-toolbar">
             <div><h2>Attendance Records</h2><div class="muted"><?php echo h($reportDateObject->format('F d, Y')); ?></div></div>
             <form class="date-filter" method="GET">
-                <div><label for="attendance-date">Report date</label><input id="attendance-date" type="date" name="date" value="<?php echo h($reportDate); ?>"></div>
-                <button class="attendance-button" type="submit">View Date</button>
+                <div><label>From Date</label><input type="date" name="start_date" value="<?php echo h($start_date); ?>"></div>
+                <div><label>Up To Date</label><input type="date" name="end_date" value="<?php echo h($end_date); ?>"></div>
+                <button class="attendance-button" type="submit">Filter</button>
             </form>
-            <a class="report-link" href="attendance.php?report=1&amp;date=<?php echo h($reportDate); ?>" target="_blank" rel="noopener">Print Attendance Report</a>
+            <a class="report-link" href="attendance.php?report=1&amp;start_date=<?php echo h($start_date); ?>&amp;end_date=<?php echo h($end_date); ?>" target="_blank" rel="noopener">Print Attendance Report</a>
         </div>
         <div class="table-wrap">
             <table>

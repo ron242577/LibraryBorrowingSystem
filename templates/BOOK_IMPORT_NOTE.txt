@@ -1,0 +1,14 @@
+BOOK BULK ADDING NOTE
+
+For bulk adding books, CSV format is recommended for importing.
+**Importing takes time
+Why CSV is preferred:
+- Easier to edit using Excel or Google Sheets
+- Faster preparation for large numbers of books
+- Less formatting issues during import
+- Compatible with bulk import processes
+
+Use:
+templates/book_import_template.csv
+
+Prepare the data based on the column headers before importing books.

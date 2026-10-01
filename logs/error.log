@@ -218,3 +218,41 @@
 [2026-09-21 11:28:28] Table 'library_borrowing_system.book_reservations' doesn't exist
 [2026-09-21 11:29:04] Table 'library_borrowing_system.book_reservations' doesn't exist
 [2026-09-21 11:29:05] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-27 22:29:53] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-27 22:29:55] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-27 22:30:00] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-27 22:30:10] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-27 22:30:19] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-27 22:30:27] Login attempt: Username, student number, email, or contact number and password are required.
+[2026-09-27 22:42:10] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:42:30] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:42:32] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:42:33] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:42:41] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:42:51] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:42:58] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:43:04] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:47:30] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:47:36] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:47:45] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:47:49] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:47:54] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:48:04] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:48:08] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:48:10] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:48:11] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-27 22:48:29] Transactions page error: Illegal mix of collations (utf8mb4_bin,NONE) and (utf8mb4_0900_ai_ci,COERCIBLE) for operation 'like'
+[2026-09-30 14:55:45] Login attempt: Invalid student credentials or inactive account.
+[2026-09-30 19:03:41] Login attempt: Invalid login credentials or inactive account.
+[2026-09-30 20:32:37] Login attempt: Invalid login credentials or inactive account.
+[2026-09-30 21:13:53] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-30 21:14:02] Unknown database 'library_borrowing_system'
+[2026-09-30 21:14:32] Unknown database 'library_borrowing_system'
+[2026-09-30 21:14:54] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-30 21:15:02] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-30 22:05:40] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-30 22:05:46] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-09-30 22:05:47] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-10-01 00:15:07] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-10-01 00:15:37] Table 'library_borrowing_system.book_reservations' doesn't exist
+[2026-10-01 00:48:41] Login attempt: Your request could not be verified. Refresh the page and try again.

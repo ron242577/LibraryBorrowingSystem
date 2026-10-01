@@ -18,6 +18,8 @@ function h($value) {
 
 $filter_status = $_GET['status'] ?? 'all';
 $search = trim($_GET['search'] ?? '');
+$start_date = trim($_GET['start_date'] ?? '');
+$end_date = trim($_GET['end_date'] ?? '');
 $allowed_statuses = ['all', 'borrowed', 'returned'];
 if (!in_array($filter_status, $allowed_statuses, true)) {
     $filter_status = 'all';
@@ -27,9 +29,26 @@ $where = ['1=1'];
 if ($filter_status !== 'all') {
     $where[] = "t.status = '" . $conn->real_escape_string($filter_status) . "'";
 }
+if ($start_date !== '') {
+    $start_date_sql = $conn->real_escape_string($start_date);
+    $where[] = "DATE(t.date_borrowed) >= '$start_date_sql'";
+}
+if ($end_date !== '') {
+    $end_date_sql = $conn->real_escape_string($end_date);
+    $where[] = "DATE(t.date_borrowed) <= '$end_date_sql'";
+}
 if ($search !== '') {
     $term = $conn->real_escape_string($search);
-    $where[] = "(COALESCE(s.full_name, te.full_name) LIKE '%$term%' OR COALESCE(s.student_no, te.teacher_no) LIKE '%$term%' OR b.title LIKE '%$term%' OR b.author LIKE '%$term%' OR b.book_number LIKE '%$term%' OR CAST(t.transaction_id AS CHAR) LIKE '%$term%')";
+    $where[] = "(
+        s.full_name LIKE '%$term%' OR
+        te.full_name LIKE '%$term%' OR
+        s.student_no LIKE '%$term%' OR
+        te.teacher_no LIKE '%$term%' OR
+        b.title LIKE '%$term%' OR
+        b.author LIKE '%$term%' OR
+        b.book_number LIKE '%$term%' OR
+        CAST(t.transaction_id AS CHAR) LIKE '%$term%'
+    )";
 }
 $where_sql = implode(' AND ', $where);
 
@@ -60,6 +79,27 @@ try {
     }
 } catch (Exception $e) {
     logError('Transactions page error: ' . $e->getMessage());
+}
+
+if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
+    if (empty($transactions)) {
+        echo '<div class="empty">No transaction records found.</div>';
+    } else {
+        echo '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Borrower</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr></thead><tbody>';
+        foreach ($transactions as $t) {
+            echo '<tr>';
+            echo '<td>#'.(int)$t['transaction_id'].'</td>';
+            echo '<td><strong>'.h($t['borrower_name']).'</strong><br><small>'.h($t['borrower_no']).'</small></td>';
+            echo '<td><strong>'.h($t['book_title']).'</strong><br><small>'.h($t['book_author']).' · '.h($t['book_number']).'</small></td>';
+            echo '<td>'.h(date('M d, Y h:i A', strtotime($t['date_borrowed']))).'</td>';
+            echo '<td>'.h(date('M d, Y', strtotime($t['due_date']))).'<br><small>Same-day return</small></td>';
+            echo '<td>'.($t['return_date'] ? h(date('M d, Y h:i A', strtotime($t['return_date']))) : '—').'</td>';
+            echo '<td><span class="badge '.h($t['status']).'">'.h(ucfirst($t['status'])).'</span></td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table></div>';
+    }
+    exit;
 }
 
 $status_counts = ['all' => 0, 'borrowed' => 0, 'returned' => 0];
@@ -227,11 +267,13 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="toolbar">
             <form method="GET">
                 <input type="hidden" name="status" value="<?php echo h($filter_status); ?>">
+                <input type="date" name="start_date" value="<?php echo h($start_date); ?>" title="From date">
+                <input type="date" name="end_date" value="<?php echo h($end_date); ?>" title="To date">
                 <input type="text" name="search" value="<?php echo h($search); ?>" placeholder="Search borrower, book, book number, or transaction ID">
                 <button class="btn auto-search-submit" type="submit">Search</button>
                 <?php if ($search !== ''): ?><a class="btn secondary" href="?status=<?php echo h($filter_status); ?>">Clear</a><?php endif; ?>
             </form>
-            <a class="btn secondary" href="?status=<?php echo h($filter_status); ?>&search=<?php echo urlencode($search); ?>&report=1" target="_blank">Print Report</a>
+            <a class="btn secondary" href="?status=<?php echo h($filter_status); ?>&start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>&search=<?php echo urlencode($search); ?>&report=1" target="_blank">Print Report</a>
         </div>
 
         <section class="table-card">
@@ -261,5 +303,35 @@ document.addEventListener('DOMContentLoaded', function () {
             <?php endif; ?>
         </section>
     </main>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('.toolbar form');
+    const tableCard = document.querySelector('.table-card');
+    if (!form || !tableCard) return;
+
+    const search = form.querySelector('input[name="search"]');
+    const inputs = form.querySelectorAll('input');
+    let timer;
+
+    function updateTable() {
+        const params = new URLSearchParams(new FormData(form));
+        params.set('ajax','1');
+        fetch('transactions.php?' + params.toString(), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+            .then(r => r.text())
+            .then(html => { tableCard.innerHTML = html; });
+    }
+
+    if (search) {
+        search.addEventListener('input', function(){
+            clearTimeout(timer);
+            timer=setTimeout(updateTable, 250);
+        });
+    }
+
+    form.querySelectorAll('input[type=date]').forEach(function(input){
+        input.addEventListener('change', updateTable);
+    });
+});
+</script>
 </body>
 </html>

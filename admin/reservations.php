@@ -1,4 +1,16 @@
 <?php
+// Safety check: reservation module should not crash if the optional reservation table is unavailable.
+$reservationTableAvailable = false;
+try {
+    $checkReservationTable = $conn->query("SHOW TABLES LIKE 'book_reservations'");
+    $reservationTableAvailable = $checkReservationTable && $checkReservationTable->num_rows > 0;
+} catch (Throwable $e) {
+    $reservationTableAvailable = false;
+}
+if (!$reservationTableAvailable) {
+    echo '<div class="alert alert-warning">Reservation module is unavailable because the reservation table is not installed.</div>';
+    return;
+}
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/library_rules.php';
