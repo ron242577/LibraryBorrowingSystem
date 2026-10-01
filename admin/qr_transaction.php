@@ -673,7 +673,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         function startScannerStudent() {
             document.getElementById('startBtnStudent').style.display = 'none';
             document.getElementById('stopBtnStudent').style.display = 'inline-flex';
-            studentScanner = new Html5QrcodeScanner('qr-reader-student', { facingMode: 'environment', qrbox: 250 }, false);
+            studentScanner = new Html5QrcodeScanner('qr-reader-student', { facingMode: 'environment', qrbox: undefined }, false);
             studentScanner.render(onScanSuccessStudent, onScanError);
         }
 
@@ -689,7 +689,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         function startScannerBook() {
             document.getElementById('startBtnBook').style.display = 'none';
             document.getElementById('stopBtnBook').style.display = 'inline-flex';
-            bookScanner = new Html5QrcodeScanner('qr-reader-book', { facingMode: 'environment', qrbox: 250 }, false);
+            bookScanner = new Html5QrcodeScanner('qr-reader-book', { facingMode: 'environment', qrbox: undefined }, false);
             bookScanner.render(onScanSuccessBook, onScanError);
         }
 

@@ -7,6 +7,39 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/gmail_smtp.php';
 
+// AJAX validation for live registration checks
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['registration_check'])) {
+    header('Content-Type: application/json');
+    $type = $_POST['registration_check'];
+    $value = trim($_POST['value'] ?? '');
+    $role = $_POST['role'] ?? 'student';
+    $available = true;
+    $message = '';
+
+    if ($type === 'email' && filter_var($value, FILTER_VALIDATE_EMAIL)) {
+        $stmt = $conn->prepare("SELECT student_id FROM students WHERE email=? UNION SELECT teacher_id FROM teachers WHERE email=? LIMIT 1");
+        $stmt->bind_param("ss", $value, $value);
+    } elseif ($type === 'contact' && $value !== '') {
+        $stmt = $conn->prepare("SELECT student_id FROM students WHERE contact_number=? UNION SELECT teacher_id FROM teachers WHERE contact_number=? LIMIT 1");
+        $stmt->bind_param("ss", $value, $value);
+    } else {
+        echo json_encode(['available'=>true,'message'=>'']);
+        exit;
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result && $result->num_rows > 0) {
+        $available = false;
+        $message = 'Already registered';
+    } else {
+        $message = 'Available';
+    }
+    echo json_encode(['available'=>$available,'message'=>$message]);
+    exit;
+}
+
+
 $conn->query("CREATE TABLE IF NOT EXISTS teachers (
     teacher_id INT NOT NULL AUTO_INCREMENT,
     teacher_no VARCHAR(100) NOT NULL,
@@ -1004,7 +1037,20 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
         .password-field {
             position: relative;
             width: 100%;
+            display: flex;
+            align-items: center;
         }
+
+        .password-requirements {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: #F7F9FC;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+        .password-requirements div.valid { color: #198754; }
+        .password-requirements div.invalid { color: #dc3545; }
 
         .password-field > input[type="password"],
         .password-field > input[type="text"] {
@@ -1062,7 +1108,16 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
             }
         }
 
-    </style>
+    
+        .live-check {
+            display: block;
+            width: 100%;
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.4;
+            clear: both;
+        }
+</style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
 <body class="student-register-page">
@@ -1243,17 +1298,17 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
 
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Contact Number <span class="required">*</span></label>
+                                <label>Contact Number</label>
                                 <input type="tel" name="contact_number" placeholder="e.g., +63 945 735 2866" 
-                                       value="<?php echo htmlspecialchars($_POST['contact_number'] ?? ''); ?>" required>
-                                <div class="helper-text">Your mobile or phone number</div>
+                                       value="<?php echo htmlspecialchars($_POST['contact_number'] ?? ''); ?>" >
+                                <div class="live-check" id="contactLiveCheck"></div>                                <div class="helper-text">Your mobile or phone number</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Email <span class="required">*</span></label>
                                 <input type="email" name="email" placeholder="e.g., student@example.com" 
                                        value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
-                                <div class="helper-text">A 6-digit verification code will be sent here to finish registration.</div>
+                                <div class="live-check" id="emailLiveCheck"></div>                                <div class="helper-text">A 6-digit verification code will be sent here to finish registration.</div>
                             </div>
 
                             <div class="form-group">
@@ -1274,7 +1329,13 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                                     <input type="password" name="password" maxlength="128" autocomplete="new-password" required>
                                     <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
                                 </div>
-                                <div class="helper-text">Use at least 10 characters with uppercase, lowercase, number, and special character.</div>
+                                <div class="password-requirements" id="passwordRequirements">
+                                    <div class="invalid" data-rule="length">✗ Minimum 8 characters</div>
+                                    <div class="invalid" data-rule="upper">✗ Uppercase letter (A-Z)</div>
+                                    <div class="invalid" data-rule="lower">✗ Lowercase letter (a-z)</div>
+                                    <div class="invalid" data-rule="number">✗ Number (0-9)</div>
+                                    <div class="invalid" data-rule="symbol">✗ Symbol (! @ # $ % ^ & * _ - +)</div>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Confirm Password <span class="required">*</span></label>
@@ -1510,6 +1571,70 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
         initPasswordToggles();
     }
 })();
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    function addStatus(input, ok, msg){
+        // Always reuse one validation message per field. Prevent duplicate loops.
+        let container = input.closest('.form-group') || input.parentElement;
+        let el = container.querySelector(':scope > .live-check');
+
+        if(!el){
+            el=document.createElement('small');
+            el.className='live-check';
+            el.style.display='block';
+            el.style.marginTop='8px';
+            container.appendChild(el);
+        }
+
+        el.textContent = msg;
+        el.style.color = ok ? 'green' : 'red';
+    }
+    async function check(type,input){
+        let v=input.value.trim();
+        if(!v) return;
+        let fd=new FormData();
+        fd.append('registration_check',type);
+        fd.append('value',v);
+        let r=await fetch(location.href,{method:'POST',body:fd});
+        let d=await r.json();
+        addStatus(input,d.available,d.available?'✓ '+d.message:'✗ '+d.message);
+        input.dataset.available=d.available?'1':'0';
+    }
+    let email=document.querySelector('[name="email"]');
+    let contact=document.querySelector('[name="contact_number"]');
+    if(email) email.addEventListener('input',()=>check('email',email));
+    if(contact) contact.addEventListener('input',()=>check('contact',contact));
+
+    let pass=document.querySelector('[name="password"]');
+    let confirm=document.querySelector('[name="confirm_password"]');
+    if(pass){
+      function validate(){
+        let p=pass.value;
+        let checks={
+          length:p.length>=8,
+          upper:/[A-Z]/.test(p),
+          lower:/[a-z]/.test(p),
+          number:/[0-9]/.test(p),
+          symbol:/[^A-Za-z0-9]/.test(p)
+        };
+        Object.keys(checks).forEach(function(key){
+          let item=document.querySelector('#passwordRequirements [data-rule="'+key+'"]');
+          if(item){
+            item.className=checks[key]?'valid':'invalid';
+            item.textContent=(checks[key]?'✓ ':'✗ ')+item.textContent.substring(2);
+          }
+        });
+        pass.dataset.valid=Object.values(checks).every(Boolean)?'1':'0';
+      }
+      pass.addEventListener('input',validate);
+      if(confirm) confirm.addEventListener('input',function(){
+        addStatus(confirm,confirm.value===pass.value && confirm.value!=='',confirm.value===pass.value?'✓ Passwords match':'✗ Passwords do not match');
+      });
+    }
+});
 </script>
 
 </body>

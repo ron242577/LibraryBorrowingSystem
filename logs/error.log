@@ -256,3 +256,14 @@
 [2026-10-01 00:15:07] Table 'library_borrowing_system.book_reservations' doesn't exist
 [2026-10-01 00:15:37] Table 'library_borrowing_system.book_reservations' doesn't exist
 [2026-10-01 00:48:41] Login attempt: Your request could not be verified. Refresh the page and try again.
+[2026-10-02 01:32:03] Login attempt: Invalid login credentials or inactive account.
+[2026-10-02 01:32:30] Login attempt: Invalid login credentials or inactive account.
+[2026-10-02 01:33:22] Login attempt: Invalid login credentials or inactive account.
+[2026-10-02 01:33:34] Login attempt: Invalid login credentials or inactive account.
+[2026-10-02 01:34:44] Attendance error: Active student or teacher not found. Check the QR code or ID number.
+[2026-10-02 01:39:35] Login attempt: Invalid login credentials or inactive account.
+[2026-10-02 01:49:28] Attendance error: Active student or teacher not found. Check the QR code or ID number.
+[2026-10-02 01:49:34] Attendance error: Active student or teacher not found. Check the QR code or ID number.
+[2026-10-02 01:49:41] Attendance error: Active student or teacher not found. Check the QR code or ID number.
+[2026-10-02 01:50:55] Attendance error: Active student or teacher not found. Check the QR code or ID number.
+[2026-10-02 03:55:44] Login attempt: Invalid login credentials or inactive account.

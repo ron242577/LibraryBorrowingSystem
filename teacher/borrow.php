@@ -1331,6 +1331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         body.dark{background:#0d132d;color:#f4f7ff}body.dark .page-header,body.dark .search-section,body.dark .teacher-info-section,body.dark .results-section,body.dark .book-details,body.dark .modal-content{background:#18213f;color:#f4f7ff}body.dark .header h1,body.dark .results-section h2,body.dark .teacher-info-section h2,body.dark .book-details h3,body.dark .book-title,body.dark .detail-value{color:#f4f7ff}body.dark .header p,body.dark .book-author,body.dark .info-label,body.dark .detail-label{color:#b7c5e2}body.dark .book-item,body.dark .info-item,body.dark .detail-item{background:#222d4d;color:#f4f7ff;border-color:#3c4b72}
         </style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
+    <?php require_once __DIR__ . '/../includes/portal_ui.php'; ?>
 </head>
 <body class="teacher-app teacher-borrow-page">
     <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
