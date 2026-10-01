@@ -453,7 +453,22 @@ function addBookRecord($conn, $data, &$error_message) {
         return false;
     }
 
-    $book_qr_code = generateUniqueBookQRId($conn);
+    // Use imported QR code when available; otherwise generate a new one
+    $book_qr_code = trim((string)($data['qr_code'] ?? ''));
+    if ($book_qr_code === '') {
+        $book_qr_code = generateUniqueBookQRId($conn);
+    } else {
+        $qr_check = $conn->prepare('SELECT book_id FROM books WHERE qr_code = ? LIMIT 1');
+        $qr_check->bind_param('s', $book_qr_code);
+        $qr_check->execute();
+        $qr_exists = $qr_check->get_result()->num_rows > 0;
+        $qr_check->close();
+        if ($qr_exists) {
+            $book_qr_code = generateUniqueBookQRId($conn);
+        }
+    }
+
+    // Always create the QR image file after import/manual creation
     generateBookQRCode($book_qr_code);
 
     $status = 'available';
@@ -1205,7 +1220,7 @@ try {
         .low-stock-item-info p { font-size: 12px; color: #52618D; }
         .low-stock-badge { font-size: 11px; font-weight: 600; background: #FBFDCB; color: #5C5F05; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
 
-        .table-wrapper { overflow-x: auto; }
+        .table-wrapper { overflow-x: hidden; width:100%; }
         table { width: 100%; border-collapse: collapse; min-width: 1000px; }
         thead { background: #F7F9FC; border-bottom: 2px solid #D2E2F6; }
         th { padding: 12px 14px; text-align: left; font-weight: 600; color: #52618D; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
@@ -1465,6 +1480,57 @@ try {
 .inventory-compact-table td:nth-child(12),
 .inventory-compact-table th:nth-child(13),
 .inventory-compact-table td:nth-child(13) { display:none; }
+</style>
+
+<style id="responsive-inventory-priority-fix">
+@media (max-width: 768px) {
+
+    /* Inventory catalogue: show only Title, Available, Action */
+    .inventory-compact-table th,
+    .inventory-compact-table td {
+        display: none;
+    }
+
+    .inventory-compact-table th:nth-child(2),
+    .inventory-compact-table td:nth-child(2),
+    .inventory-compact-table th:nth-child(11),
+    .inventory-compact-table td:nth-child(11),
+    .inventory-compact-table th:nth-child(15),
+    .inventory-compact-table td:nth-child(15) {
+        display: table-cell;
+    }
+
+    .inventory-compact-table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    .inventory-compact-table td {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+}
+</style>
+
+<style id="mobile-no-horizontal-scroll-fix">
+@media (max-width: 768px) {
+    html, body { overflow-x: hidden !important; }
+    .container, .table-section, .table-wrapper, .table-responsive {
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    table, .student-compact-table, .teacher-compact-table, .inventory-compact-table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+    }
+    th, td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 1px;
+    }
+}
 </style>
 </head>
 <body>

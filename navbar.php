@@ -242,6 +242,103 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
         body { margin-left: 0 !important; }
     }
 
+
+/* Global Responsive Enhancements */
+.main-content,
+.content,
+.page-content,
+.container-fluid {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+table {
+    min-width: 650px;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+.form-row,
+.row {
+    flex-wrap: wrap;
+}
+
+input, select, textarea, button {
+    max-width: 100%;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 260px;
+    }
+
+    body {
+        overflow-x: hidden;
+    }
+
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    .main-content,
+    .content,
+    .page-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 12px !important;
+    }
+
+    .card,
+    .dashboard-card,
+    .panel {
+        width: 100% !important;
+        margin-bottom: 15px;
+    }
+
+    .modal-dialog {
+        width: calc(100% - 24px);
+        margin: 12px auto;
+    }
+
+    .btn {
+        white-space: normal;
+    }
+
+    table {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar-brand-text {
+        font-size: 13px;
+    }
+
+    .sidebar-link {
+        padding: 12px 14px;
+    }
+
+    input, select, textarea {
+        font-size: 16px;
+    }
+
+    .modal-content {
+        border-radius: 10px;
+    }
+}
 </style>
 
 <div id="sidebarOverlay" class="sidebar-overlay"></div>

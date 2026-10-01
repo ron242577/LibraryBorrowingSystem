@@ -336,15 +336,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                                             throw new Exception('Failed to update inventory: ' . $update->error);
                                         }
 
+                                        // Reservation cleanup safety: only update reservation records when the table exists.
                                         if ($student['borrower_type'] === 'student' && $readyReservation && (int)$readyReservation['student_id'] === $student_id) {
-                                            $fulfillStmt = $conn->prepare("
-                                                UPDATE book_reservations
-                                                SET status='fulfilled', fulfilled_at=NOW()
-                                                WHERE reservation_id=? AND status='ready'
-                                            ");
-                                            $fulfillStmt->bind_param('i', $readyReservation['reservation_id']);
-                                            $fulfillStmt->execute();
-                                            $fulfillStmt->close();
+                                            $hasReservationTable = $conn->query("SHOW TABLES LIKE 'book_reservations'");
+                                            if ($hasReservationTable && $hasReservationTable->num_rows > 0) {
+                                                $fulfillStmt = $conn->prepare("
+                                                    UPDATE book_reservations
+                                                    SET status='fulfilled', fulfilled_at=NOW()
+                                                    WHERE reservation_id=? AND status='ready'
+                                                ");
+                                                $fulfillStmt->bind_param('i', $readyReservation['reservation_id']);
+                                                $fulfillStmt->execute();
+                                                $fulfillStmt->close();
+                                            }
                                         }
 
                                         $conn->commit();

@@ -207,6 +207,32 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
             right: -8px;
         }
     }
+
+@media (max-width: 768px) {
+    .jashs-header {
+        padding: 10px 12px;
+        min-height: 68px;
+        margin-bottom: 15px;
+    }
+
+    .jashs-header-title {
+        font-size: 17px;
+    }
+
+    .jashs-header-subtitle {
+        display: none;
+    }
+
+    .jashs-notification-bell {
+        width: 38px;
+        height: 38px;
+    }
+
+    .jashs-notification-panel {
+        right: -8px;
+        width: min(340px, calc(100vw - 24px));
+    }
+}
 </style>
 
 <header class="jashs-header">

@@ -1,11 +1,4 @@
 <?php
-/**
- * Student Records - Library Borrowing System
- * Includes inline search/filter, Add Student form, and
- * a "View" button per row that opens a centred popup modal with full
- * student details + borrowing history.
- */
-
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
 
@@ -945,7 +938,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         .table-header h3 { font-size: 16px; color: #202A44; }
         .table-header span { font-size: 13px; color: #888; }
 
-        .table-responsive { overflow-x: auto; }
+        .table-responsive { overflow-x: hidden; width:100%; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         thead th {
             background: #141F52;
@@ -1177,6 +1170,73 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
 .student-compact-table th:nth-child(14),
 .student-compact-table td:nth-child(14) { display:none; }
 </style>
+
+<style id="responsive-table-priority-fix">
+/* Mobile responsive table priority columns */
+@media (max-width: 768px) {
+
+    /* Student records: show only Name, Archive, Action */
+    .student-compact-table th,
+    .student-compact-table td {
+        display: none;
+    }
+    .student-compact-table th:nth-child(2),
+    .student-compact-table td:nth-child(2),
+    .student-compact-table th:nth-child(11),
+    .student-compact-table td:nth-child(11),
+    .student-compact-table th:nth-child(15),
+    .student-compact-table td:nth-child(15) {
+        display: table-cell;
+    }
+
+    /* Teacher records: show only Name, Archive, Action */
+    .teacher-compact-table th,
+    .teacher-compact-table td {
+        display: none;
+    }
+    .teacher-compact-table th:nth-child(2),
+    .teacher-compact-table td:nth-child(2),
+    .teacher-compact-table th:nth-child(7),
+    .teacher-compact-table td:nth-child(7),
+    .teacher-compact-table th:nth-child(9),
+    .teacher-compact-table td:nth-child(9) {
+        display: table-cell;
+    }
+
+    .student-compact-table,
+    .teacher-compact-table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+    .student-compact-table td,
+    .teacher-compact-table td {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+}
+</style>
+
+<style id="mobile-no-horizontal-scroll-fix">
+@media (max-width: 768px) {
+    html, body { overflow-x: hidden !important; }
+    .container, .table-section, .table-wrapper, .table-responsive {
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    table, .student-compact-table, .teacher-compact-table, .inventory-compact-table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+    }
+    th, td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 1px;
+    }
+}
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -1283,7 +1343,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                     </div>
                     <div class="filter-action-right">
                         <button type="button" class="btn btn-primary" onclick="scrollToAddForm()">Add Student</button>
-                        <button type="button" class="btn btn-secondary" onclick="openBulkModal()">Bulk Add</button>
                     </div>
                 </div>
             </form>
@@ -1508,7 +1567,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                 <div class="no-data">No teacher records found<?php echo !empty($search_rec) ? '. Try adjusting your search.' : '.'; ?></div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table>
+                    <table class="teacher-compact-table">
                         <thead><tr><th>Teacher ID Number</th><th>Full Name</th><th>Grade Levels Teaching</th><th>Senior High Strand(s)</th><th>Contact Number</th><th>Status</th><th>Archive</th><th>Date Added</th><th>Action</th></tr></thead>
                         <tbody>
                             <?php foreach ($teachers as $teacher): ?>
@@ -1539,37 +1598,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
     </div><!-- /container -->
 
 
-
-    <!-- Bulk Add Students Modal -->
-    <div id="bulkAddModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bulkAddModalTitle">
-        <div class="modal-box modal-form-box">
-            <div class="modal-top-bar">
-                <h2 id="bulkAddModalTitle">Bulk Add Students</h2>
-                <button class="modal-close" onclick="closeBulkModal()" title="Close">&times;</button>
-            </div>
-            <div class="add-modal-body">
-                <form method="POST" enctype="multipart/form-data">
-                    <?php echo csrfField(); ?>
-                    <input type="hidden" name="action" value="import">
-                    <div class="form-row">
-                        <div class="form-group" style="grid-column:1/-1;">
-                            <label for="students_file">Upload CSV or XLSX File</label>
-                            <input type="file" id="students_file" name="students_file" accept=".csv,.xlsx" required
-                                   style="padding:8px;border:2px dashed #D2E2F6;border-radius:6px;background:#F7F9FC;cursor:pointer;">
-                        </div>
-                    </div>
-                    <div class="bulk-note" style="margin-top:14px;">
-                        <strong>Accepted column headers:</strong> Name, Student No, Section, Department / Strand, Grade Level, Contact Number, Validity of the Library Access Card, Email, Password. Department / Strand is required only for Grade 11 and Grade 12.<br>
-                        Supported file formats: <strong>.CSV</strong> and <strong>.XLSX</strong>
-                    </div>
-                    <div class="form-actions" style="margin-top:18px;">
-                        <button type="submit" class="btn btn-primary">Import Students</button>
-                        <button type="button" class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <!-- ══════════════════════════════════════════
          STUDENT DETAIL MODAL (centred popup)
@@ -1628,21 +1656,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         icon.classList.toggle('open', !isVisible);
     }
 
-    /* ── Bulk Add Modal ── */
-    function openBulkModal() {
-        document.getElementById('bulkAddModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeBulkModal() {
-        document.getElementById('bulkAddModal').classList.remove('show');
-        document.body.style.overflow = '';
-    }
-
-    document.getElementById('bulkAddModal').addEventListener('click', function(e) {
-        if (e.target === this) closeBulkModal();
-    });
-
     <?php if ($message_type === 'error' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'): ?>
     document.addEventListener('DOMContentLoaded', function() {
         <?php if (($_POST['action'] ?? '') === 'import'): ?>
@@ -1678,8 +1691,8 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                 const strands = (JSON.parse(t.teaching_strands || '[]') || []).join(', ') || 'N/A';
                 const transactions = data.transactions || [];
                 const transactionRows = transactions.length ? transactions.map(function (transaction) {
-                    return `<tr><td><strong>${escHtml(transaction.title)}</strong><br><small style="color:#999;">${escHtml(transaction.author)}</small></td><td>${fmtDate(transaction.date_borrowed)}</td><td>${fmtDate(transaction.due_date)}</td><td>${fmtDate(transaction.return_date)}</td><td>${escHtml(transaction.status)}</td></tr>`;
-                }).join('') : '<tr><td colspan="5" class="empty-tx">No borrowing history yet.</td></tr>';
+                    return `<tr><td><strong>${escHtml(transaction.title)}</strong><br><small style="color:#999;">${escHtml(transaction.author)}</small></td><td>${fmtDate(transaction.date_borrowed)}</td><td>${fmtDate(transaction.due_date)}</td><td>${escHtml(transaction.status)}</td></tr>`;
+                }).join('') : '<tr><td colspan="4" class="empty-tx">No borrowing history yet.</td></tr>';
                 document.getElementById('modalBody').innerHTML = `
                     <div class="stu-header"><h3>${escHtml(t.full_name)}</h3><p>Teacher Since: ${fmtDate(t.created_at)}</p></div>
                     <div class="stu-info-grid">
@@ -1691,7 +1704,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                         <div class="stu-info-item"><div class="stu-info-label">Status</div><div class="stu-info-value" style="color:${t.status === 'active' ? '#567D1F' : '#c0392b'};">${t.is_archived == 1 ? 'Archived' : (t.status === 'active' ? 'Active' : 'Inactive')}</div></div>
                     </div>
                     <div class="stu-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(t.qr_code || '')}" alt="Teacher QR Code" style="cursor:pointer;" onclick="openQRModal('${escHtml(t.qr_code || '')}', 'teacher')"><div class="stu-qr-info"><h4>QR Code ID</h4><div class="stu-qr-code">${escHtml(t.qr_code || 'N/A')}</div></div></div>
-                    <div class="stu-tx"><h3>Borrowing History (${transactions.length})</h3><div class="stu-tx-table"><table><thead><tr><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr></thead><tbody>${transactionRows}</tbody></table></div></div>`;
+                    <div class="stu-tx"><h3>Borrowing History (${transactions.length})</h3><div class="stu-tx-table"><table><thead><tr><th>Book</th><th>Borrowed</th><th>Return By</th><th>Status</th></tr></thead><tbody>${transactionRows}</tbody></table></div></div>`;
             })
             .catch(function (error) { document.getElementById('modalBody').innerHTML = '<div class="empty-tx">' + escHtml(error.message) + '</div>'; });
     }
@@ -1765,7 +1778,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                     </td>
                     <td>${fmtDate(t.date_borrowed)}</td>
                     <td>${fmtDate(t.due_date)} <small style="color:#999;">(same day)</small></td>
-                    <td>${fmtDate(t.return_date)}</td>
                     <td>${txBadge(t.status)}</td>
                 </tr>`).join('');
 
@@ -1777,7 +1789,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                                 <th>Book</th>
                                 <th>Borrowed</th>
                                 <th>Return By</th>
-                                <th>Returned</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
