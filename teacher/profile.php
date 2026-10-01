@@ -321,6 +321,7 @@ try {
 body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .card,body.dark .teacher-dropdown{background:#18213f!important;color:#f4f7ff;border-color:#33456f}body.dark .card-header,body.dark .page-title h1,body.dark .profile-name h2,body.dark .info-value,body.dark .book-title{color:#fff}body.dark .page-title p,body.dark .profile-name p,body.dark .info-label,body.dark .book-meta{color:#c4d1ea}body.dark .info-item,body.dark .book-row,body.dark .qr-box{background:#222d4d;border-color:#3b4d78}body.dark a{color:#fff}
 </style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
+    <?php require_once __DIR__ . '/../includes/portal_ui.php'; ?>
 </head>
 <body class="teacher-app teacher-profile-page">
     <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>

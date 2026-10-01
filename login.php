@@ -8,7 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/audit_logger.php';
 
 if (isset($_SESSION['user_id'])) {
-    header('Location: /LibraryBorrowingSystem/admin/dashboard.php');
+    header('Location: /LibraryBorrowingSystem/' . ($account['role'] === 'attendance_kiosk' ? 'attendance_kiosk.php' : 'admin/dashboard.php'));
     exit();
 }
 if (isset($_SESSION['student_id'])) {
@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($accountType === 'admin') {
             $passwordOk = constantTimePasswordVerify($password, $account['password']);
 
-            if (!$passwordOk || $account['status'] !== 'active' || $account['role'] !== 'admin') {
+            if (!$passwordOk || $account['status'] !== 'active' || !in_array($account['role'], ['admin','attendance_kiosk'], true)) {
                 recordFailedLogin($conn, 'login', $identifier);
 
                 auditLogLoginEvent(
@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = (int)$account['user_id'];
             $_SESSION['full_name'] = $account['full_name'];
             $_SESSION['username'] = $account['username'];
-            $_SESSION['role'] = 'admin';
+            $_SESSION['role'] = $account['role'];
             $_SESSION['login_time'] = time();
             $_SESSION['login_started_at'] = time();
             $_SESSION['session_fingerprint'] = createSessionFingerprint();
@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ['login_method' => $loginMethod]
             );
 
-            header('Location: /LibraryBorrowingSystem/admin/dashboard.php');
+            header('Location: /LibraryBorrowingSystem/' . ($account['role'] === 'attendance_kiosk' ? 'attendance_kiosk.php' : 'admin/dashboard.php'));
             exit();
         }
 

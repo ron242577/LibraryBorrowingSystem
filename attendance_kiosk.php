@@ -1,8 +1,8 @@
 <?php
-require_once __DIR__ . '/../session_check.php';
-require_once __DIR__ . '/../db.php';
+require_once(__DIR__ . '/session_check.php');
+require_once(__DIR__ . "/db.php");
 
-if (!isAdmin()) {
+if (!isAdmin() && !hasRole('attendance_kiosk')) {
     header('Location: /LibraryBorrowingSystem/login.php');
     exit();
 }
@@ -103,6 +103,7 @@ foreach (['start_date','end_date'] as $d) {
     }
 }
 $reportDateObject = new DateTime($start_date);
+if (($_GET['report'] ?? '') === '1') {
 $listStmt = $conn->prepare("SELECT a.time_in, COALESCE(s.student_no COLLATE utf8mb4_unicode_ci, t.teacher_no COLLATE utf8mb4_unicode_ci) AS borrower_no, COALESCE(s.full_name COLLATE utf8mb4_unicode_ci, t.full_name COLLATE utf8mb4_unicode_ci) AS full_name, CASE WHEN a.student_id IS NULL THEN 'Teacher' ELSE 'Student' END AS borrower_type FROM library_attendance a LEFT JOIN students s ON s.student_id = a.student_id LEFT JOIN teachers t ON t.teacher_id = a.teacher_id WHERE a.visit_date BETWEEN ? AND ? ORDER BY a.time_in DESC");
 $listStmt->bind_param('ss', $start_date, $end_date);
 $listStmt->execute();
@@ -111,6 +112,7 @@ while ($row = $listResult->fetch_assoc()) {
     $attendance[] = $row;
 }
 $listStmt->close();
+}
 
 $totalVisits = count($attendance);
 
@@ -165,8 +167,12 @@ if (($_GET['report'] ?? '') === '1'):
     <style>
         :root{--navy:#141F52;--slate:#52618D;--sky:#D2E2F6;--mist:#E7EEF7;--bg:#F3F7FC;--ink:#202A44;--green:#567D1F;--green-bg:#EDF5DD;--red:#9B2335;--red-bg:#FBE4E7;--yellow:#F4F916}
         *{box-sizing:border-box}
-        body.attendance-page{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Tahoma,sans-serif}
-        .attendance-container{max-width:1200px;margin:0 auto 40px;padding:0 20px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:22px;align-items:start}
+        body.attendance-page{margin:0;background:var(--bg);color:var(--ink);font-family:'Segoe UI',Tahoma,sans-serif}
+        .kiosk-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:760px;margin:-8px auto 0;padding:0 20px}
+        .kiosk-nav .crumb{font-size:13px;font-weight:600;color:var(--slate)}
+        .kiosk-nav a.logout{color:var(--navy);font-weight:700;font-size:13px;text-decoration:none;padding:8px 14px;border:1px solid var(--sky);border-radius:8px;background:#fff}
+        .kiosk-nav a.logout:hover{background:var(--navy);color:#fff}
+        .attendance-container{max-width:760px;margin:18px auto 40px;padding:0 20px}
         .card{background:#fff;border:1px solid var(--sky);border-radius:14px;padding:24px;box-shadow:0 4px 18px rgba(20,31,82,.07)}
         .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px}
         .attendance-title{margin:0;color:var(--navy);font-size:26px;line-height:1.15}
@@ -188,7 +194,7 @@ if (($_GET['report'] ?? '') === '1'):
         .status.busy .icon{animation:pulse 1s infinite}
         @keyframes pulse{50%{opacity:.35}}
 
-        .scanner-wrap{margin-top:18px;position:relative;border-radius:14px;overflow:hidden;background:#0c1333;aspect-ratio:4/3;max-height:430px;width:100%}
+        .scanner-wrap{margin-top:18px;position:relative;border-radius:14px;overflow:hidden;background:#0c1333;aspect-ratio:16/10;max-height:360px;width:100%}
         #attendance-reader{width:100%;height:100%}
         #attendance-reader video{width:100%!important;height:100%!important;object-fit:cover;display:block}
         #attendance-reader img{display:none}
@@ -210,42 +216,18 @@ if (($_GET['report'] ?? '') === '1'):
         .manual input{flex:1;min-width:0;padding:14px;border:2px solid var(--sky);border-radius:10px;font-size:16px;color:var(--ink)}
         .manual input:focus{outline:0;border-color:var(--navy);box-shadow:0 0 0 3px rgba(20,31,82,.12)}
 
-        .list-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-        .count{display:inline-block;background:var(--navy);color:#fff;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:700;margin-left:8px;vertical-align:middle}
-        .date-filter{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:14px;padding:12px;background:var(--mist);border-radius:10px}
-        .date-filter label{display:block;font-size:11px;font-weight:700;color:var(--slate);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
-        .date-filter input{padding:8px 10px;border:1px solid var(--sky);border-radius:8px;font-size:13px;background:#fff}
-        .date-filter .btn{padding:9px 14px;font-size:13px}
-        .report-link{color:var(--navy);font-weight:700;font-size:13px;text-decoration:none}
-        .report-link:hover{text-decoration:underline}
-        .table-wrap{max-height:560px;overflow:auto;border:1px solid var(--mist);border-radius:10px}
-        .table-wrap table{width:100%;min-width:0;border-collapse:collapse}
-        th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--mist);font-size:13px}
-        th{background:var(--navy);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;z-index:1}
-        tbody tr:nth-child(even){background:#FAFCFF}
-        tr.new{animation:flash 2.4s ease-out}
-        @keyframes flash{from{background:#E4F0C8}to{background:transparent}}
-        .name{font-weight:700;color:var(--navy)}
-        .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700}
-        .badge.Student{background:#DCE8FA;color:#1F3A7A}
-        .badge.Teacher{background:#EFE3F8;color:#5B2E7E}
-        .empty td{text-align:center;color:var(--slate);padding:34px 12px}
-
         .attendance-shell{container-type:inline-size;container-name:att;width:100%}
-        .list-card{container-type:inline-size;container-name:lst}
-        @container att (max-width:900px){.attendance-container{grid-template-columns:1fr;gap:18px}}
         @container att (max-width:560px){.attendance-container{padding:0 12px}.card{padding:16px;border-radius:12px}.scanner-wrap{aspect-ratio:1/1;max-height:360px}}
-        @container lst (max-width:440px){.table-wrap{max-height:none;border:0;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}tbody tr{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name time' 'type id';gap:6px 12px;align-items:center;padding:12px 14px;margin-bottom:10px;border:1px solid var(--mist);border-radius:12px;background:#fff!important}tbody td{display:block;padding:0;border:0;font-size:13px}tbody td:nth-child(1){grid-area:name;font-size:15px}tbody td:nth-child(2){grid-area:type}tbody td:nth-child(3){grid-area:id;justify-self:end;color:var(--slate)}tbody td:nth-child(4){grid-area:time;justify-self:end;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tr.empty{display:block!important;text-align:center;border-style:dashed}tr.empty td{padding:22px 8px;display:block} .date-filter>div{flex:1 1 130px}.date-filter input{width:100%}.date-filter .btn{flex:1 1 100%}}
-        @supports not (container-type:inline-size){
-            @media(max-width:1180px){.attendance-container{grid-template-columns:1fr}}
-            @media(max-width:480px){.table-wrap{max-height:none;border:0;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}tbody tr{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name time' 'type id';gap:6px 12px;align-items:center;padding:12px 14px;margin-bottom:10px;border:1px solid var(--mist);border-radius:12px;background:#fff!important}tbody td{display:block;padding:0;border:0;font-size:13px}tbody td:nth-child(1){grid-area:name;font-size:15px}tbody td:nth-child(2){grid-area:type}tbody td:nth-child(3){grid-area:id;justify-self:end;color:var(--slate)}tbody td:nth-child(4){grid-area:time;justify-self:end;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tr.empty{display:block!important;text-align:center;border-style:dashed}tr.empty td{padding:22px 8px;display:block}}
-        }
+        @media(max-height:520px) and (orientation:landscape){.scanner-wrap{aspect-ratio:16/9;max-height:300px}}
         @media(max-width:520px){.card{padding:18px}.manual .row{flex-direction:column}.manual .btn{width:100%}.clock strong{font-size:21px}.attendance-title{font-size:22px}}
     </style>
 </head>
 <body class="attendance-page">
-<?php include __DIR__ . '/../navbar.php'; ?>
-<?php include __DIR__ . '/../header.php'; ?>
+<?php include __DIR__ . '/header.php'; ?>
+<nav class="kiosk-nav">
+    <span class="crumb">Library Attendance Kiosk</span>
+    <a class="logout" href="/LibraryBorrowingSystem/logout.php">Logout</a>
+</nav>
 
 <div class="attendance-shell">
 <div class="attendance-container">
@@ -286,33 +268,6 @@ if (($_GET['report'] ?? '') === '1'):
         </form>
     </section>
 
-    <section class="card list-card" aria-label="Attendance list">
-        <div class="list-head">
-            <h2 class="attendance-title" style="font-size:20px">Visits<span class="count" id="visitCount"><?php echo $totalVisits; ?></span></h2>
-            <a class="report-link" href="?report=1&amp;start_date=<?php echo h($start_date); ?>&amp;end_date=<?php echo h($end_date); ?>" target="_blank" rel="noopener">Print report &rarr;</a>
-        </div>
-        <form method="GET" class="date-filter">
-            <div><label for="start_date">From</label><input type="date" id="start_date" name="start_date" value="<?php echo h($start_date); ?>"></div>
-            <div><label for="end_date">To</label><input type="date" id="end_date" name="end_date" value="<?php echo h($end_date); ?>"></div>
-            <button class="btn" type="submit">Filter</button>
-        </form>
-        <div class="table-wrap">
-            <table>
-                <thead><tr><th>Name</th><th>Type</th><th>ID No.</th><th>Time In</th></tr></thead>
-                <tbody id="visitBody">
-                <?php foreach ($attendance as $row): ?>
-                    <tr>
-                        <td class="name"><?php echo h($row['full_name']); ?></td>
-                        <td><span class="badge <?php echo h($row['borrower_type']); ?>"><?php echo h($row['borrower_type']); ?></span></td>
-                        <td><?php echo h($row['borrower_no']); ?></td>
-                        <td><?php echo h(date(($start_date === $end_date) ? 'h:i A' : 'M d, h:i A', strtotime($row['time_in']))); ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                <?php if (!$attendance): ?><tr class="empty"><td colspan="4">No visits recorded for this period yet.</td></tr><?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
 </div>
 </div>
 
@@ -325,16 +280,11 @@ if (($_GET['report'] ?? '') === '1'):
     const statusIcon = document.getElementById('statusIcon');
     const statusTitle = document.getElementById('statusTitle');
     const statusSub = document.getElementById('statusSub');
-    const visitBody = document.getElementById('visitBody');
-    const visitCount = document.getElementById('visitCount');
     const scannerMsg = document.getElementById('scannerMsg');
     const scannerMsgText = document.getElementById('scannerMsgText');
     const retryBtn = document.getElementById('retryCamera');
-    const showsToday = <?php echo json_encode($start_date === date('Y-m-d') && $end_date === date('Y-m-d')); ?>;
 
     let busy = false, resetTimer = null, lastCode = '', lastCodeAt = 0, scanner = null;
-
-    function esc(v) { const d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
 
     function setStatus(kind, title, sub, icon) {
         status.className = 'status ' + kind;
@@ -357,17 +307,6 @@ if (($_GET['report'] ?? '') === '1'):
         } catch (e) { return text; }
     }
 
-    function addRow(v) {
-        if (!showsToday) return;
-        const empty = visitBody.querySelector('.empty');
-        if (empty) empty.remove();
-        const tr = document.createElement('tr');
-        tr.className = 'new';
-        tr.innerHTML = '<td class="name">' + esc(v.full_name) + '</td><td><span class="badge ' + esc(v.borrower_type) + '">' + esc(v.borrower_type) + '</span></td><td>' + esc(v.borrower_no) + '</td><td>' + esc(v.time_in) + '</td>';
-        visitBody.insertBefore(tr, visitBody.firstChild);
-        visitCount.textContent = String(parseInt(visitCount.textContent, 10) + 1);
-    }
-
     async function submitCode(code) {
         if (busy || !code) return;
         busy = true;
@@ -385,7 +324,6 @@ if (($_GET['report'] ?? '') === '1'):
             const data = await res.json();
             if (data.ok && data.visit) {
                 setStatus('success', data.visit.full_name, data.visit.borrower_type + ' \u2022 timed in at ' + data.visit.time_in, '\u2713');
-                addRow(data.visit);
                 input.value = '';
             } else {
                 setStatus('error', 'Could not record', data.message || 'Something went wrong.', '!');
