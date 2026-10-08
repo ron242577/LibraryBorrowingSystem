@@ -12,12 +12,17 @@ if (isset($_SESSION['user_id'])) {
     exit();
 }
 if (isset($_SESSION['student_id'])) {
-    header('Location: /LibraryBorrowingSystem/student/profile.php');
+    header('Location: /LibraryBorrowingSystem/student/dashboard.php');
+    exit();
+}
+if (isset($_SESSION['teacher_id'])) {
+    header('Location: /LibraryBorrowingSystem/teacher/dashboard.php');
     exit();
 }
 
 $error = '';
 $success = '';
+$lockSeconds = 0;
 
 if (isset($_GET['logout'])) {
     $success = 'You have been logged out successfully.';
@@ -61,8 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Login attempt was blocked by rate limiting.',
                 ['reason' => 'rate_limited']
             );
-            $minutes = max(1, (int)ceil($lock['seconds'] / 60));
-            throw new RuntimeException("Too many failed login attempts. Try again in about {$minutes} minute(s).");
+            $lockSeconds = max(1, (int)$lock['seconds']);
+            $minutes = max(1, (int)ceil($lockSeconds / 60));
+            throw new RuntimeException("Too many failed login attempts. Try again in about {$minutes} minute(s). If you forgot your password or continue having trouble, please use Forgot Password.");
         }
 
         // Chief Librarian account is identified by username.
@@ -235,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ['login_method' => $loginMethod]
             );
 
-            header('Location: /LibraryBorrowingSystem/student/profile.php');
+            header('Location: /LibraryBorrowingSystem/student/dashboard.php');
             exit();
         }
 
@@ -253,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['teacher_qr'] = $account['qr_code'];
             $_SESSION['teacher_login_time'] = time();
             $_SESSION['teacher_session_fingerprint'] = createSessionFingerprint();
-            header('Location: /LibraryBorrowingSystem/teacher/profile.php');
+            header('Location: /LibraryBorrowingSystem/teacher/dashboard.php');
             exit();
         }
 
@@ -718,6 +724,9 @@ $csrf = csrfToken();
             <?php if ($error): ?>
             <script>document.addEventListener('DOMContentLoaded',()=>showToast(<?php echo json_encode($error); ?>,'error',4500,'Login'));</script>
             <?php endif; ?>
+            <?php if ($lockSeconds > 0): ?>
+            <div id="login-lock-countdown" class="field-hint" style="color:#b42318;font-weight:700;margin-bottom:16px;"></div>
+            <?php endif; ?>
             <?php if ($success): ?>
             <script>document.addEventListener('DOMContentLoaded',()=>showToast(<?php echo json_encode($success); ?>,'success',3500));</script>
             <?php endif; ?>
@@ -831,7 +840,29 @@ $csrf = csrfToken();
         window.addEventListener('pageshow', function (e) { if (e.persisted) reset(); });
     }
 
-    function init() { initPasswordToggles(); initCapsLockHint(); initAutofocus(); initSubmitState(); }
+    function initLockCountdown() {
+        var box = document.getElementById('login-lock-countdown');
+        if (!box) return;
+        var seconds = <?php echo (int)$lockSeconds; ?>;
+        var form = document.getElementById('login-form');
+        var button = form ? form.querySelector('button[type=\"submit\"]') : null;
+        function update() {
+            var m = Math.floor(seconds / 60);
+            var s = seconds % 60;
+            box.textContent = 'Login temporarily locked. Try again in ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0') + '.';
+            if (button) button.disabled = true;
+            if (seconds <= 0) {
+                box.textContent = 'You may try logging in again. If you continue having trouble, use Forgot Password.';
+                if (button) button.disabled = false;
+                return;
+            }
+            seconds--;
+            setTimeout(update,1000);
+        }
+        update();
+    }
+
+    function init() { initPasswordToggles(); initCapsLockHint(); initAutofocus(); initSubmitState(); initLockCountdown(); }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

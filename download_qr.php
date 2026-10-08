@@ -7,6 +7,7 @@
 require_once __DIR__ . '/session_check.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/qr_security.php';
+require_once __DIR__ . '/includes/library_access_card.php';
 
 $code = trim((string)($_GET['code'] ?? ''));
 $type = strtolower(trim((string)($_GET['type'] ?? 'auto')));
@@ -59,6 +60,26 @@ if (!$record && ($type === 'book' || $type === 'auto')) {
     }
 }
 
+if (!$record && ($type === 'book' || $type === 'auto')) {
+    $chk = $conn->query("SHOW TABLES LIKE 'book_copies'");
+    if ($chk && $chk->num_rows > 0) {
+        $stmt = $conn->prepare("
+            SELECT c.copy_id AS book_id, c.qr_code, b.is_archived
+            FROM book_copies c JOIN books b ON b.book_id = c.book_id
+            WHERE c.qr_code = ? AND c.copy_status <> 'removed'
+            LIMIT 1
+        ");
+        $stmt->bind_param('s', $code);
+        $stmt->execute();
+        $copyRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($copyRow && (int)$copyRow['is_archived'] === 0) {
+            $record = $copyRow;
+            $resolvedType = 'book';
+        }
+    }
+}
+
 if (!$record && ($type === 'teacher' || $type === 'auto')) {
     $stmt = $conn->prepare("SELECT teacher_id, qr_code, COALESCE(is_archived,0) AS is_archived, status FROM teachers WHERE qr_code = ? LIMIT 1");
     $stmt->bind_param('s', $code);
@@ -104,6 +125,44 @@ qrSecurityLog(
     $targetId,
     'QR download requested for ' . $resolvedType . '.'
 );
+
+// Personal student/teacher QR downloads are delivered as the complete
+// Library Access Card JPEG. Book QR downloads remain QR-only.
+if ($resolvedType === 'student' || $resolvedType === 'teacher') {
+    $table = $resolvedType === 'student' ? 'students' : 'teachers';
+    $idColumn = $resolvedType === 'student' ? 'student_id' : 'teacher_id';
+    $numberColumn = $resolvedType === 'student' ? 'student_no' : 'teacher_no';
+
+    $stmt = $conn->prepare("SELECT full_name, {$numberColumn} AS id_number, qr_code FROM {$table} WHERE {$idColumn} = ? LIMIT 1");
+    $stmt->bind_param('i', $targetId);
+    $stmt->execute();
+    $personal = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$personal) {
+        http_response_code(404);
+        exit('Personal Library Access Card data was not found.');
+    }
+
+    try {
+        $qrBytes = fetchLibraryQrPngBytes((string)$personal['qr_code']);
+        if ($qrBytes === null) throw new RuntimeException('Unable to prepare the QR image right now.');
+        $cardJpeg = buildLibraryAccessCardJpeg((string)$personal['full_name'], (string)$personal['id_number'], (string)$personal['qr_code'], $qrBytes);
+    } catch (Throwable $e) {
+        http_response_code(503);
+        exit($e->getMessage());
+    }
+
+    $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string)$personal['full_name']);
+    $downloadName = ($safeName ?: ucfirst($resolvedType)) . '_Library_Access_Card.jpg';
+    header('Content-Type: image/jpeg');
+    header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+    header('Content-Length: ' . strlen($cardJpeg));
+    header('Cache-Control: private, no-store, max-age=0, must-revalidate');
+    header('Pragma: no-cache');
+    echo $cardJpeg;
+    exit;
+}
 
 $qrDir = __DIR__ . '/qr_codes';
 if (!is_dir($qrDir)) {

@@ -595,7 +595,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                     <td>
                                         <div class="action-buttons">
                                             <button class="btn-small btn-reset" onclick="openResetModal(<?php echo $staff['user_id']; ?>, '<?php echo htmlspecialchars($staff['full_name']); ?>')">
-                                                🔑 Reset
+                                                Reset
                                             </button>
                                             
                                             <?php if ($staff['status'] === 'active'): ?>
@@ -609,7 +609,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                                     <input type="hidden" name="user_id" value="<?php echo $staff['user_id']; ?>">
                                                     <input type="hidden" name="new_status" value="inactive">
                                                     <button type="submit" class="btn-small btn-deactivate">
-                                                        ⏸ Deactivate
+                                                        Deactivate
                                                     </button>
                                                 </form>
                                             <?php else: ?>
@@ -622,7 +622,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                                     <input type="hidden" name="user_id" value="<?php echo $staff['user_id']; ?>">
                                                     <input type="hidden" name="new_status" value="active">
                                                     <button type="submit" class="btn-small btn-activate">
-                                                        ✓ Activate
+                                                        Activate
                                                     </button>
                                                 </form>
                                             <?php endif; ?>
@@ -645,7 +645,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <div id="resetModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>🔑 Reset Password</h3>
+                <h3>Reset Password</h3>
                 <p id="staffName" style="color: #666; margin-top: 5px; font-size: 14px;"></p>
             </div>
             

@@ -6,16 +6,79 @@
 
 require_once __DIR__ . '/../includes/student_session.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/book_copies.php';
+bcEnsureSchema($conn);
 require_once __DIR__ . '/../includes/notification_helper.php';
+require_once __DIR__ . '/../includes/account_profile.php';
+apEnsureProfileSchema($conn, 'students');
 
 $student = null;
 $borrowed_books = [];
 $error = null;
 $student_id = (int)$_SESSION['student_id'];
+$profile_message = '';
+$profile_error = '';
 $student_qr = $_SESSION['student_qr'] ?? '';
 
+// Account settings actions
 try {
-    $student_stmt = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, qr_code, status, created_at FROM students WHERE student_id = ? AND status = 'active' AND COALESCE(is_archived,0) = 0 LIMIT 1");
+    $account_stmt = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, email, qr_code, profile_picture, password, status, created_at FROM students WHERE student_id = ? AND status = 'active' AND COALESCE(is_archived,0) = 0 LIMIT 1");
+    $account_stmt->bind_param('i', $student_id);
+    $account_stmt->execute();
+    $account = $account_stmt->get_result()->fetch_assoc();
+    $account_stmt->close();
+    if (!$account) {
+        header('Location: /LibraryBorrowingSystem/student/portal.php');
+        exit();
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        requireValidCsrf($_POST['csrf_token'] ?? '');
+        $accountAction = (string)($_POST['account_action'] ?? '');
+
+        if ($accountAction === 'update_profile') {
+            $newName = apValidateName((string)($_POST['full_name'] ?? ''));
+            $newContact = apValidateContact((string)($_POST['contact_number'] ?? ''));
+            $newPicture = apProfilePictureUpload('student', $student_id, $_FILES['profile_picture'] ?? [], $account['profile_picture'] ?? null);
+            $update = $conn->prepare("UPDATE students SET full_name = ?, contact_number = ?, profile_picture = ? WHERE student_id = ?");
+            $update->bind_param('sssi', $newName, $newContact, $newPicture, $student_id);
+            if (!$update->execute()) throw new RuntimeException('Unable to update your profile details.');
+            $update->close();
+            $_SESSION['student_name'] = $newName;
+            $profile_message = 'Your profile details were updated successfully.';
+        } elseif ($accountAction === 'start_password_change') {
+            apStartPasswordChange(
+                'student',
+                $student_id,
+                (string)($account['email'] ?? ''),
+                (string)$account['full_name'],
+                (string)($_POST['current_password'] ?? ''),
+                (string)$account['password'],
+                (string)($_POST['new_password'] ?? '')
+            );
+            $profile_message = 'A 6-digit verification code was sent to ' . apMaskEmail((string)$account['email']) . '.';
+        } elseif ($accountAction === 'verify_password_change') {
+            apVerifyPasswordChange('student', $student_id, trim((string)($_POST['verification_code'] ?? '')));
+            $state = $_SESSION[apPasswordSessionKey('student')] ?? [];
+            $newHash = (string)($state['new_password_hash'] ?? '');
+            if ($newHash === '') throw new RuntimeException('Password change authorization is incomplete.');
+            $pw = $conn->prepare("UPDATE students SET password = ? WHERE student_id = ?");
+            $pw->bind_param('si', $newHash, $student_id);
+            if (!$pw->execute()) throw new RuntimeException('Unable to save the new password.');
+            $pw->close();
+            apClearPasswordChange('student');
+            $profile_message = 'Your password was changed successfully.';
+        } elseif ($accountAction === 'cancel_password_change') {
+            apClearPasswordChange('student');
+            $profile_message = 'Password change cancelled.';
+        }
+    }
+} catch (Throwable $accountError) {
+    $profile_error = $accountError->getMessage();
+}
+
+try {
+    $student_stmt = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, email, qr_code, profile_picture, password, status, created_at FROM students WHERE student_id = ? AND status = 'active' AND COALESCE(is_archived,0) = 0 LIMIT 1");
     $student_stmt->bind_param('i', $student_id);
     $student_stmt->execute();
     $student = $student_stmt->get_result()->fetch_assoc();
@@ -25,7 +88,7 @@ try {
     try {
         $reservation_stmt = $conn->prepare("
             SELECT r.reservation_id, r.status, r.reserved_at, r.ready_at,
-                   b.title, b.book_number
+                   b.title
             FROM book_reservations r
             INNER JOIN books b ON r.book_id = b.book_id
             WHERE r.student_id = ? AND r.status IN ('pending','ready')
@@ -49,7 +112,23 @@ try {
         exit();
     }
 
-    $books_stmt = $conn->prepare("\n        SELECT\n            t.transaction_id,\n            t.date_borrowed,\n            t.due_date,\n            t.return_date,\n            t.status,\n            b.title,\n            b.author\n        FROM transactions t\n        INNER JOIN books b ON t.book_id = b.book_id\n        WHERE t.student_id = ?\n        ORDER BY t.date_borrowed DESC\n    ");
+    $books_stmt = $conn->prepare("
+        SELECT
+            t.transaction_id,
+            t.date_borrowed,
+            t.due_date,
+            t.return_date,
+            t.status,
+            b.title,
+            b.author,
+            COALESCE(c.book_number, b.book_number) AS book_number,
+            COALESCE(c.qr_code, b.qr_code) AS qr_code
+        FROM transactions t
+        INNER JOIN books b ON t.book_id = b.book_id
+        LEFT JOIN book_copies c ON c.copy_id = t.copy_id
+        WHERE t.student_id = ?
+        ORDER BY t.date_borrowed DESC
+    ");
     $books_stmt->bind_param('i', $student_id);
     $books_stmt->execute();
     $books_result = $books_stmt->get_result();
@@ -62,6 +141,7 @@ try {
     logError('Student profile error: ' . $e->getMessage());
     $error = 'Unable to load your profile right now. Please try again.';
 }
+$password_change_state = $_SESSION[apPasswordSessionKey('student')] ?? null; $password_change_pending = is_array($password_change_state); $password_change_email = $password_change_pending ? apMaskEmail((string)($password_change_state['email'] ?? ($account['email'] ?? ''))) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -69,10 +149,13 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Profile - Library Borrowing System</title>
-    <style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
             background: #F3F7FC;
             color: #202A44;
             padding-bottom: 40px;
@@ -261,6 +344,35 @@ try {
         .badge.returned { background: #EDF5DD; color: #344E15; }
         .empty, .error-box { text-align: center; padding: 40px 20px; color: #52618D; }
         .error-box { color: #c62828; background: #ffebee; border: 2px solid #ef5350; border-radius: 10px; }
+        .account-message{padding:14px 16px;border-radius:10px;margin-bottom:18px;font-size:14px;font-weight:700}
+        .account-message.success{background:#E7F4D4;color:#2F4B12;border:1px solid #B8D98D}
+        .account-message.error{background:#FBE4E7;color:#8E1F2E;border:1px solid #E8A8B1}
+        .account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+        .account-field{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:700;color:#52618D}
+        .account-field input{width:100%;padding:12px 13px;border:1px solid #D2E2F6;border-radius:10px;background:#fff;color:#202A44;font:inherit;font-weight:500}
+        .account-field input:focus{outline:0;border-color:#141F52;box-shadow:0 0 0 3px rgba(244,249,22,.35)}
+        .account-field input[readonly]{background:#F7F9FC;color:#6B7690}
+        .account-field small,.account-hint,.password-rules{font-size:12px;line-height:1.5;color:#75819A;font-weight:500}
+        .account-profile-preview{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+        .account-avatar{width:86px;height:86px;border-radius:50%;background:#141F52;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;overflow:hidden;flex:0 0 auto}
+        .account-avatar img,.profile-avatar-image{width:100%;height:100%;object-fit:cover;border-radius:50%}
+        .account-btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 17px;border-radius:9px;border:1px solid transparent;font:inherit;font-weight:800;cursor:pointer;text-decoration:none}
+        .account-btn.primary{background:#141F52;color:#fff}.account-btn.primary:hover{background:#52618D}
+        .account-btn.secondary{background:#EDF3FA;color:#141F52;border-color:#D2E2F6}.account-btn.secondary:hover{background:#D2E2F6}
+        .account-divider{height:1px;background:#E6ECF5;margin:26px 0}
+        .profile-edit-action{display:flex;justify-content:flex-end;margin:0 0 14px}
+        .account-card[hidden]{display:none!important}
+        .account-security{display:grid;gap:14px}.account-security h3{font-size:17px;color:#202A44;margin-bottom:4px}
+        .password-form{display:grid;gap:12px}.account-actions{display:flex;justify-content:flex-start}.account-link-btn{border:0;background:none;padding:6px 0;color:#52618D;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+        .account-link-btn:hover{color:#141F52;text-decoration:underline}
+        .notification-icon{display:inline-flex;align-items:center;justify-content:center}
+        body.dark .account-field input{background:#18213f;color:#f4f7ff;border-color:#3c4b72}
+        body.dark .account-field input[readonly]{background:#222d4d;color:#c4d1ea}
+        body.dark .account-security h3{color:#fff}
+        body.dark .account-divider{background:#33456f}
+        body.dark .account-message.success{background:#233a1c;color:#c9efa0;border-color:#466d34}
+        body.dark .account-message.error{background:#4a1f29;color:#ffc2cb;border-color:#7b3442}
+        body.dark .account-btn.secondary{background:#222d4d;color:#f4f7ff;border-color:#3c4b72}
         @media (max-width: 700px) {
             body { padding-top: 60px; }
             .page-header { height: 60px; padding: 0 16px; }
@@ -308,18 +420,19 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
 </style>
     <?php require_once __DIR__ . '/../includes/responsive.php'; ?>
     <?php require_once __DIR__ . '/../includes/portal_ui.php'; ?>
+    <style>.qr-box .qr-zoomable img{width:min(60vw,200px);height:auto;aspect-ratio:1/1}.qr-box .qr-zoomable{margin:0 auto}html{scroll-behavior:smooth}</style>
 </head>
 <body class="student-app student-profile-page">
     <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
     <header class="page-header">
-        <a href="/LibraryBorrowingSystem/student/borrow.php" class="header-brand">
+        <a href="/LibraryBorrowingSystem/student/dashboard.php" class="header-brand">
             <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
             <span class="header-brand-text">Jose Abad Santos High School<span class="header-brand-subtitle">Library Management System</span></span>
         </a>
         <div class="student-header-actions">
         <div class="student-notification-wrap">
     <button type="button" class="student-notification-bell" id="studentNotificationBell" aria-label="Notifications">
-        <span>🔔</span><span class="student-notification-count" id="studentNotificationCount" style="display:none;">0</span>
+        <span class="notification-icon" aria-hidden="true">🔔</span><span class="student-notification-count" id="studentNotificationCount" style="display:none;">0</span>
     </button>
     <div class="student-notification-panel" id="studentNotificationPanel">
         <div class="student-notification-header"><strong>Notifications</strong><button type="button" id="studentMarkAllNotifications">Mark all read</button></div>
@@ -333,11 +446,9 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
                 <span class="student-menu-caret">▼</span>
             </button>
             <div class="student-dropdown" id="studentDropdown">
+                <a href="/LibraryBorrowingSystem/student/dashboard.php">Dashboard</a>
                 <a href="/LibraryBorrowingSystem/student/profile.php" class="active">Profile</a>
-                <?php if ($student_qr): ?>
-                    <a href="/LibraryBorrowingSystem/student/borrow.php">Search Books</a>
-                    <button type="button" class="theme-switch" id="studentThemeToggle">Dark theme</button>
-                <?php endif; ?>
+                <button type="button" class="theme-switch" id="studentThemeToggle">Dark mode</button>
                 <div class="dropdown-divider"></div>
                 <a href="/LibraryBorrowingSystem/student/portal.php?logout=1">Logout</a>
             </div>
@@ -351,6 +462,89 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
             <p>Your student information and borrowing history are shown here.</p>
         </div>
 
+        <?php if ($profile_message): ?><div class="account-message success"><?php echo htmlspecialchars($profile_message); ?></div><?php endif; ?>
+        <?php if ($profile_error): ?><div class="account-message error"><?php echo htmlspecialchars($profile_error); ?></div><?php endif; ?>
+
+        <?php if ($student): ?>
+        <div class="profile-edit-action">
+            <button type="button" class="account-btn secondary" id="editProfileToggle" aria-expanded="false" aria-controls="account-settings">Edit Profile</button>
+        </div>
+        <section class="card account-card" id="account-settings" hidden data-auto-open="<?php echo ($profile_message || $profile_error || $password_change_pending) ? '1' : '0'; ?>">
+            <div class="card-header">Account Settings</div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" class="account-form">
+                    <?php echo csrfField(); ?>
+                    <input type="hidden" name="account_action" value="update_profile">
+                    <div class="account-profile-preview">
+                        <div class="account-avatar">
+                            <?php if (!empty($student['profile_picture'])): ?>
+                                <img src="<?php echo htmlspecialchars(apProfilePictureUrl($student['profile_picture'])); ?>" alt="Profile picture">
+                            <?php else: ?>
+                                <?php echo htmlspecialchars(strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string)$student['full_name']), 0, 2) ?: 'US')); ?>
+                            <?php endif; ?>
+                        </div>
+                        <div>
+                            <strong>Profile picture</strong>
+                            <p class="account-hint">JPG, PNG, or WebP, maximum 2 MB.</p>
+                            <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                    </div>
+                    <div class="account-grid">
+                        <label class="account-field">
+                            <span>Full Name</span>
+                            <input type="text" name="full_name" maxlength="255" value="<?php echo htmlspecialchars($student['full_name']); ?>" required>
+                        </label>
+                        <label class="account-field">
+                            <span>Contact Number</span>
+                            <input type="text" name="contact_number" maxlength="20" value="<?php echo htmlspecialchars($student['contact_number'] ?? ''); ?>" placeholder="Optional">
+                        </label>
+                        <label class="account-field">
+                            <span>Email Address</span>
+                            <input type="email" value="<?php echo htmlspecialchars($student['email'] ?? ''); ?>" readonly>
+                            <small>This email is used for password verification.</small>
+                        </label>
+                    </div>
+                    <button class="account-btn primary" type="submit">Save Profile Details</button>
+                </form>
+
+                <div class="account-divider"></div>
+                <div class="account-security">
+                    <div>
+                        <h3>Change Password</h3>
+                        <p class="account-hint">A verification code will be sent to <?php echo htmlspecialchars(apMaskEmail((string)($student['email'] ?? ''))); ?> before your new password is saved.</p>
+                    </div>
+                    <?php if (!$password_change_pending): ?>
+                    <form method="POST" class="password-form">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="account_action" value="start_password_change">
+                        <div class="account-grid">
+                            <label class="account-field"><span>Current Password</span><input type="password" name="current_password" autocomplete="current-password" required></label>
+                            <label class="account-field"><span>New Password</span><input type="password" name="new_password" autocomplete="new-password" required></label>
+                        </div>
+                        <p class="password-rules">10+ characters, uppercase, lowercase, number, and special character.</p>
+                        <button class="account-btn secondary" type="submit">Send Verification Code</button>
+                    </form>
+                    <?php else: ?>
+                    <form method="POST" class="password-form">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="account_action" value="verify_password_change">
+                        <label class="account-field"><span>Verification Code</span><input type="text" name="verification_code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" required></label>
+                        <p class="account-hint">Code sent to <?php echo htmlspecialchars($password_change_email); ?>. It expires in 5 minutes.</p>
+                        <div class="account-actions">
+                            <button class="account-btn primary" type="submit">Verify and Change Password</button>
+                        </div>
+                    </form>
+                    <form method="POST" class="cancel-password-form">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="account_action" value="cancel_password_change">
+                        <button class="account-link-btn" type="submit">Cancel password change</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </section>
+        <?php endif; ?>
+
         <?php if ($error): ?>
             <div class="error-box"><?php echo htmlspecialchars($error); ?></div>
         <?php elseif ($student): ?>
@@ -358,7 +552,7 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
                 <div class="card-header">Student Information</div>
                 <div class="card-body">
                     <div class="profile-top">
-                        <div class="avatar">🎓</div>
+                        <div class="avatar" aria-label="Profile picture"><?php if (!empty($student['profile_picture'])): ?><img class="profile-avatar-image" src="<?php echo htmlspecialchars(apProfilePictureUrl($student['profile_picture'])); ?>" alt="Profile picture"><?php else: ?><?php echo htmlspecialchars(strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string)$account['full_name']), 0, 2) ?: 'US')); ?><?php endif; ?></div>
                         <div class="profile-name">
                             <h2><?php echo htmlspecialchars($student['full_name']); ?></h2>
                             <p>Member since <?php echo date('M d, Y', strtotime($student['created_at'])); ?></p>
@@ -399,14 +593,14 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
                     </div>
 
                     <div class="qr-box">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($student['qr_code']); ?>" alt="Student QR Code">
+                        <button type="button" class="qr-zoomable" data-qr-zoom data-qr-code="<?php echo htmlspecialchars($student['qr_code'], ENT_QUOTES, 'UTF-8'); ?>" data-qr-title="My Library ID" data-qr-sub="<?php echo htmlspecialchars($student['full_name'], ENT_QUOTES, 'UTF-8'); ?>" data-qr-download="/LibraryBorrowingSystem/student/download_qr.php?format=jpg" data-qr-print="/LibraryBorrowingSystem/print_library_card.php?type=student" data-qr-card="1" data-qr-card-name="<?php echo htmlspecialchars($student['full_name'], ENT_QUOTES, 'UTF-8'); ?>" data-qr-card-id="<?php echo htmlspecialchars($student['student_no'], ENT_QUOTES, 'UTF-8'); ?>" data-qr-card-image="/LibraryBorrowingSystem/qr_codes/<?php echo rawurlencode($student['qr_code']); ?>.png" data-qr-card-logo="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" aria-label="Enlarge my QR code"><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=<?php echo urlencode($student['qr_code']); ?>" alt="Student QR Code"><span class="qr-zoom-hint" aria-hidden="true">⤢</span></button>
+                        <span class="qr-tap-note">Tap to enlarge</span>
                         <div class="qr-text"><?php echo htmlspecialchars($student['qr_code']); ?></div>
-                        <a class="qr-download-btn" href="/LibraryBorrowingSystem/student/download_qr.php">Download QR Code</a>
                     </div>
                 </div>
             </section>
 
-            <section class="card">
+            <section class="card" id="history">
                 <div class="card-header">Borrowing History</div>
                 <div class="card-body">
                     <?php if (empty($borrowed_books)): ?>
@@ -423,6 +617,7 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
                                         <div class="book-title"><?php echo htmlspecialchars($book['title']); ?></div>
                                         <div class="book-meta">
                                             Author: <?php echo htmlspecialchars($book['author']); ?><br>
+                                            Physical Copy: <?php echo htmlspecialchars($book['book_number'] ?? 'N/A'); ?><?php if (!empty($book['qr_code'])): ?> · QR ID: <?php echo htmlspecialchars($book['qr_code']); ?><?php endif; ?><br>
                                             Borrowed: <?php echo date('M d, Y', strtotime($book['date_borrowed'])); ?> •
                                             Return By: <?php echo date('M d, Y', strtotime($book['due_date'])); ?> (same day)
                                             <?php if (!empty($book['return_date'])): ?> • Returned: <?php echo date('M d, Y', strtotime($book['return_date'])); ?><?php endif; ?>
@@ -435,6 +630,8 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
                     <?php endif; ?>
                 </div>
             </section>
+
+            <?php require_once __DIR__ . '/../includes/portal_activity.php'; renderRecentActivity($conn, 'student', $student); ?>
         <?php endif; ?>
 
     </main>
@@ -444,7 +641,7 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
         function applyStudentTheme() {
             const dark = localStorage.getItem('jas-theme') === 'dark';
             document.body.classList.toggle('dark', dark);
-            if (studentThemeToggle) studentThemeToggle.textContent = dark ? 'Light theme' : 'Dark theme';
+            if (studentThemeToggle) studentThemeToggle.textContent = dark ? 'Light mode' : 'Dark mode';
         }
         applyStudentTheme();
         if (studentThemeToggle) studentThemeToggle.addEventListener('click', function () {
@@ -468,6 +665,23 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
         }
     </script>
 
+    <script>
+    (function(){
+        const editButton = document.getElementById('editProfileToggle');
+        const settings = document.getElementById('account-settings');
+        if (!editButton || !settings) return;
+        function setOpen(open, scroll) {
+            settings.hidden = !open;
+            editButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open && scroll) settings.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        editButton.addEventListener('click', function () {
+            setOpen(settings.hidden, true);
+        });
+        if (settings.dataset.autoOpen === '1') setOpen(true, false);
+    })();
+    </script>
+
 <script>
 (function(){
   const bell=document.getElementById('studentNotificationBell');
@@ -486,5 +700,6 @@ body.dark{background:#0b1228;color:#f4f7ff}body.dark .page-header,body.dark .car
 })();
 </script>
 
+<?php require_once __DIR__ . '/../includes/qr_lightbox.php'; ?>
 </body>
 </html>

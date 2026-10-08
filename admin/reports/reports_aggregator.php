@@ -25,6 +25,31 @@ class ReportsAggregator {
         ];
     }
 
+    /** Months between start and end (inclusive), with 0 for months that had no borrows. */
+    public static function fillMonths(array $rows, $start_date, $end_date) {
+        $counts = [];
+        foreach ($rows as $r) $counts[$r['month']] = (int)$r['count'];
+        $out = [];
+        $d = new DateTime(date('Y-m-01', strtotime($start_date)));
+        $last = new DateTime(date('Y-m-01', strtotime($end_date)));
+        for ($i = 0; $d <= $last && $i < 60; $i++) {
+            $key = $d->format('Y-m');
+            $out[] = ['month' => $key, 'count' => $counts[$key] ?? 0];
+            $d->modify('+1 month');
+        }
+        return $out;
+    }
+
+    /** Sunday to Saturday, with 0 for days that had no borrows. */
+    public static function fillDays(array $rows) {
+        $names = [1 => 'Sunday', 2 => 'Monday', 3 => 'Tuesday', 4 => 'Wednesday', 5 => 'Thursday', 6 => 'Friday', 7 => 'Saturday'];
+        $counts = [];
+        foreach ($rows as $r) $counts[(int)$r['day_num']] = (int)$r['count'];
+        $out = [];
+        foreach ($names as $num => $name) $out[] = ['day_name' => $name, 'day_num' => $num, 'count' => $counts[$num] ?? 0];
+        return $out;
+    }
+
     private function dateRangeEnd($end_date) {
         return date('Y-m-d', strtotime($end_date . ' +1 day'));
     }
@@ -38,6 +63,7 @@ class ReportsAggregator {
                   LEFT JOIN transactions t ON b.book_id = t.book_id
                     AND t.date_borrowed >= ? AND t.date_borrowed < ?
                   GROUP BY b.book_id, b.title, b.author
+                  HAVING borrow_count > 0
                   ORDER BY borrow_count DESC, b.title ASC
                   LIMIT 15";
         $stmt = $this->conn->prepare($query);
@@ -114,7 +140,7 @@ class ReportsAggregator {
                                       LEFT JOIN students s ON s.student_id = t.student_id
                                       LEFT JOIN teachers te ON te.teacher_id = t.teacher_id
                                       WHERE t.date_borrowed >= ? AND t.date_borrowed < ?
-                                      GROUP BY borrower_name, borrower_type
+                                      GROUP BY t.student_id, t.teacher_id, s.full_name, te.full_name
                                       ORDER BY borrow_count DESC, borrower_name ASC
                                       LIMIT 10");
         $stmt->bind_param('ss', $start_date, $end_exclusive);

@@ -34,6 +34,8 @@ try {
     $aggregator = new ReportsAggregator($conn);
     if ($report_type === 'dashboard' || $report_type === 'borrowing_trends') {
         $borrowing_trends = $aggregator->getBorrowingTrends($start_date, $end_date);
+        $borrowing_trends['borrowing_by_month'] = ReportsAggregator::fillMonths($borrowing_trends['borrowing_by_month'], $start_date, $end_date);
+        $borrowing_trends['borrowing_by_day'] = ReportsAggregator::fillDays($borrowing_trends['borrowing_by_day']);
     }
     if ($report_type === 'dashboard' || $report_type === 'system_metrics') {
         $system_metrics = $aggregator->getSystemMetrics($start_date, $end_date);
@@ -75,7 +77,7 @@ try {
         .tabs a { padding:10px 16px; border-radius:7px; background:white; color:#141F52; text-decoration:none; font-weight:700; border:1px solid #D2E2F6; }
         .tabs a.active { background:#141F52; color:white; border-color:#141F52; }
         .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:22px; }
-        .metric-card { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.06); border-left:4px solid #141F52; }
+        .metric-card { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
         .metric-card .label { font-size:12px; color:#52618D; font-weight:700; text-transform:uppercase; }
         .metric-card .value { font-size:30px; color:#141F52; font-weight:800; margin-top:6px; }
         .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:22px; }
@@ -123,7 +125,7 @@ try {
                 <button class="btn auto-filter-submit" type="submit">Apply Filters</button>
                 <a class="btn secondary" href="?report=dashboard">Reset</a>
                 <?php if ($report_type !== 'dashboard'): ?>
-                    <a class="btn secondary" href="reports/export_csv.php?type=<?php echo h($report_type); ?>&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Export CSV</a>
+                    <a class="btn secondary" href="reports/export_csv.php?type=<?php echo h($report_type); ?>&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Export Excel</a>
                     <a class="btn secondary" target="_blank" href="reports/export_pdf.php?type=<?php echo h($report_type); ?>&start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Print / Save PDF</a>
                 <?php endif; ?>
             </div>
@@ -158,7 +160,7 @@ try {
         </section>
 
         <section class="table-card">
-            <h3>Top Borrowers This Month</h3>
+            <h3>Top Borrowers</h3>
             <?php if (empty($borrowing_trends['borrowing_by_borrower'])): ?><div class="empty">No borrowing data for this period.</div><?php else: ?>
             <div class="table-wrapper"><table><thead><tr><th>Borrower</th><th>Type</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
             <?php foreach ($borrowing_trends['borrowing_by_borrower'] as $borrower): ?><tr><td><?php echo h($borrower['borrower_name'] ?: 'Unknown borrower'); ?></td><td><?php echo h($borrower['borrower_type']); ?></td><td><?php echo (int)$borrower['borrow_count']; ?></td><td><?php echo (int)$borrower['return_count']; ?></td></tr><?php endforeach; ?>
@@ -188,12 +190,18 @@ try {
 </main>
 <script>
 <?php if ($report_type === 'dashboard' || $report_type === 'borrowing_trends'): ?>
-const monthLabels = <?php echo json_encode(array_column($borrowing_trends['borrowing_by_month'] ?? [], 'month')); ?>;
+const monthLabels = <?php echo json_encode(array_map(function ($r) { return date('M Y', strtotime($r['month'] . '-01')); }, $borrowing_trends['borrowing_by_month'] ?? [])); ?>;
 const monthData = <?php echo json_encode(array_map('intval', array_column($borrowing_trends['borrowing_by_month'] ?? [], 'count'))); ?>;
 const dayLabels = <?php echo json_encode(array_column($borrowing_trends['borrowing_by_day'] ?? [], 'day_name')); ?>;
 const dayData = <?php echo json_encode(array_map('intval', array_column($borrowing_trends['borrowing_by_day'] ?? [], 'count'))); ?>;
-if (document.getElementById('monthChart')) new Chart(document.getElementById('monthChart'), { type:'line', data:{labels:monthLabels,datasets:[{label:'Borrows',data:monthData,borderColor:'#141F52',backgroundColor:'rgba(20,31,82,.12)',fill:true,tension:.25}]}, options:{responsive:true,maintainAspectRatio:false} });
-if (document.getElementById('dayChart')) new Chart(document.getElementById('dayChart'), { type:'bar', data:{labels:dayLabels,datasets:[{label:'Borrows',data:dayData,backgroundColor:'#52618D'}]}, options:{responsive:true,maintainAspectRatio:false} });
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } }
+};
+if (document.getElementById('monthChart')) new Chart(document.getElementById('monthChart'), { type:'bar', data:{labels:monthLabels,datasets:[{label:'Borrows',data:monthData,backgroundColor:'#141F52',maxBarThickness:56}]}, options:chartOptions });
+if (document.getElementById('dayChart')) new Chart(document.getElementById('dayChart'), { type:'bar', data:{labels:dayLabels,datasets:[{label:'Borrows',data:dayData,backgroundColor:'#52618D',maxBarThickness:56}]}, options:chartOptions });
 <?php endif; ?>
 </script>
 

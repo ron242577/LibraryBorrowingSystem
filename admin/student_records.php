@@ -63,6 +63,13 @@ if (!isAdmin()) {
     exit();
 }
 
+// Prevent Hostinger/proxy/browser caches from serving an older User Management page.
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
 // ── QR Code directory ────────────────────────────────────────────────────────
 $qr_dir = __DIR__ . '/../qr_codes';
 if (!is_dir($qr_dir)) {
@@ -593,10 +600,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
 /* ═══════════════════════════════════════════════════════════════════════════
    RECORDS logic
 ═══════════════════════════════════════════════════════════════════════════ */
-$page          = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$per_page      = 20;
-$offset        = ($page - 1) * $per_page;
-
 $search_rec    = $_GET['search']  ?? '';
 $status_filter = $_GET['status']  ?? '';
 $archive_filter = $_GET['archive_filter'] ?? 'active';
@@ -622,23 +625,24 @@ if (!empty($status_filter)) {
 }
 
 $cr             = $conn->query("SELECT COUNT(*) as total FROM students s $where");
-$total_students = $cr ? $cr->fetch_assoc()['total'] : 0;
-$total_pages    = max(1, ceil($total_students / $per_page));
+$total_students = $cr ? (int)$cr->fetch_assoc()['total'] : 0;
 
+// Render the full filtered student result set and let the shared client-side
+// paginator (the same paginator used by Catalogue) control which 15 rows are
+// visible. This avoids page-2 partial reload/action issues on Hostinger.
 $qry = "SELECT
             s.student_id, s.student_no, s.full_name, s.student_group, s.department,
             s.year_level, s.contact_number, s.card_valid_until, s.email, s.qr_code,
             s.status, s.is_archived, s.archived_at, s.created_at, s.updated_at,
-            COUNT(t.transaction_id)                                    AS total_borrows,
-            SUM(CASE WHEN t.status = 'borrowed' THEN 1 ELSE 0 END)    AS currently_borrowed
+            COUNT(t.transaction_id) AS total_borrows,
+            COALESCE(SUM(CASE WHEN t.status = 'borrowed' THEN 1 ELSE 0 END), 0) AS currently_borrowed
         FROM students s
         LEFT JOIN transactions t ON s.student_id = t.student_id
         $where
         GROUP BY s.student_id, s.student_no, s.full_name, s.student_group, s.department,
                  s.year_level, s.contact_number, s.card_valid_until, s.email, s.qr_code,
                  s.status, s.is_archived, s.archived_at, s.created_at, s.updated_at
-        ORDER BY $sort_by $sort_order
-        LIMIT $offset, $per_page";
+        ORDER BY $sort_by $sort_order";
 
 $students_paginated = [];
 $res = $conn->query($qry);
@@ -684,7 +688,7 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
             SELECT t.transaction_id, t.date_borrowed, t.due_date, t.return_date,
                    t.status, b.title, b.author
             FROM transactions t
-            JOIN books b ON t.book_id = b.book_id
+            LEFT JOIN books b ON t.book_id = b.book_id
             WHERE t.student_id = ?
             ORDER BY t.date_borrowed DESC
         ");
@@ -708,7 +712,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
     $teacherData = $teacherDetail->get_result()->fetch_assoc(); $teacherDetail->close();
     header('Content-Type: application/json');
     $teacherTransactions = [];
-    $history = $conn->prepare('SELECT t.transaction_id, t.date_borrowed, t.due_date, t.return_date, t.status, t.borrow_condition, t.return_condition, b.title, b.author FROM transactions t JOIN books b ON t.book_id=b.book_id WHERE t.teacher_id=? ORDER BY t.date_borrowed DESC');
+    $history = $conn->prepare('SELECT t.transaction_id, t.date_borrowed, t.due_date, t.return_date, t.status, t.borrow_condition, t.return_condition, b.title, b.author FROM transactions t LEFT JOIN books b ON t.book_id=b.book_id WHERE t.teacher_id=? ORDER BY t.date_borrowed DESC');
     $history->bind_param('i', $tid); $history->execute();
     $historyResult = $history->get_result();
     while ($row = $historyResult->fetch_assoc()) $teacherTransactions[] = $row;
@@ -774,7 +778,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
             padding: 18px 20px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border-left: 4px solid #141F52;
         }
         .stat-card h4 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
         .stat-card .value { font-size: 26px; font-weight: 700; color: #202A44; }
@@ -790,11 +793,12 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         .filter-section h3 { font-size: 15px; color: #202A44; margin-bottom: 14px; }
         .filter-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 14px;
+            grid-template-columns: minmax(300px, 2.1fr) repeat(4, minmax(125px, 1fr));
+            gap: 10px;
             align-items: end;
         }
-        .filter-group { display: flex; flex-direction: column; }
+        .filter-group { display: flex; flex-direction: column; min-width: 0; }
+        .filter-group:first-child { grid-column: auto; }
         .filter-group label { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #52618D; }
         .filter-group input,
         .filter-group select {
@@ -809,10 +813,33 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
             border-color: #141F52;
             box-shadow: 0 0 0 3px rgba(244,249,22,.35);
         }
-        .filter-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-        .filter-action-left { display: flex; gap: 10px; flex-wrap: wrap; }
-        .filter-action-right { margin-left: auto; }
-        @media (max-width: 600px) { .filter-actions { align-items: stretch; } .filter-action-left, .filter-action-right, .filter-action-right .btn { width: 100%; justify-content: center; } }
+        .filter-actions { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; }
+        .filter-action-left { display: flex; gap: 8px; flex: 0 0 auto; }
+        .filter-action-right { margin-left: auto; flex: 0 0 auto; }
+        .filter-actions .btn { min-height: 38px; }
+        @media (min-width: 1101px) {
+            .filter-section form { display: flex; align-items: flex-end; gap: 10px; }
+            .filter-grid { flex: 1 1 auto; }
+            .filter-actions { margin-top: 0; }
+        }
+        @media (max-width: 1100px) {
+            .filter-grid { grid-template-columns: repeat(5, minmax(105px, 1fr)); }
+            .filter-group input, .filter-group select { min-width: 0; }
+            .filter-actions { margin-top: 10px; }
+        }
+        @media (max-width: 900px) {
+            .filter-section form { display: block; }
+            .filter-grid { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+            .filter-actions { margin-top: 10px; }
+        }
+        @media (max-width: 760px) {
+            .filter-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 600px) {
+            .filter-grid { grid-template-columns: 1fr; }
+            .filter-actions { align-items: stretch; flex-direction: column; }
+            .filter-action-left, .filter-action-right, .filter-action-right .btn { width: 100%; justify-content: center; }
+        }
 
         /* ── Add Student section ── */
         .add-student-section {
@@ -938,8 +965,15 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         .table-header h3 { font-size: 16px; color: #202A44; }
         .table-header span { font-size: 13px; color: #888; }
 
-        .table-responsive { overflow-x: hidden; width:100%; }
+        .table-responsive { overflow-x: auto; width:100%; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .student-compact-table, .teacher-compact-table { min-width: 980px; }
+        .student-compact-table th:last-child, .student-compact-table td:last-child,
+        .teacher-compact-table th:last-child, .teacher-compact-table td:last-child,
+        .student-compact-table th:nth-last-child(2), .student-compact-table td:nth-last-child(2),
+        .teacher-compact-table th:nth-last-child(2), .teacher-compact-table td:nth-last-child(2) {
+            white-space: nowrap;
+        }
         thead th {
             background: #141F52;
             color: white;
@@ -963,27 +997,63 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         .badge-active   { background: #EDF5DD; color: #344E15; }
         .badge-inactive { background: #f8d7da; color: #721c24; }
 
-        /* ── Pagination ── */
-        .pagination {
-            display: flex;
-            gap: 6px;
-            padding: 16px 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        .pagination a,
-        .pagination span {
-            padding: 7px 13px;
-            border: 1px solid #D2E2F6;
-            border-radius: 4px;
-            text-decoration: none;
-            font-size: 13px;
-            color: #141F52;
-        }
-        .pagination a:hover { background: #141F52; color: white; border-color: #141F52; }
-        .pagination .active { background: #141F52; color: white; border-color: #F4F916; }
+        /* Student table uses server-side pagination; the visual controls match the shared table paginator. */
+        .student-server-pagination { padding: 12px 4px 2px; }
 
         .no-data { text-align: center; padding: 40px; color: #aaa; }
+
+        .records-nav {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin: 0 0 12px;
+            position: sticky;
+            top: 74px;
+            z-index: 20;
+            padding: 5px;
+            background: #EEF3FA;
+            border-radius: 8px;
+            width: fit-content;
+            max-width: 100%;
+        }
+        #studentTableSection, #teacherTableSection { scroll-margin-top: 118px; }
+
+        .records-nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 13px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #52618D;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .records-nav-link span {
+            font-size: 10px;
+            min-width: 20px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: #DDE7F5;
+            color: #202A44;
+            text-align: center;
+        }
+        .records-nav-link:hover, .records-nav-link.active {
+            background: #141F52;
+            color: #fff;
+        }
+        .records-nav-link.active span, .records-nav-link:hover span {
+            background: #F4F916;
+            color: #141F52;
+        }
+        .table-pagination-ellipsis {
+            min-width: 18px;
+            text-align: center;
+            color: #94A3B8;
+            font-size: 13px;
+            font-weight: 700;
+        }
 
         /* ══════════════════════════════════════════
            STUDENT DETAIL MODAL
@@ -1172,47 +1242,63 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
 </style>
 
 <style id="responsive-table-priority-fix">
-/* Mobile responsive table priority columns */
+/* Mobile user-management tables: keep the same useful columns and make the
+   action controls physically visible even under the global responsive rules. */
 @media (max-width: 768px) {
-
-    /* Student records: show only Name, Archive, Action */
-    .student-compact-table th,
-    .student-compact-table td {
-        display: none;
-    }
-    .student-compact-table th:nth-child(2),
-    .student-compact-table td:nth-child(2),
-    .student-compact-table th:nth-child(11),
-    .student-compact-table td:nth-child(11),
-    .student-compact-table th:nth-child(15),
-    .student-compact-table td:nth-child(15) {
-        display: table-cell;
-    }
-
-    /* Teacher records: show only Name, Archive, Action */
-    .teacher-compact-table th,
-    .teacher-compact-table td {
-        display: none;
-    }
-    .teacher-compact-table th:nth-child(2),
-    .teacher-compact-table td:nth-child(2),
-    .teacher-compact-table th:nth-child(7),
-    .teacher-compact-table td:nth-child(7),
-    .teacher-compact-table th:nth-child(9),
-    .teacher-compact-table td:nth-child(9) {
-        display: table-cell;
-    }
-
     .student-compact-table,
     .teacher-compact-table {
-        width: 100%;
-        table-layout: fixed;
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+    }
+    .student-compact-table th, .student-compact-table td,
+    .teacher-compact-table th, .teacher-compact-table td {
+        display: none !important;
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
     }
 
-    .student-compact-table td,
-    .teacher-compact-table td {
-        white-space: normal;
-        overflow-wrap: break-word;
+    /* Student: Name | Archive | Action */
+    .student-compact-table th:nth-child(2), .student-compact-table td:nth-child(2),
+    .student-compact-table th:nth-child(11), .student-compact-table td:nth-child(11),
+    .student-compact-table th:nth-child(15), .student-compact-table td:nth-child(15),
+    /* Teacher: Name | Archive | Action */
+    .teacher-compact-table th:nth-child(2), .teacher-compact-table td:nth-child(2),
+    .teacher-compact-table th:nth-child(7), .teacher-compact-table td:nth-child(7),
+    .teacher-compact-table th:nth-child(8), .teacher-compact-table td:nth-child(8) {
+        display: table-cell !important;
+    }
+
+    .student-compact-table th:nth-child(2), .student-compact-table td:nth-child(2),
+    .teacher-compact-table th:nth-child(2), .teacher-compact-table td:nth-child(2) { width: auto !important; }
+    .student-compact-table th:nth-child(11), .student-compact-table td:nth-child(11),
+    .student-compact-table th:nth-child(15), .student-compact-table td:nth-child(15),
+    .teacher-compact-table th:nth-child(7), .teacher-compact-table td:nth-child(7),
+    .teacher-compact-table th:nth-child(8), .teacher-compact-table td:nth-child(8) {
+        width: 76px !important;
+        white-space: nowrap !important;
+    }
+
+    .student-compact-table td form, .teacher-compact-table td form {
+        margin: 0 !important;
+        display: inline-flex !important;
+    }
+    .student-compact-table .btn, .student-compact-table .btn-view,
+    .teacher-compact-table .btn, .teacher-compact-table .btn-view {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: auto !important;
+        min-width: 58px !important;
+        min-height: 34px !important;
+        padding: 7px 10px !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        position: relative;
+        z-index: 2;
     }
 }
 </style>
@@ -1237,6 +1323,225 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
     }
 }
 </style>
+
+<style id="final-user-management-layout-fix">
+/* Compact desktop toolbar: keep all filters on one horizontal line, matching the catalogue layout. */
+.filter-section {
+    padding: 14px 16px !important;
+    margin-bottom: 16px !important;
+}
+.filter-section h3 {
+    font-size: 15px !important;
+    margin-bottom: 10px !important;
+}
+.filter-section form {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+    align-items: end !important;
+}
+.filter-grid {
+    display: grid !important;
+    grid-template-columns: minmax(190px, 1.7fr) repeat(4, minmax(105px, 1fr)) !important;
+    gap: 9px !important;
+    min-width: 0 !important;
+    align-items: end !important;
+}
+.filter-group {
+    min-width: 0 !important;
+}
+.filter-group label {
+    font-size: 11px !important;
+    margin-bottom: 4px !important;
+}
+.filter-group input,
+.filter-group select {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    padding: 7px 9px !important;
+    font-size: 12.5px !important;
+}
+.filter-actions {
+    margin-top: 0 !important;
+    gap: 7px !important;
+    align-items: end !important;
+    flex-wrap: nowrap !important;
+}
+.filter-action-left,
+.filter-action-right {
+    display: flex !important;
+    gap: 7px !important;
+    align-items: end !important;
+}
+.filter-actions .btn {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+}
+@media (max-width: 1200px) {
+    .filter-section form { display: block !important; }
+    .filter-grid { grid-template-columns: minmax(180px, 1.5fr) repeat(4, minmax(96px, 1fr)) !important; }
+    .filter-actions { margin-top: 9px !important; justify-content: space-between !important; }
+}
+@media (max-width: 900px) {
+    .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 650px) {
+    .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 460px) {
+    .filter-grid { grid-template-columns: 1fr !important; }
+    .filter-actions { flex-direction: column !important; align-items: stretch !important; }
+    .filter-action-left, .filter-action-right { width: 100% !important; }
+    .filter-actions .btn { flex: 1 1 auto !important; justify-content: center !important; }
+}
+</style>
+
+
+<style id="final-user-management-final-fix">
+/* Final User Management layout: compact one-line filter + true Students/Teachers tabs. */
+.filter-section {
+    padding: 14px 16px !important;
+    margin-bottom: 16px !important;
+}
+.filter-section h3 {
+    font-size: 15px !important;
+    margin: 0 0 10px !important;
+}
+.filter-section form {
+    display: grid !important;
+    grid-template-columns: minmax(300px, 1.8fr) repeat(4, minmax(125px, 1fr)) auto !important;
+    gap: 10px !important;
+    align-items: end !important;
+}
+.filter-grid {
+    display: contents !important;
+}
+.filter-group {
+    min-width: 0 !important;
+}
+.filter-group label {
+    font-size: 11px !important;
+    margin: 0 0 4px !important;
+    white-space: nowrap !important;
+}
+.filter-group input,
+.filter-group select {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    padding: 7px 9px !important;
+    font-size: 12.5px !important;
+    box-sizing: border-box !important;
+}
+.filter-actions {
+    display: contents !important;
+    margin: 0 !important;
+}
+.filter-action-left {
+    display: contents !important;
+}
+.filter-action-right {
+    display: none !important;
+}
+.filter-actions .auto-search-submit {
+    display: none !important;
+}
+.filter-actions .btn-reset {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    justify-self: stretch !important;
+}
+
+/* Tabs stay in normal document flow; they never cover the first table row. */
+.records-nav {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    margin: 0 0 12px !important;
+    padding: 4px !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    background: #EEF3FA !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+.records-nav-link {
+    border: 0 !important;
+    cursor: pointer !important;
+}
+.record-panel[hidden] {
+    display: none !important;
+}
+#studentTableSection, #teacherTableSection {
+    scroll-margin-top: 20px !important;
+}
+
+/* Stable record tabs: never cover table rows, including on long/paginated lists. */
+.records-nav {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    z-index: 1 !important;
+    margin: 0 0 12px !important;
+}
+.record-panel { position: relative; z-index: 1; }
+.student-compact-table td:last-child,
+.student-compact-table td:nth-child(11),
+.teacher-compact-table td:last-child,
+.teacher-compact-table td:nth-last-child(2) {
+    position: relative;
+    z-index: 3;
+}
+.table-pagination-controls {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+}
+.table-pagination-link { flex: 0 0 auto !important; }
+
+@media (max-width: 1240px) {
+    .filter-section form {
+        grid-template-columns: minmax(190px, 1.6fr) repeat(4, minmax(100px, 1fr)) auto !important;
+    }
+}
+@media (max-width: 1120px) {
+    .filter-section form {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 9px !important;
+    }
+    .filter-grid {
+        display: grid !important;
+        grid-template-columns: minmax(220px, 1.7fr) repeat(4, minmax(105px, 1fr)) !important;
+        width: 100% !important;
+    }
+    .filter-actions {
+        display: flex !important;
+    }
+    .filter-action-left {
+        display: flex !important;
+    }
+}
+@media (max-width: 760px) {
+    .filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+@media (max-width: 460px) {
+    .filter-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -1257,7 +1562,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         <?php endif; ?>
 
         <!-- Stats -->
-        <div class="stats-grid">
+        <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <h4>Total Students</h4>
                 <div class="value"><?php echo number_format($total_students); ?></div>
@@ -1341,9 +1646,6 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                         <button type="submit" class="btn btn-primary auto-search-submit">Search</button>
                         <a href="?" class="btn btn-reset">↺ Reset</a>
                     </div>
-                    <div class="filter-action-right">
-                        <button type="button" class="btn btn-primary" onclick="scrollToAddForm()">Add Student</button>
-                    </div>
                 </div>
             </form>
         </div>
@@ -1422,7 +1724,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                     <div class="form-row">
                         <div class="form-group">
                             <label for="inline_password">Password *</label>
-                            <input type="password" id="inline_password" name="password" maxlength="128" autocomplete="new-password" required placeholder="10+ chars, upper/lower/number/symbol">
+                            <input type="password" id="inline_password" name="password" maxlength="128" autocomplete="new-password" required placeholder="10+ chars, upper/lower/number">
                             <div style="font-size:12px;color:#52618D;margin-top:6px;">Used for student contact information. Self-registration verifies this email before the account is created.</div>
                         </div>
                         <div class="form-group">
@@ -1442,8 +1744,18 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
             </div>
         </div>
 
-        <!-- Records Table -->
-        <div class="table-section">
+        <div id="recordsResults">
+        <div class="records-nav" aria-label="User record sections" role="tablist">
+            <button type="button" class="records-nav-link active" role="tab" aria-selected="true" aria-controls="studentTableSection" data-record-tab="studentTableSection">
+                Students <span><?php echo number_format($total_students); ?></span>
+            </button>
+            <button type="button" class="records-nav-link" role="tab" aria-selected="false" aria-controls="teacherTableSection" data-record-tab="teacherTableSection">
+                Teachers <span><?php echo number_format($total_teachers); ?></span>
+            </button>
+        </div>
+
+        <!-- Records Tables: shared client-side pagination keeps all row actions available on every page. -->
+        <div class="table-section record-panel" id="studentTableSection">
             <div class="table-header">
                 <h3>Student Information</h3>
                 <span><?php echo number_format($total_students); ?> student<?php echo $total_students !== 1 ? 's' : ''; ?> found</span>
@@ -1456,7 +1768,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="student-compact-table">
+                    <table class="student-compact-table" data-user-management-table="students">
                         <thead>
                             <tr>
                                 <th>Student No</th>
@@ -1524,8 +1836,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                                     </td>
                                     <td><?php echo date('M d, Y', strtotime($student['created_at'])); ?></td>
                                     <td>
-                                        <button class="btn-view"
-                                                onclick="openStudentModal(<?php echo (int)$student['student_id']; ?>)">
+                                        <button type="button" class="btn-view" data-view-student="<?php echo (int)$student['student_id']; ?>">
                                             View
                                         </button>
                                     </td>
@@ -1535,30 +1846,11 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                     </table>
                 </div>
 
-                <!-- Pagination -->
-                <?php if ($total_pages > 1): ?>
-                    <div class="pagination">
-                        <?php if ($page > 1): ?>
-                            <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => 1])); ?>">« First</a>
-                            <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])); ?>">‹ Prev</a>
-                        <?php endif; ?>
-                        <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
-                            <?php if ($i === $page): ?>
-                                <span class="active"><?php echo $i; ?></span>
-                            <?php else: ?>
-                                <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])); ?>"><?php echo $i; ?></a>
-                            <?php endif; ?>
-                        <?php endfor; ?>
-                        <?php if ($page < $total_pages): ?>
-                            <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])); ?>">Next ›</a>
-                            <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $total_pages])); ?>">Last »</a>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
+                <!-- Pagination is provided automatically by includes/table_pagination.js. -->
             <?php endif; ?>
         </div>
         <!-- Teacher Records -->
-        <div class="table-section">
+        <div class="table-section record-panel" id="teacherTableSection" hidden>
             <div class="table-header">
                 <h3>Teacher Information</h3>
                 <span><?php echo number_format($total_teachers); ?> teacher<?php echo $total_teachers !== 1 ? 's' : ''; ?> found</span>
@@ -1567,8 +1859,8 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                 <div class="no-data">No teacher records found<?php echo !empty($search_rec) ? '. Try adjusting your search.' : '.'; ?></div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="teacher-compact-table">
-                        <thead><tr><th>Teacher ID Number</th><th>Full Name</th><th>Grade Levels Teaching</th><th>Senior High Strand(s)</th><th>Contact Number</th><th>Status</th><th>Archive</th><th>Date Added</th><th>Action</th></tr></thead>
+                    <table class="teacher-compact-table" data-user-management-table="teachers">
+                        <thead><tr><th>Teacher ID Number</th><th>Full Name</th><th>Grade Levels Teaching</th><th>Senior High Strand(s)</th><th>Contact Number</th><th>Status</th><th>Archive</th><th>Action</th></tr></thead>
                         <tbody>
                             <?php foreach ($teachers as $teacher): ?>
                                 <tr>
@@ -1584,8 +1876,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
                                             <button type="submit" class="btn <?php echo (int)$teacher['is_archived'] === 1 ? 'btn-primary' : 'btn-reset'; ?>"><?php echo (int)$teacher['is_archived'] === 1 ? 'Restore' : 'Archive'; ?></button>
                                         </form>
                                     </td>
-                                    <td><?php echo date('M d, Y', strtotime($teacher['created_at'])); ?></td>
-                                    <td><button class="btn-view" onclick="openTeacherModal(<?php echo (int)$teacher['teacher_id']; ?>)">View</button></td>
+                                    <td><button type="button" class="btn-view" title="View teacher details" aria-label="View teacher details for <?php echo htmlspecialchars($teacher['full_name'], ENT_QUOTES); ?>" data-view-teacher="<?php echo (int)$teacher['teacher_id']; ?>">View</button></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -1594,6 +1885,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
             <?php endif; ?>
         </div>
 
+        </div><!-- /recordsResults -->
 
     </div><!-- /container -->
 
@@ -1918,30 +2210,72 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
     });
     </script>
 
-<script id="autoFilterEnhancement">
+<script id="userManagementInteractionFix">
+/* User Management interaction fix:
+   - Keep server-side pagination as normal page navigation.
+   - Keep tabs local to the current page.
+   - Delegate View clicks so they continue to work after any DOM updates.
+   This avoids stale handlers/partial-page replacement problems on page 2+. */
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('filterForm');
-    if (!form) return;
-    const search = form.querySelector('input[name="search"]');
-    let timer = null;
+    if (form) {
+        form.addEventListener('submit', function () {
+            const page = form.querySelector('input[name="page"]');
+            if (page) page.remove();
+        });
 
-    function autoSubmit() {
-        clearTimeout(timer);
-        timer = setTimeout(function () {
-            form.submit();
-        }, 350);
+        form.querySelectorAll('select').forEach(function (select) {
+            select.addEventListener('change', function () {
+                form.submit();
+            });
+        });
     }
 
-    if (search) search.addEventListener('input', autoSubmit);
-    form.querySelectorAll('select').forEach(function (select) {
-        select.addEventListener('change', function () {
-            clearTimeout(timer);
-            form.submit();
-        });
+    document.addEventListener('click', function (e) {
+        const tab = e.target.closest('[data-record-tab]');
+        if (tab) {
+            const targetId = tab.getAttribute('data-record-tab');
+            document.querySelectorAll('[data-record-tab]').forEach(function (item) {
+                const active = item === tab;
+                item.classList.toggle('active', active);
+                item.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            document.querySelectorAll('#recordsResults .record-panel').forEach(function (panel) {
+                panel.hidden = panel.id !== targetId;
+            });
+            return;
+        }
+
+        const studentButton = e.target.closest('[data-view-student]');
+        if (studentButton) {
+            const id = parseInt(studentButton.getAttribute('data-view-student'), 10);
+            if (id > 0 && typeof window.openStudentModal === 'function') {
+                window.openStudentModal(id);
+            }
+            return;
+        }
+
+        const teacherButton = e.target.closest('[data-view-teacher]');
+        if (teacherButton) {
+            const id = parseInt(teacherButton.getAttribute('data-view-teacher'), 10);
+            if (id > 0 && typeof window.openTeacherModal === 'function') {
+                window.openTeacherModal(id);
+            }
+        }
     });
 });
 </script>
 
 <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
+
+<style id="mobile-action-visibility-fix">
+@media (max-width: 768px) {
+    .teacher-compact-table td:nth-child(8) button,
+    .student-compact-table td:nth-child(15) button {
+        position: relative;
+        z-index: 1;
+    }
+}
+</style>
 </body>
 </html>

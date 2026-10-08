@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Your password reset authorization expired. Start again.');
             }
 
-            $policyErrors = passwordPolicyErrors($newPassword);
+            $policyErrors = passwordPolicyErrors($newPassword, false);
             if ($newPassword === '' || !empty($policyErrors)) {
                 throw new RuntimeException($newPassword === '' ? 'Password is required.' : strongPasswordMessage($policyErrors));
             }
@@ -177,30 +177,29 @@ if (!$masked_email && !empty($_SESSION['password_reset_email'])) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Student Password Recovery - JASHS Library</title>
-<style>
-:root{--navy:#141F52;--blue:#52618D;--sky:#91B0E0;--light:#D2E2F6;--yellow:#F4F916;--white:#FEFEF9;--text:#202A44}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--light);font-family:'Segoe UI',Tahoma,sans-serif;color:var(--text)}
-.card{width:min(520px,100%);background:var(--white);border:1px solid var(--sky);border-top:6px solid var(--navy);border-radius:12px;padding:32px;box-shadow:0 14px 40px rgba(20,31,82,.18)}
-.logo{display:flex;justify-content:center;margin-bottom:18px}.logo img{width:78px;height:78px;object-fit:cover;border-radius:50%;border:3px solid var(--yellow)}
-h1{margin:0 0 8px;text-align:center;color:var(--navy);font-size:24px}p.desc{text-align:center;color:var(--blue);font-size:13px;line-height:1.5;margin:0 0 22px}
-.group{margin-bottom:16px}.group label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}.group input{width:100%;padding:12px;border:1px solid var(--light);border-radius:7px;font-size:14px}.group input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(244,249,22,.35)}
-.btn{width:100%;padding:12px;border:0;border-radius:7px;background:var(--navy);color:#fff;font-weight:800;cursor:pointer}.btn.secondary{background:#E7EEF7;color:var(--text);margin-top:10px}
-.notice{padding:12px;border-radius:7px;margin-bottom:16px;font-size:13px;line-height:1.5}.success{background:#EDF5DD;color:#344E15;border:1px solid #B5D27A}.error{background:#FBE8DC;color:#7A3A0E;border:1px solid #E8B08A}
-.code{font-size:22px;letter-spacing:7px;text-align:center}.note{padding:12px;background:#F7F9FC;border-radius:7px;color:var(--blue);font-size:12px;line-height:1.5;margin-bottom:16px}
-.password-field{position:relative}.password-field input{padding-right:76px}.show-password-btn{position:absolute;right:7px;top:50%;transform:translateY(-50%);padding:6px 9px;width:auto;border:1px solid var(--light);border-radius:6px;background:#F7F9FC;color:var(--blue);font-size:11px;font-weight:800;cursor:pointer}
-@media(max-width:480px){.card{padding:22px 18px}.code{letter-spacing:5px;font-size:20px}}
-</style>
+<?php require_once __DIR__ . '/../includes/auth_ui.php'; authUiHead(); ?>
+<?php require_once __DIR__ . '/../includes/responsive.php'; ?>
 </head>
-<body>
-<div class="card">
-<div class="logo"><img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School"></div>
-<h1>Password Recovery</h1>
-<p class="desc">Reset your password using the registered email address.</p>
+<body class="auth-page">
+<?php authUiBackdrop(); ?>
+<div class="auth-wrap">
+<?php authUiBrand(); ?>
+<div class="auth-card">
+<div class="auth-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3m-4 4 3 3m-5-1 2 2"/></svg></div>
+<h1 class="auth-title">Reset your password</h1>
+<?php if ($step === 'request'): ?>
+<p class="auth-sub">Enter the email address registered to your student account and we will send you a verification code.</p>
+<?php elseif ($step === 'verify'): ?>
+<p class="auth-sub">Enter the 6-digit code we sent to <strong><?php echo htmlspecialchars($masked_email); ?></strong>. It expires in 5 minutes.</p>
+<?php else: ?>
+<p class="auth-sub">Code verified. Choose a new password for your account.</p>
+<?php endif; ?>
+<?php authUiSteps($step); ?>
 
 <?php if ($message !== ''): ?>
-<div class="notice <?php echo $message_type === 'success' ? 'success' : 'error'; ?>">
-    <?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?>
+<div class="alert <?php echo $message_type === 'success' ? 'success' : 'error'; ?>" role="<?php echo $message_type === 'success' ? 'status' : 'alert'; ?>">
+    <?php echo $message_type === 'success' ? '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>' : '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>'; ?>
+    <div><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
 </div>
 <?php endif; ?>
 
@@ -208,60 +207,82 @@ h1{margin:0 0 8px;text-align:center;color:var(--navy);font-size:24px}p.desc{text
 <form method="POST">
     <?php echo csrfField(); ?>
     <input type="hidden" name="action" value="request_code">
-    <div class="group">
-        <label for="email">Registered Email</label>
-        <input type="email" id="email" name="email" required autocomplete="email" placeholder="student@gmail.com">
+    <div class="field">
+        <label for="email">Registered email</label>
+        <div class="input-wrap has-icon">
+            <input type="email" id="email" name="email" required autocomplete="email" placeholder="student@gmail.com">
+            <svg class="lead" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        </div>
     </div>
-    <button class="btn" type="submit">Send Verification Code</button>
-    <a class="btn secondary" href="/LibraryBorrowingSystem/login.php" style="display:block;text-align:center;text-decoration:none;">Back to Login</a>
+    <button class="btn primary" type="submit">Send verification code</button>
+    <a class="btn ghost" href="/LibraryBorrowingSystem/login.php"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6"/></svg> Back to login</a>
 </form>
 <?php elseif ($step === 'verify'): ?>
-<div class="note">A 6-digit code was sent to <strong><?php echo htmlspecialchars($masked_email); ?></strong>. It expires in 5 minutes.</div>
 <form method="POST">
     <?php echo csrfField(); ?>
     <input type="hidden" name="action" value="verify_code">
-    <div class="group">
-        <label for="code">Verification Code</label>
-        <input class="code" type="text" id="code" name="code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="000000" required>
+    <div class="field">
+        <label for="code">Verification code</label>
+        <input class="code" type="text" id="code" name="code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="000000" required autofocus>
     </div>
-    <button class="btn" type="submit">Verify Code</button>
-    <a class="btn secondary" href="?cancel=1" style="display:block;text-align:center;text-decoration:none;">Cancel</a>
+    <button class="btn primary" type="submit">Verify code</button>
+    <a class="btn ghost" href="?cancel=1">Cancel</a>
 </form>
 <?php else: ?>
-<div class="note">Code verified. Create a new strong password. You will be returned to the login page after saving it.</div>
-<form method="POST">
+<form method="POST" id="resetForm">
     <?php echo csrfField(); ?>
     <input type="hidden" name="action" value="reset_password">
-    <div class="group">
-        <label for="new_password">New Password</label>
-        <div class="password-field">
+    <div class="field">
+        <label for="new_password">New password</label>
+        <div class="password-field has-icon">
+            <svg class="lead" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <input type="password" id="new_password" name="new_password" maxlength="128" autocomplete="new-password" required>
-            <button type="button" class="show-password-btn" data-password-toggle="new_password">Show</button>
+            <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
+        </div>
+        <div class="rules" id="rules" aria-live="polite">
+            <div data-rule="length">10+ characters</div>
+            <div data-rule="upper">Uppercase letter</div>
+            <div data-rule="lower">Lowercase letter</div>
+            <div data-rule="number">Number</div>
         </div>
     </div>
-    <div class="group">
-        <label for="confirm_password">Confirm New Password</label>
-        <div class="password-field">
+    <div class="field">
+        <label for="confirm_password">Confirm new password</label>
+        <div class="password-field has-icon">
+            <svg class="lead" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <input type="password" id="confirm_password" name="confirm_password" maxlength="128" autocomplete="new-password" required>
-            <button type="button" class="show-password-btn" data-password-toggle="confirm_password">Show</button>
+            <button type="button" class="show-password-btn" aria-pressed="false" aria-label="Show password">Show</button>
         </div>
+        <div class="hint" id="matchHint" aria-live="polite"></div>
     </div>
-    <div class="note">Password requirements: at least 10 characters, uppercase, lowercase, number, and special character.</div>
-    <button class="btn" type="submit">Save New Password</button>
-    <a class="btn secondary" href="?cancel=1" style="display:block;text-align:center;text-decoration:none;">Cancel</a>
+    <button class="btn primary" type="submit">Save new password</button>
+    <a class="btn ghost" href="?cancel=1">Cancel</a>
 </form>
 <?php endif; ?>
+
+<div class="sec-note"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>For your security, codes expire quickly and only work once.</span></div>
 </div>
+</div>
+<?php authUiToggleScript(); ?>
 <script>
-document.querySelectorAll('.show-password-btn').forEach(function(button){
-    button.addEventListener('click',function(){
-        const input=document.getElementById(button.dataset.passwordToggle);
-        if(!input)return;
-        const showing=input.type==='text';
-        input.type=showing?'password':'text';
-        button.textContent=showing?'Show':'Hide';
-    });
-});
+(function(){
+    var p=document.getElementById('new_password'),c=document.getElementById('confirm_password'),m=document.getElementById('matchHint');
+    if(!p)return;
+    var tests={length:function(v){return v.length>=10},upper:function(v){return /[A-Z]/.test(v)},lower:function(v){return /[a-z]/.test(v)},number:function(v){return /[0-9]/.test(v)}};
+    function check(){
+        Object.keys(tests).forEach(function(k){
+            var el=document.querySelector('#rules [data-rule="'+k+'"]');
+            if(el)el.className=tests[k](p.value)?'valid':'';
+        });
+        if(c&&c.value){
+            var ok=c.value===p.value;
+            m.textContent=ok?'Passwords match.':'Passwords do not match yet.';
+            m.style.color=ok?'#2F6B1F':'#7A3A0E';
+        }else if(m){m.textContent='';}
+    }
+    p.addEventListener('input',check);
+    if(c)c.addEventListener('input',check);
+})();
 </script>
 </body>
 </html>

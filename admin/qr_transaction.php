@@ -6,6 +6,8 @@
 
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/book_copies.php';
+bcEnsureSchema($conn);
 require_once __DIR__ . '/../includes/library_rules.php';
 require_once __DIR__ . '/../includes/notification_helper.php';
 
@@ -39,16 +41,20 @@ function normalizeBorrowerQrInput($value) {
 }
 
 function getBorrowerByQr($conn, $borrower_qr) {
-    $stmt = $conn->prepare('
-        SELECT student_id, NULL AS teacher_id, student_no COLLATE utf8mb4_unicode_ci AS borrower_no, full_name COLLATE utf8mb4_unicode_ci AS full_name, student_group COLLATE utf8mb4_unicode_ci AS student_group, department COLLATE utf8mb4_unicode_ci AS department, year_level COLLATE utf8mb4_unicode_ci AS year_level, card_valid_until, contact_number COLLATE utf8mb4_unicode_ci AS contact_number, email COLLATE utf8mb4_unicode_ci AS email, qr_code COLLATE utf8mb4_unicode_ci AS qr_code, status COLLATE utf8mb4_unicode_ci AS status, "student" COLLATE utf8mb4_unicode_ci AS borrower_type
+    $stmt = $conn->prepare("
+        SELECT student_id, NULL AS teacher_id, student_no COLLATE utf8mb4_unicode_ci AS borrower_no, full_name COLLATE utf8mb4_unicode_ci AS full_name, student_group COLLATE utf8mb4_unicode_ci AS student_group, department COLLATE utf8mb4_unicode_ci AS department, year_level COLLATE utf8mb4_unicode_ci AS year_level, card_valid_until, contact_number COLLATE utf8mb4_unicode_ci AS contact_number, email COLLATE utf8mb4_unicode_ci AS email, qr_code COLLATE utf8mb4_unicode_ci AS qr_code, status COLLATE utf8mb4_unicode_ci AS status, 'student' COLLATE utf8mb4_unicode_ci AS borrower_type
         FROM students
-        WHERE (qr_code = ? OR student_no = ?) AND status = "active" AND COALESCE(is_archived,0) = 0
+        WHERE ((qr_code COLLATE utf8mb4_unicode_ci) = (CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+            OR (student_no COLLATE utf8mb4_unicode_ci) = (CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci))
+            AND (status COLLATE utf8mb4_unicode_ci) = 'active' AND COALESCE(is_archived,0) = 0
         UNION ALL
-        SELECT NULL AS student_id, teacher_id, teacher_no COLLATE utf8mb4_unicode_ci AS borrower_no, full_name COLLATE utf8mb4_unicode_ci AS full_name, NULL AS student_group, NULL AS department, NULL AS year_level, NULL AS card_valid_until, contact_number COLLATE utf8mb4_unicode_ci AS contact_number, email COLLATE utf8mb4_unicode_ci AS email, qr_code COLLATE utf8mb4_unicode_ci AS qr_code, status COLLATE utf8mb4_unicode_ci AS status, "teacher" COLLATE utf8mb4_unicode_ci AS borrower_type
+        SELECT NULL AS student_id, teacher_id, teacher_no COLLATE utf8mb4_unicode_ci AS borrower_no, full_name COLLATE utf8mb4_unicode_ci AS full_name, NULL AS student_group, NULL AS department, NULL AS year_level, NULL AS card_valid_until, contact_number COLLATE utf8mb4_unicode_ci AS contact_number, email COLLATE utf8mb4_unicode_ci AS email, qr_code COLLATE utf8mb4_unicode_ci AS qr_code, status COLLATE utf8mb4_unicode_ci AS status, 'teacher' COLLATE utf8mb4_unicode_ci AS borrower_type
         FROM teachers
-        WHERE (qr_code = ? OR teacher_no = ?) AND status = "active" AND COALESCE(is_archived,0) = 0
+        WHERE ((qr_code COLLATE utf8mb4_unicode_ci) = (CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+            OR (teacher_no COLLATE utf8mb4_unicode_ci) = (CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci))
+            AND (status COLLATE utf8mb4_unicode_ci) = 'active' AND COALESCE(is_archived,0) = 0
         LIMIT 1
-    ');
+    ");
     $stmt->bind_param('ssss', $borrower_qr, $borrower_qr, $borrower_qr, $borrower_qr);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -63,7 +69,9 @@ function getBookStateByQr($conn, $book_qr) {
             b.book_id,
             b.title,
             b.author,
-            b.book_number,
+            c.book_number,
+            c.copy_id,
+            c.copy_status,
             b.book_pages,
             b.source_of_funds,
             b.cost_price,
@@ -71,8 +79,8 @@ function getBookStateByQr($conn, $book_qr) {
             b.edition,
             b.volumes,
             b.class,
-            b.qr_code,
-            b.book_status, b.book_condition,
+            c.qr_code,
+            b.book_status, c.copy_condition AS book_condition,
             b.total_copies,
             b.available_copies,
             b.borrowed_copies,
@@ -84,11 +92,12 @@ function getBookStateByQr($conn, $book_qr) {
             COALESCE(s.full_name, te.full_name) AS borrower_name,
             COALESCE(s.student_no, te.teacher_no) AS borrower_no,
             CASE WHEN te.teacher_id IS NULL THEN "student" ELSE "teacher" END AS borrower_type
-        FROM books b
-        LEFT JOIN transactions t ON b.book_id = t.book_id AND t.status = "borrowed"
+        FROM book_copies c
+        JOIN books b ON b.book_id = c.book_id
+        LEFT JOIN transactions t ON t.copy_id = c.copy_id AND t.status = "borrowed"
         LEFT JOIN students s ON t.student_id = s.student_id
         LEFT JOIN teachers te ON t.teacher_id = te.teacher_id
-        WHERE b.qr_code = ? AND COALESCE(b.is_archived,0) = 0
+        WHERE c.qr_code = ? AND c.copy_status <> "removed" AND COALESCE(b.is_archived,0) = 0
         ORDER BY t.date_borrowed ASC
         LIMIT 1
     ');
@@ -100,18 +109,34 @@ function getBookStateByQr($conn, $book_qr) {
     return $book;
 }
 
-function detectBookMode($book) {
-    if (!$book) {
-        return 'not_found';
+function sameBorrower($a, $b) {
+    if (!$a || !$b) return false;
+    $typeA = $a['borrower_type'] ?? '';
+    $typeB = $b['borrower_type'] ?? '';
+    if ($typeA !== $typeB) return false;
+    if ($typeA === 'teacher') {
+        return (int)($a['teacher_id'] ?? 0) > 0 && (int)($a['teacher_id'] ?? 0) === (int)($b['teacher_id'] ?? 0);
     }
+    return (int)($a['student_id'] ?? 0) > 0 && (int)($a['student_id'] ?? 0) === (int)($b['student_id'] ?? 0);
+}
+
+function detectBookMode($book, $scannedBorrower = null, $borrowerQrProvided = false) {
+    if (!$book) return 'not_found';
     if (!empty($book['transaction_id'])) {
+        if ($borrowerQrProvided) {
+            $activeBorrower = [
+                'borrower_type' => $book['borrower_type'] ?? 'student',
+                'student_id' => $book['student_id'] ?? null,
+                'teacher_id' => $book['teacher_id'] ?? null
+            ];
+            if (!$scannedBorrower || !sameBorrower($scannedBorrower, $activeBorrower)) return 'wrong_borrower';
+        }
         return 'return';
     }
-    if ((int)$book['available_copies'] > 0 && in_array($book['book_status'], ['available', 'out_of_stock'], true)) {
-        return 'borrow';
-    }
+    if (($book['copy_status'] ?? '') === 'available') return 'borrow';
     return 'unavailable';
 }
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api'])) {
     header('Content-Type: application/json');
@@ -135,17 +160,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['api'])) {
 
     if ($_GET['api'] === 'lookup_book') {
         $book_qr = trim($_GET['book_qr'] ?? '');
+        $borrower_qr = normalizeBorrowerQrInput($_GET['student_qr'] ?? $_GET['borrower_qr'] ?? '');
+        $scannedBorrower = $borrower_qr !== '' ? getBorrowerByQr($conn, $borrower_qr) : null;
         $book = $book_qr !== '' ? getBookStateByQr($conn, $book_qr) : null;
-        $mode = detectBookMode($book);
+        $mode = detectBookMode($book, $scannedBorrower, $borrower_qr !== '');
+        $message = $mode === 'return'
+            ? 'This exact copy is borrowed by the confirmed borrower and will be returned.'
+            : ($mode === 'borrow'
+                ? 'This exact copy is available and will be borrowed.'
+                : ($mode === 'wrong_borrower'
+                    ? ($scannedBorrower ? 'This exact copy is currently borrowed by ' . ($book['borrower_name'] ?? 'another borrower') . '. It was NOT returned.' : 'The scanned borrower is invalid or inactive. The borrowed copy was NOT returned.')
+                    : ($mode === 'unavailable' ? 'This exact copy is unavailable.' : 'Book not found.')));
         echo json_encode([
             'found' => $book !== null,
             'mode' => $mode,
             'book' => $book,
-            'message' => $mode === 'return'
-                ? 'This book has an active borrowing record and will be returned.'
-                : ($mode === 'borrow'
-                    ? 'This book is available and will be borrowed.'
-                    : ($mode === 'unavailable' ? 'This book is unavailable.' : 'Book not found.'))
+            'borrower_found' => ($borrower_qr === '' ? null : $scannedBorrower !== null),
+            'message' => $message
         ]);
         exit();
     }
@@ -178,13 +209,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
     } else {
         try {
             $book = getBookStateByQr($conn, $book_qr);
-            $mode = detectBookMode($book);
+            $scannedBorrower = $student_qr !== '' ? getBorrowerByQr($conn, $student_qr) : null;
+            $mode = detectBookMode($book, $scannedBorrower, $student_qr !== '');
 
             if ($mode === 'not_found') {
                 $message = 'Book not found. Please scan a valid book QR code.';
                 $message_type = 'error';
             } elseif ($mode === 'unavailable') {
                 $message = 'This book is unavailable and cannot be borrowed or returned from this screen.';
+                $message_type = 'error';
+            } elseif ($mode === 'wrong_borrower') {
+                $freeList = [];
+                $fs = $conn->prepare("SELECT book_number FROM book_copies WHERE book_id = ? AND copy_status = 'available' ORDER BY copy_id LIMIT 5");
+                $fs->bind_param('i', $book['book_id']);
+                $fs->execute();
+                foreach ($fs->get_result()->fetch_all(MYSQLI_NUM) as $fr) { $freeList[] = $fr[0]; }
+                $fs->close();
+                $message = $scannedBorrower
+                    ? 'This exact copy (' . $book['book_number'] . ') is currently borrowed by ' . ($book['borrower_name'] ?? 'another borrower') . '. It was NOT returned. ' . ($freeList ? 'Scan an available copy: ' . implode(', ', $freeList) . '.' : 'No other copy of this title is available right now.')
+                    : 'The borrower QR is invalid or inactive. The borrowed copy was NOT returned.';
                 $message_type = 'error';
             } elseif ($mode === 'return') {
                 $transaction_id = (int)$book['transaction_id'];
@@ -206,19 +249,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                         throw new Exception('Failed to update transaction: ' . $update_transaction->error);
                     }
 
-                    $new_borrowed = max(0, (int)$book['borrowed_copies'] - 1);
-                    $new_available = (int)$book['available_copies'] + 1;
-                    $book_status = 'available';
-
-                    $update_book = $conn->prepare('
-                        UPDATE books
-                        SET borrowed_copies = ?, available_copies = ?, book_status = ?, book_condition = ?
-                        WHERE book_id = ?
-                    ');
-                    $update_book->bind_param('iissi', $new_borrowed, $new_available, $book_status, $return_condition, $book_id);
-                    if (!$update_book->execute()) {
-                        throw new Exception('Failed to update book: ' . $update_book->error);
+                    $copy_id = (int)$book['copy_id'];
+                    $copy_cond = in_array($return_condition, ['Excellent','Good','Fair','Damaged','Lost'], true) ? $return_condition : 'Good';
+                    $update_copy = $conn->prepare("UPDATE book_copies SET copy_status = 'available', copy_condition = ? WHERE copy_id = ?");
+                    $update_copy->bind_param('si', $copy_cond, $copy_id);
+                    if (!$update_copy->execute()) {
+                        throw new Exception('Failed to update book copy: ' . $update_copy->error);
                     }
+                    $update_copy->close();
+                    bcSync($conn, $book_id);
 
                     $conn->commit();
                     auditRecordChange($conn, 'book_returned', 'qr_transaction', 'Processed a book return.', 'success', 'transaction', $transaction_id, ['status' => 'borrowed', 'return_date' => null], ['status' => 'returned', 'return_date' => $return_date, 'return_condition' => $return_condition], ['book_title' => $book['title'], 'student_name' => $book['borrower_name'] ?? 'Unknown']);
@@ -234,12 +273,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                         'borrower_type' => $book['borrower_type'] ?? 'student',
                         'book_title' => $book['title'],
                         'book_author' => $book['author'],
+                        'book_number' => $book['book_number'],
+                        'qr_code' => $book['qr_code'],
                         'date_borrowed' => $book['date_borrowed'],
                         'due_date' => $due_date,
                         'return_date' => $return_date
                     ];
                     $update_transaction->close();
-                    $update_book->close();
                 } catch (Exception $e) {
                     $conn->rollback();
                     throw $e;
@@ -249,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                     $message = 'Student QR code is required to borrow an available book.';
                     $message_type = 'error';
                 } else {
-                    $student = getBorrowerByQr($conn, $student_qr);
+                    $student = $scannedBorrower;
 
                     if (!$student) {
                         $message = 'Student not found or account is inactive. Please scan a valid student QR code.';
@@ -321,20 +361,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                                         }
 
                                         $transaction_id = $conn->insert_id;
-                                        $new_borrowed = (int)$book['borrowed_copies'] + 1;
-                                        $new_available = (int)$book['available_copies'] - 1;
-                                        $book_status = $new_available <= 0 ? 'out_of_stock' : 'available';
-
-                                        $update = $conn->prepare("
-                                            UPDATE books
-                                            SET borrowed_copies=?, available_copies=?, book_status=?
-                                            WHERE book_id=?
-                                        ");
-                                        $update->bind_param('iisi', $new_borrowed, $new_available, $book_status, $book_id);
-
-                                        if (!$update->execute()) {
-                                            throw new Exception('Failed to update inventory: ' . $update->error);
+                                        $copy_id = (int)$book['copy_id'];
+                                        $claim = $conn->prepare("UPDATE book_copies SET copy_status='borrowed' WHERE copy_id=? AND copy_status='available'");
+                                        $claim->bind_param('i', $copy_id);
+                                        $claim->execute();
+                                        if ($claim->affected_rows !== 1) {
+                                            throw new Exception('This copy is no longer available.');
                                         }
+                                        $claim->close();
+                                        $link = $conn->prepare("UPDATE transactions SET copy_id=? WHERE transaction_id=?");
+                                        $link->bind_param('ii', $copy_id, $transaction_id);
+                                        $link->execute();
+                                        $link->close();
+                                        bcSync($conn, $book_id);
 
                                         // Reservation cleanup safety: only update reservation records when the table exists.
                                         if ($student['borrower_type'] === 'student' && $readyReservation && (int)$readyReservation['student_id'] === $student_id) {
@@ -376,13 +415,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                                             'borrower_type' => $student['borrower_type'],
                                             'book_title' => $book['title'],
                                             'book_author' => $book['author'],
+                                            'book_number' => $book['book_number'],
+                                            'qr_code' => $book['qr_code'],
                                             'date_borrowed' => $date_borrowed,
                                             'due_date' => $due_date,
                                             'return_date' => null
                                         ];
 
                                         $insert->close();
-                                        $update->close();
                                     } catch (Throwable $e) {
                                         $conn->rollback();
                                         throw $e;
@@ -511,6 +551,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                     <div class="summary-item"><div class="summary-label">Borrower</div><div class="summary-value"><?php echo h($transaction_details['borrower_name'] ?? $transaction_details['student_name'] ?? 'N/A'); ?> (<?php echo h($transaction_details['borrower_no'] ?? $transaction_details['student_no'] ?? 'N/A'); ?>)</div></div>
                     <div class="summary-item"><div class="summary-label">Book</div><div class="summary-value"><?php echo h($transaction_details['book_title']); ?></div></div>
                     <div class="summary-item"><div class="summary-label">Author</div><div class="summary-value"><?php echo h($transaction_details['book_author']); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Physical Copy</div><div class="summary-value"><?php echo h($transaction_details['book_number'] ?? 'N/A'); ?></div></div>
+                    <div class="summary-item"><div class="summary-label">Copy QR ID</div><div class="summary-value" style="word-break:break-all;"><?php echo h($transaction_details['qr_code'] ?? 'N/A'); ?></div></div>
                     <div class="summary-item"><div class="summary-label">Borrowed</div><div class="summary-value"><?php echo h(date('M d, Y', strtotime($transaction_details['date_borrowed']))); ?></div></div>
                     <div class="summary-item"><div class="summary-label">Return By</div><div class="summary-value"><?php echo h(date('M d, Y', strtotime($transaction_details['due_date']))); ?> (same day)</div></div>
                     <div class="summary-item"><div class="summary-label">Returned</div><div class="summary-value"><?php echo $transaction_details['return_date'] ? h(date('M d, Y', strtotime($transaction_details['return_date']))) : 'N/A'; ?></div></div>
@@ -523,7 +565,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 <div class="step" id="step1" onclick="goToStep(1)">
                     <div class="step-number">1</div>
                     <h4>Borrower QR</h4>
-                    <p>Required only for borrowing</p>
+                    <p>Required for borrowing; optional for returns</p>
                 </div>
                 <div class="step" id="step2" onclick="goToStep(2)">
                     <div class="step-number">2</div>
@@ -636,7 +678,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         let studentValid = false;
         let bookValid = false;
         let transactionMode = null;
-            updateReturnConditionVisibility();
+        updateReturnConditionVisibility();
 
         document.addEventListener('DOMContentLoaded', function() {
             updateSteps();
@@ -786,7 +828,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
 
         function lookupBook(code, jumpNext) {
             setStatus('bookStatus', 'Checking...', 'pending');
-            fetch('?api=lookup_book&book_qr=' + encodeURIComponent(code))
+            const borrowerCode = document.getElementById('student_qr').value.trim();
+            fetch('?api=lookup_book&book_qr=' + encodeURIComponent(code) + '&student_qr=' + encodeURIComponent(borrowerCode))
                 .then(response => response.json())
                 .then(data => {
                     if (data.found && (data.mode === 'borrow' || data.mode === 'return')) {
@@ -794,11 +837,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                         transactionMode = data.mode;
                         setStatus('bookStatus', data.mode === 'return' ? 'Return detected' : 'Borrow detected', 'ready');
                         renderBookSummary(data.book, data.mode);
-                        if (jumpNext) goToStep(3);
+                        updateSteps();
+                        if (jumpNext) {
+                            if (data.mode === 'return' || studentValid) {
+                                goToStep(3);
+                            } else {
+                                goToStep(1);
+                            }
+                        }
                     } else {
                         bookValid = false;
                         transactionMode = null;
-            updateReturnConditionVisibility();
+                        updateReturnConditionVisibility();
                         setStatus('bookStatus', data.message || 'Unavailable', 'error');
                         document.getElementById('bookSummary').classList.remove('show');
                     }
@@ -807,7 +857,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 .catch(() => {
                     bookValid = false;
                     transactionMode = null;
-            updateReturnConditionVisibility();
+                    updateReturnConditionVisibility();
                     setStatus('bookStatus', 'Lookup failed', 'error');
                     updateSteps();
                 });
@@ -836,7 +886,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 summaryItem('Action', mode === 'return' ? 'Return Book' : 'Borrow Book') +
                 summaryItem('Title', book.title) +
                 summaryItem('Author', book.author) +
-                summaryItem('Book Number', book.book_number) +
+                summaryItem('Physical Copy', book.book_number) +
+                summaryItem('Copy QR ID', book.qr_code) +
                 summaryItem('Book Pages', book.book_pages) +
                 (book.publisher ? summaryItem('Publisher', book.publisher) : '') +
                 (book.edition ? summaryItem('Edition', book.edition) : '') +
@@ -861,16 +912,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 document.getElementById('section' + number).classList.remove('disabled');
             });
 
-            // Step 1 is always enabled
-            // Step 2 is enabled only when Step 1 is completed
-            if (!studentValid) {
-                document.getElementById('section2').classList.add('disabled');
+            // Borrower QR is optional for returns, but required for borrowing.
+            // The Book QR step must always remain available so an existing loan can be returned.
+            if (!bookValid) {
                 document.getElementById('section3').classList.add('disabled');
-            } else {
-                // Step 3 is enabled only when Step 2 is completed
-                if (!bookValid) {
-                    document.getElementById('section3').classList.add('disabled');
-                }
+            } else if (transactionMode === 'borrow' && !studentValid) {
+                document.getElementById('section3').classList.add('disabled');
             }
 
             if (studentValid) document.getElementById('step1').classList.add('completed');
@@ -891,7 +938,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 document.getElementById('transactionForm').setAttribute('data-confirm-message', 'Return this book now? This will complete the active borrowing transaction.');
                 document.getElementById('transactionForm').setAttribute('data-confirm-text', 'Return Book');
                 modeBanner.className = 'mode-banner return';
-                modeBanner.textContent = 'Return detected. This book has an active borrowed transaction, so the system will process it as a return. Student QR is not required.';
+                modeBanner.textContent = 'Return detected for this exact physical copy. Borrower QR is optional, but when supplied it must match the active borrower.';
                 document.getElementById('step3').classList.add('completed');
             } else if (transactionMode === 'borrow' && studentValid) {
                 submitBtn.disabled = false;
