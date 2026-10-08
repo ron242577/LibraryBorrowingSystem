@@ -5,6 +5,7 @@
 require_once __DIR__ . '/includes/notification_helper.php';
 
 $headerUserId = (int)($_SESSION['user_id'] ?? 0);
+$headerIsLibrarian = (($_SESSION['role'] ?? '') === 'admin');
 ?>
 <style>
     .jashs-header {
@@ -185,8 +186,8 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
         .jashs-header {
             width: 100vw;
             margin-left: 0;
-            min-height: 64px;
-            padding: 10px 14px;
+            min-height: 68px;
+            padding: 10px 14px 10px 70px; /* leave room for the fixed menu button */
             margin-bottom: 16px;
         }
 
@@ -210,7 +211,9 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
 
 @media (max-width: 768px) {
     .jashs-header {
-        padding: 10px 12px;
+        position: sticky;
+        top: 0;
+        padding: 10px 12px 10px 70px; /* keep logo clear of the menu button */
         min-height: 68px;
         margin-bottom: 15px;
     }
@@ -233,9 +236,39 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
         width: min(340px, calc(100vw - 24px));
     }
 }
+
+    /* Librarian pages use a viewport-fixed header so it remains visible while any page scrolls.
+       A spacer immediately after the header preserves the original document flow. */
+    .jashs-header.jashs-librarian-header {
+        position: fixed !important;
+        top: 0 !important;
+        right: 0 !important;
+        left: var(--sidebar-width) !important;
+        width: auto !important;
+        margin: 0 !important;
+        min-height: 78px;
+    }
+    .jashs-header-spacer {
+        height: 78px;
+        margin-bottom: 24px;
+        flex: none;
+    }
+
+    @media (max-width: 768px) {
+        .jashs-header.jashs-librarian-header {
+            left: 0 !important;
+            width: 100vw !important;
+            min-height: 68px;
+        }
+        .jashs-header-spacer {
+            height: 68px;
+            margin-bottom: 16px;
+        }
+    }
+
 </style>
 
-<header class="jashs-header">
+<header class="jashs-header<?php echo $headerIsLibrarian ? ' jashs-librarian-header' : ''; ?>">
     <div class="jashs-header-brand">
         <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
         <div class="jashs-header-title-wrap">
@@ -262,6 +295,7 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
     </div>
     <?php endif; ?>
 </header>
+<div class="jashs-header-spacer" aria-hidden="true"></div>
 
 <script>
 (function () {
@@ -358,3 +392,30 @@ $headerUserId = (int)($_SESSION['user_id'] ?? 0);
     setInterval(loadNotifications, 30000);
 })();
 </script>
+
+<style id="global-table-pagination-styles">
+/* Shared admin typography: keeps librarian, student, teacher, inventory, transaction,
+   reservation, staff, attendance, and report screens visually consistent. */
+html, body, button, input, select, textarea, table {
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif !important;
+}
+body {
+    color: #202A44;
+}
+.table-pagination {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    flex-wrap: wrap; padding: 8px 2px 0;
+}
+.table-pagination-summary { color: #64748B; font-size: 11px; font-weight: 600; }
+.table-pagination-controls { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.table-pagination-button, .table-pagination-link { min-width: 24px; width: 24px; height: 24px; padding: 0; border: 1px solid #D2E2F6;
+    border-radius: 4px; background: #fff; color: #141F52; font-size: 12px; font-weight: 800; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.table-pagination-button:hover:not(:disabled), .table-pagination-link:hover:not(.disabled) { background: #141F52; color: #fff; border-color: #141F52; }
+.table-pagination-button.active, .table-pagination-link.active { background: #141F52; color: #fff; border-color: #F4F916; }
+.table-pagination-button:disabled, .table-pagination-link.disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.table-pagination-separator { display:none !important; }
+.table-pagination-ellipsis { min-width: 18px; text-align: center; color: #94A3B8; font-size: 13px; font-weight: 700; }
+@media (max-width: 680px) { .table-pagination { align-items: flex-start; } .table-pagination-summary { width: 100%; } }
+</style>
+<script src="/LibraryBorrowingSystem/includes/table_pagination.js"></script>

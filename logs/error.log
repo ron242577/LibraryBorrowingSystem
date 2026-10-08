@@ -267,3 +267,101 @@
 [2026-10-02 01:49:41] Attendance error: Active student or teacher not found. Check the QR code or ID number.
 [2026-10-02 01:50:55] Attendance error: Active student or teacher not found. Check the QR code or ID number.
 [2026-10-02 03:55:44] Login attempt: Invalid login credentials or inactive account.
+[2026-10-04 21:05:32] Login attempt: Invalid student credentials or inactive account.
+[2026-10-04 21:05:34] Login attempt: Too many failed login attempts. Try again in about 2 minute(s). If you forgot your password or continue having trouble, please use Forgot Password.
+[2026-10-05 13:33:50] Server shutdown in progress
+[2026-10-06 20:20:30] Attendance error: Active student or teacher not found. Check the QR code or ID number.
+[2026-10-06 21:05:40] Login attempt: Invalid login credentials or inactive account.
+[2026-10-06 23:17:31] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:17:32] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:17:35] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:17:42] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:17:51] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:17:53] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:17] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:32] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:33] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:34] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:39] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:41] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:18:42] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:25:45] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:26:08] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:26:11] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:26:24] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:26:24] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:26:29] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:26:38] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:35:56] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:00] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:03] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:14] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:14] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:17] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:29] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:53] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:53] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:36:59] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:00] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:02] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:25] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:29] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:29] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:30] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:36] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:37] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:38] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:45] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:45] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:50] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:52] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:53] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:57] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:37:58] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:26] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:27] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:32] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:38] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:38] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:42] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:43] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:44] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:49] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-06 23:38:49] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:00:20] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:00:26] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:01:41] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:02:10] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:02:40] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:03:02] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:03:02] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:03:08] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:34:28] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:34:29] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:42:06] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:42:12] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:42:28] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:42:59] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:43:18] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:44:32] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 00:44:37] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 01:23:35] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 01:24:03] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 01:43:56] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 01:48:12] Book copy repair warning: Undefined constant "MYSQLI_COLUMN"
+[2026-10-07 23:11:44] Login attempt: Invalid student credentials or inactive account.
+[2026-10-08 11:39:19] Login attempt: Invalid login credentials.
+[2026-10-08 11:46:00] Student registration email verification error: Unable to establish a secure TLS connection to Gmail.
+[2026-10-08 11:52:00] Student registration email verification error: Unable to establish a secure TLS connection to Gmail.
+[2026-10-08 11:53:41] Student registration email verification error: Gmail App Password is not configured. Your normal Gmail password cannot be used for SMTP. Create a 16-character App Password and put it in config/mail_config.php.
+[2026-10-08 11:53:58] Student registration email verification error: Gmail App Password is not configured. Your normal Gmail password cannot be used for SMTP. Create a 16-character App Password and put it in config/mail_config.php.
+[2026-10-08 11:58:09] Student registration email verification error: Unable to establish a secure TLS connection to Gmail. stream_socket_enable_crypto(): SSL operation failed with code 1. OpenSSL Error messages:
+error:0A000086:SSL routines::certificate verify failed
+[2026-10-08 11:58:27] Student registration email verification error: Unable to establish a secure TLS connection to Gmail. stream_socket_enable_crypto(): SSL operation failed with code 1. OpenSSL Error messages:
+error:0A000086:SSL routines::certificate verify failed
+[2026-10-08 12:00:32] Student registration email verification error: Gmail App Password is not configured. Your normal Gmail password cannot be used for SMTP. Create a 16-character App Password and put it in config/mail_config.php.
+[2026-10-08 12:00:47] Student registration email verification error: Unable to establish a secure TLS connection to Gmail. stream_socket_enable_crypto(): SSL operation failed with code 1. OpenSSL Error messages:
+error:0A000086:SSL routines::certificate verify failed CA bundle used: C:\laragon\www\LibraryBorrowingSystem\certs\cacert.pem.
+[2026-10-08 12:01:14] Student registration email verification error: Unable to establish a secure TLS connection to Gmail. stream_socket_enable_crypto(): SSL operation failed with code 1. OpenSSL Error messages:
+error:0A000086:SSL routines::certificate verify failed CA bundle used: C:\laragon\www\LibraryBorrowingSystem\certs\cacert.pem.
+[2026-10-08 12:18:54] Student registration email verification error: Gmail App Password is not configured. Your normal Gmail password cannot be used for SMTP. Create a 16-character App Password and put it in config/mail_config.php.

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/reports_aggregator.php';
+require_once __DIR__ . '/../../includes/print_charts.php';
 require_once __DIR__ . '/../../session_check.php';
 
 if (!isAdmin()) {
@@ -27,53 +28,75 @@ $data = $type === 'borrowing_trends'
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Library Report - Jose Abad Santos High School</title>
 <style>
-    * { box-sizing:border-box; }
-    body { font-family:Arial,sans-serif; background:#f4f6fa; color:#202A44; padding:22px; }
-    .actions { text-align:right; margin-bottom:15px; }
-    button { background:#141F52; color:white; border:0; border-radius:6px; padding:10px 15px; cursor:pointer; }
-    .sheet { max-width:900px; margin:auto; background:white; padding:34px; box-shadow:0 2px 14px rgba(0,0,0,.1); }
-    .head { text-align:center; border-bottom:3px solid #141F52; padding-bottom:18px; margin-bottom:22px; }
-    .head h1 { color:#141F52; font-size:25px; margin:0 0 7px; }
-    .head p { margin:4px 0; color:#52618D; font-size:13px; }
-    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
-    .card { border:1px solid #D2E2F6; border-left:4px solid #141F52; border-radius:8px; padding:14px; }
-    .card strong { display:block; font-size:25px; color:#141F52; }
-    h2 { color:#141F52; font-size:18px; margin:24px 0 10px; }
-    table { width:100%; border-collapse:collapse; font-size:12px; }
-    th,td { border:1px solid #D2E2F6; padding:9px; text-align:left; }
-    th { background:#141F52; color:white; }
-    @media print { body { background:white; padding:0; } .actions { display:none; } .sheet { box-shadow:none; max-width:none; padding:0; } }
+<?php echo printReportStyles(); ?>
 </style>
 </head>
 <body>
-<div class="actions"><button onclick="window.print()">Print / Save PDF</button></div>
-<div class="sheet">
-    <div class="head">
-        <h1>Jose Abad Santos High School Library Report</h1>
-        <p><?php echo h(ucwords(str_replace('_',' ',$type))); ?></p>
-        <p><?php echo h($start_date); ?> to <?php echo h($end_date); ?> · Same-day borrowing and return</p>
-    </div>
+<main class="report">
+<?php echo printReportToolbar(); ?>
+<?php echo printFrameOpen(); ?>
+<?php echo printReportHeader('Library ' . ($type === 'borrowing_trends' ? 'Borrowing Trends' : 'System Metrics') . ' Report', $start_date . ' to ' . $end_date); ?>
 
     <?php if ($type === 'borrowing_trends'): ?>
         <div class="summary">
-            <div class="card"><strong><?php echo (int)$data['total_borrows']; ?></strong>Total Borrows</div>
-            <div class="card"><strong><?php echo (int)$data['total_returns']; ?></strong>Total Returns</div>
-            <div class="card"><strong><?php echo $data['total_borrows'] > 0 ? round(($data['total_returns']/$data['total_borrows'])*100).'%' : '0%'; ?></strong>Return Rate</div>
+            <div class="summary-card"><strong><?php echo (int)$data['total_borrows']; ?></strong><span>Total Borrows</span></div>
+            <div class="summary-card"><strong><?php echo (int)$data['total_returns']; ?></strong><span>Total Returns</span></div>
+            <div class="summary-card"><strong><?php echo $data['total_borrows'] > 0 ? round(($data['total_returns']/$data['total_borrows'])*100).'%' : '0%'; ?></strong><span>Return Rate</span></div>
         </div>
+        <?php
+        $data['borrowing_by_month'] = ReportsAggregator::fillMonths($data['borrowing_by_month'], $start_date, $end_date);
+        $data['borrowing_by_day'] = ReportsAggregator::fillDays($data['borrowing_by_day']);
+        $monthLabels = array_map(function ($r) { return date('M Y', strtotime($r['month'] . '-01')); }, $data['borrowing_by_month']);
+        $monthValues = array_map(function ($r) { return (int)$r['count']; }, $data['borrowing_by_month']);
+        $dayLabels = array_map(function ($r) { return $r['day_name']; }, $data['borrowing_by_day']);
+        $dayValues = array_map(function ($r) { return (int)$r['count']; }, $data['borrowing_by_day']);
+        $bookLabels = array_map(function ($r) { return $r['title']; }, $data['most_borrowed_books']);
+        $bookValues = array_map(function ($r) { return (int)$r['borrow_count']; }, $data['most_borrowed_books']);
+        $borrowerLabels = array_map(function ($r) { return ($r['borrower_name'] ?: 'Unknown borrower') . ' (' . $r['borrower_type'] . ')'; }, $data['borrowing_by_borrower']);
+        $borrowerValues = array_map(function ($r) { return (int)$r['borrow_count']; }, $data['borrowing_by_borrower']);
+        echo renderBarChart('Borrows vs Returns', ['Selected Period'], [
+            ['name' => 'Borrows', 'color' => '#141F52', 'values' => [(int)$data['total_borrows']]],
+            ['name' => 'Returns', 'color' => '#567D1F', 'values' => [(int)$data['total_returns']]],
+        ]);
+        echo renderBarChart('Borrowing by Month', $monthLabels, [['name' => 'Borrows', 'color' => '#141F52', 'values' => $monthValues]]);
+        echo renderBarChart('Borrowing by Day of Week', $dayLabels, [['name' => 'Borrows', 'color' => '#52618D', 'values' => $dayValues]]);
+        $bookCounts = array_filter($bookValues, function ($v) { return $v > 0; });
+        echo renderHorizontalBarChart('Most Borrowed Books', array_slice($bookLabels, 0, count($bookCounts)), array_slice($bookValues, 0, count($bookCounts)), '#141F52');
+        echo renderHorizontalBarChart('Top Borrowers', $borrowerLabels, $borrowerValues, '#52618D');
+        ?>
         <h2>Most Borrowed Books</h2>
         <table><thead><tr><th>Title</th><th>Author</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
         <?php foreach ($data['most_borrowed_books'] as $book): ?><tr><td><?php echo h($book['title']); ?></td><td><?php echo h($book['author']); ?></td><td><?php echo (int)$book['borrow_count']; ?></td><td><?php echo (int)$book['return_count']; ?></td></tr><?php endforeach; ?>
         </tbody></table>
-        <h2>Top Borrowers This Month</h2>
+        <h2>Top Borrowers</h2>
         <table><thead><tr><th>Borrower</th><th>Type</th><th>Borrows</th><th>Returns</th></tr></thead><tbody>
         <?php foreach ($data['borrowing_by_borrower'] as $borrower): ?><tr><td><?php echo h($borrower['borrower_name'] ?: 'Unknown borrower'); ?></td><td><?php echo h($borrower['borrower_type']); ?></td><td><?php echo (int)$borrower['borrow_count']; ?></td><td><?php echo (int)$borrower['return_count']; ?></td></tr><?php endforeach; ?>
         </tbody></table>
     <?php else: ?>
         <div class="summary">
-            <div class="card"><strong><?php echo (int)$data['active_students']; ?></strong>Active Students</div>
-            <div class="card"><strong><?php echo (int)$data['total_books']; ?></strong>Total Book Copies</div>
-            <div class="card"><strong><?php echo (int)$data['active_transactions']; ?></strong>Currently Borrowed</div>
+            <div class="summary-card"><strong><?php echo (int)$data['active_students']; ?></strong><span>Active Students</span></div>
+            <div class="summary-card"><strong><?php echo (int)$data['total_books']; ?></strong><span>Total Book Copies</span></div>
+            <div class="summary-card"><strong><?php echo (int)$data['active_transactions']; ?></strong><span>Currently Borrowed</span></div>
         </div>
+        <?php
+        echo renderBarChart('Book Copies: Available vs Borrowed', ['Book Copies'], [
+            ['name' => 'Total', 'color' => '#141F52', 'values' => [(int)$data['total_books']]],
+            ['name' => 'Available', 'color' => '#567D1F', 'values' => [(int)$data['available_books']]],
+            ['name' => 'Borrowed', 'color' => '#9B2335', 'values' => [(int)$data['borrowed_books']]],
+        ]);
+        echo renderBarChart('Users Overview', ['Students', 'Active Students', 'Staff', 'Active Staff'], [
+            ['name' => 'Count', 'color' => '#52618D', 'values' => [(int)$data['total_students'], (int)$data['active_students'], (int)$data['total_users'], (int)$data['active_users']]],
+        ]);
+        echo renderBarChart('Activity in Selected Period', ['Borrows', 'Returns', 'Currently Borrowed'], [
+            ['name' => 'Count', 'color' => '#141F52', 'values' => [(int)$data['most_used_features']['total_borrows'], (int)$data['most_used_features']['total_returns'], (int)$data['active_transactions']]],
+        ]);
+        $inv = $aggregator->getInventoryStatus();
+        echo renderBarChart('Inventory by Book Status (copies)', array_map(function ($r) { return ucfirst((string)$r['book_status']); }, $inv), [
+            ['name' => 'Total', 'color' => '#141F52', 'values' => array_map(function ($r) { return (int)$r['total_copies']; }, $inv)],
+            ['name' => 'Available', 'color' => '#567D1F', 'values' => array_map(function ($r) { return (int)$r['available_copies']; }, $inv)],
+            ['name' => 'Borrowed', 'color' => '#9B2335', 'values' => array_map(function ($r) { return (int)$r['borrowed_copies']; }, $inv)],
+        ]);
+        ?>
         <h2>System Metrics</h2>
         <table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>
             <tr><td>Total Students</td><td><?php echo (int)$data['total_students']; ?></td></tr>
@@ -87,6 +110,7 @@ $data = $type === 'borrowing_trends'
             <tr><td>Returns in Period</td><td><?php echo (int)$data['most_used_features']['total_returns']; ?></td></tr>
         </tbody></table>
     <?php endif; ?>
-</div>
+<?php echo printFrameClose(); ?>
+</main>
 </body>
 </html>

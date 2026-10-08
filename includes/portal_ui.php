@@ -27,7 +27,7 @@ body.dark.student-app, body.dark.teacher-app {
 
 /* ---------- Header ---------- */
 body.student-app .page-header, body.teacher-app .page-header{
-    position:sticky;top:0;left:auto;right:auto;height:72px;padding:0 clamp(14px,3vw,40px);
+    position:-webkit-sticky;position:sticky;top:0;left:auto;right:auto;z-index:1000;height:72px;padding:0 clamp(14px,3vw,40px);
     background:rgba(255,255,255,.94);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px);
     border-bottom:3px solid var(--pu-yellow);box-shadow:0 4px 18px rgba(20,31,82,.08);gap:12px;
 }
@@ -103,7 +103,7 @@ body.dark .search-form select option{background:#18213f;color:#f4f7ff}
 /* ---------- Book details panel ---------- */
 .book-details{padding:clamp(16px,2.4vw,26px) !important;margin-top:20px}
 .book-details-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)) !important;gap:12px !important}
-.detail-item,.info-item{background:var(--pu-mist) !important;border:1px solid var(--pu-line);border-left:3px solid var(--pu-navy) !important;border-radius:12px !important;padding:12px 14px !important}
+.detail-item,.info-item{background:var(--pu-mist) !important;border:1px solid var(--pu-line);border-radius:12px !important;padding:12px 14px !important}
 .detail-label,.info-label{color:var(--pu-muted) !important}
 .detail-value,.info-value{color:var(--pu-ink) !important;overflow-wrap:anywhere}
 body.dark .detail-item,body.dark .info-item{border-color:#3c4b72}

@@ -70,7 +70,7 @@ function requireValidCsrf(?string $token = null): void {
     }
 }
 
-function passwordPolicyErrors(string $password): array {
+function passwordPolicyErrors(string $password, bool $requireSpecial = true): array {
     $errors = [];
     if (strlen($password) < 10) {
         $errors[] = 'at least 10 characters';
@@ -87,7 +87,7 @@ function passwordPolicyErrors(string $password): array {
     if (!preg_match('/\d/', $password)) {
         $errors[] = 'a number';
     }
-    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+    if ($requireSpecial && !preg_match('/[^A-Za-z0-9]/', $password)) {
         $errors[] = 'a special character';
     }
 
@@ -211,9 +211,10 @@ function isLoginLocked(mysqli $conn, string $context, string $identifier): array
     return ['locked' => false, 'seconds' => 0];
 }
 
-function recordFailedLogin(mysqli $conn, string $context, string $identifier, int $limit = 5, int $lockSeconds = 900): void {
+function recordFailedLogin(mysqli $conn, string $context, string $identifier, int $limit = 5, int $lockSeconds = 60): void {
     $key = loginAttemptKey($context, $identifier);
     $ip = clientIpAddress();
+
     $stmt = $conn->prepare('SELECT failed_attempts, first_failed_at FROM login_security WHERE context = ? AND identifier_hash = ? AND ip_address = ? LIMIT 1');
     if (!$stmt) return;
     $stmt->bind_param('sss', $context, $key, $ip);
@@ -224,11 +225,20 @@ function recordFailedLogin(mysqli $conn, string $context, string $identifier, in
     $now = time();
     $attempts = 1;
     $first = date('Y-m-d H:i:s', $now);
-    if ($row && !empty($row['first_failed_at']) && strtotime($row['first_failed_at']) >= $now - 900) {
+
+    if ($row && !empty($row['first_failed_at']) && strtotime($row['first_failed_at']) >= $now - 3600) {
         $attempts = (int)$row['failed_attempts'] + 1;
         $first = $row['first_failed_at'];
     }
-    $lockedUntil = $attempts >= $limit ? date('Y-m-d H:i:s', $now + $lockSeconds) : null;
+
+    // Progressive lock:
+    // 5 failed attempts = 1 minute
+    // repeated failures increase up to 10 minutes
+    $minutes = 0;
+    if ($attempts >= $limit) {
+        $minutes = min(10, max(1, $attempts - $limit + 1));
+    }
+    $lockedUntil = $minutes > 0 ? date('Y-m-d H:i:s', $now + ($minutes * 60)) : null;
 
     $stmt = $conn->prepare('INSERT INTO login_security (context, identifier_hash, ip_address, failed_attempts, first_failed_at, last_failed_at, locked_until) VALUES (?, ?, ?, ?, ?, NOW(), ?) ON DUPLICATE KEY UPDATE failed_attempts = VALUES(failed_attempts), first_failed_at = VALUES(first_failed_at), last_failed_at = NOW(), locked_until = VALUES(locked_until)');
     if (!$stmt) return;

@@ -140,13 +140,22 @@ function promoteOldestReservation(mysqli $conn, int $bookId): ?array
 
     if (!$reservation) return null;
 
-    $bookStmt=$conn->prepare("SELECT available_copies, title FROM books WHERE book_id=? LIMIT 1");
+    $bookStmt=$conn->prepare("SELECT b.title, EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='book_copies') AS has_copies FROM books b WHERE b.book_id=? LIMIT 1");
     $bookStmt->bind_param('i',$bookId);
     $bookStmt->execute();
     $book=$bookStmt->get_result()->fetch_assoc();
     $bookStmt->close();
 
-    if (!$book || (int)$book['available_copies'] <= 0) return null;
+    if (!$book) return null;
+
+    if ((int)$book['has_copies'] === 1) {
+        $copyCheck = $conn->prepare("SELECT COUNT(*) AS c FROM book_copies WHERE book_id=? AND copy_status='available'");
+        $copyCheck->bind_param('i',$bookId);
+        $copyCheck->execute();
+        $available = (int)($copyCheck->get_result()->fetch_assoc()['c'] ?? 0);
+        $copyCheck->close();
+        if ($available <= 0) return null;
+    }
 
     $readyStmt=$conn->prepare("
         UPDATE book_reservations SET status='ready', ready_at=NOW()

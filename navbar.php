@@ -36,6 +36,9 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
     body {
         margin: 0;
         padding: 0;
+        font-family: 'Inter','Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
     }
 
     .sidebar {
@@ -87,6 +90,11 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
     }
 
     .sidebar-item { width: 100%; }
+    .nav-ic{display:inline-block;width:26px;margin-right:6px;text-align:center;font-size:16px}
+    .sidebar-link,.dropdown-link{min-height:46px}
+    .dropdown-link{padding-left:56px !important}
+    .sidebar-link:focus-visible,.dropdown-link:focus-visible{outline:3px solid #F4F916;outline-offset:-3px}
+
 
     .sidebar-link,
     .dropdown-link {
@@ -204,8 +212,8 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
 
     .hamburger-btn {
         position: fixed;
-        top: 15px;
-        left: 15px;
+        top: 13px;
+        left: 14px;
         z-index: 1001;
         width: 42px;
         height: 42px;
@@ -220,6 +228,11 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
         cursor: pointer;
         font-size: 22px;
         font-weight: 800;
+    }
+
+    /* When the menu is open, slide the button out beside the sidebar so it never covers the sidebar logo */
+    body.sidebar-open .hamburger-btn {
+        left: calc(var(--sidebar-width) + 12px);
     }
 
     .sidebar-overlay {
@@ -243,103 +256,10 @@ $books_open = isActiveNavAny($books_nav_paths) === 'active';
     }
 
 
-/* Global Responsive Enhancements */
-.main-content,
-.content,
-.page-content,
-.container-fluid {
-    max-width: 100%;
-    overflow-x: hidden;
-}
 
-.table-responsive {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-table {
-    min-width: 650px;
-}
-
-img {
-    max-width: 100%;
-    height: auto;
-}
-
-.form-row,
-.row {
-    flex-wrap: wrap;
-}
-
-input, select, textarea, button {
-    max-width: 100%;
-}
-
-@media (max-width: 768px) {
-    :root {
-        --sidebar-width: 260px;
-    }
-
-    body {
-        overflow-x: hidden;
-    }
-
-    .sidebar {
-        transform: translateX(-100%);
-    }
-
-    .sidebar.active {
-        transform: translateX(0);
-    }
-
-    .main-content,
-    .content,
-    .page-content {
-        margin-left: 0 !important;
-        width: 100% !important;
-        padding: 12px !important;
-    }
-
-    .card,
-    .dashboard-card,
-    .panel {
-        width: 100% !important;
-        margin-bottom: 15px;
-    }
-
-    .modal-dialog {
-        width: calc(100% - 24px);
-        margin: 12px auto;
-    }
-
-    .btn {
-        white-space: normal;
-    }
-
-    table {
-        font-size: 13px;
-    }
-}
-
-@media (max-width: 480px) {
-    .sidebar-brand-text {
-        font-size: 13px;
-    }
-
-    .sidebar-link {
-        padding: 12px 14px;
-    }
-
-    input, select, textarea {
-        font-size: 16px;
-    }
-
-    .modal-content {
-        border-radius: 10px;
-    }
-}
 </style>
+
+<?php require_once __DIR__ . '/includes/responsive.php'; ?>
 
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 <button type="button" id="hamburgerBtn" class="hamburger-btn" aria-label="Open navigation">☰</button>
@@ -366,7 +286,7 @@ input, select, textarea, button {
             </button>
             <ul class="dropdown-menu">
                 <li><a href="/LibraryBorrowingSystem/admin/qr_transaction.php" class="dropdown-link <?php echo isActiveNav('/admin/qr_transaction.php'); ?>">Borrow/Return Books</a></li>
-                <li><a href="/LibraryBorrowingSystem/admin/attendance.php" class="dropdown-link <?php echo isActiveNav('/admin/attendance.php'); ?>">Library Attendance</a></li>
+                <li><a href="/LibraryBorrowingSystem/admin/attendance.php" class="dropdown-link <?php echo isActiveNav('/admin/attendance.php'); ?>">Time In/Time Out</a></li>
             </ul>
         </li>
         <li class="sidebar-item">

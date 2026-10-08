@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/print_charts.php';
 
 if (!isAdmin()) {
     header('Location: /LibraryBorrowingSystem/login.php');
@@ -55,28 +56,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggl
         }
 
         $borrowerId = (int)($borrowerType === 'student' ? $borrower['student_id'] : $borrower['teacher_id']);
+        $idColumn = $borrowerType === 'student' ? 'student_id' : 'teacher_id';
         $today = date('Y-m-d');
+        $nowStamp = date('Y-m-d H:i:s');
         $conn->begin_transaction();
         try {
-            $timeIn = date('Y-m-d H:i:s');
-            if ($borrowerType === 'student') {
-                $insertStmt = $conn->prepare('INSERT INTO library_attendance (student_id, teacher_id, visit_date, time_in) VALUES (?, NULL, ?, ?)');
+            // Look at this person's latest record today: still timed in = this scan is a Time Out.
+            $latestStmt = $conn->prepare("SELECT attendance_id, time_in, time_out FROM library_attendance WHERE $idColumn = ? AND visit_date = ? ORDER BY time_in DESC, attendance_id DESC LIMIT 1 FOR UPDATE");
+            $latestStmt->bind_param('is', $borrowerId, $today);
+            $latestStmt->execute();
+            $latest = $latestStmt->get_result()->fetch_assoc();
+            $latestStmt->close();
+
+            // Guard against one QR held in front of the camera flipping In -> Out immediately.
+            if ($latest) {
+                $lastEvent = strtotime($latest['time_out'] ?: $latest['time_in']);
+                if ($lastEvent && (time() - $lastEvent) < 10) {
+                    throw new Exception($borrower['full_name'] . ' was just recorded. Please wait a few seconds before scanning again.');
+                }
+            }
+
+            if ($latest && empty($latest['time_out'])) {
+                $attendanceId = (int)$latest['attendance_id'];
+                $outStmt = $conn->prepare('UPDATE library_attendance SET time_out = ? WHERE attendance_id = ? AND time_out IS NULL');
+                $outStmt->bind_param('si', $nowStamp, $attendanceId);
+                if (!$outStmt->execute() || $outStmt->affected_rows < 1) {
+                    throw new Exception('Unable to record time out.');
+                }
+                $outStmt->close();
+                $conn->commit();
+                $visitAction = 'time_out';
+                $timeIn = $latest['time_in'];
+                $timeOut = $nowStamp;
+                $message = $borrower['full_name'] . ' (' . ucfirst($borrowerType) . ') timed out successfully at ' . date('h:i A') . '.';
             } else {
-                $insertStmt = $conn->prepare('INSERT INTO library_attendance (student_id, teacher_id, visit_date, time_in) VALUES (NULL, ?, ?, ?)');
+                if ($borrowerType === 'student') {
+                    $insertStmt = $conn->prepare('INSERT INTO library_attendance (student_id, teacher_id, visit_date, time_in) VALUES (?, NULL, ?, ?)');
+                } else {
+                    $insertStmt = $conn->prepare('INSERT INTO library_attendance (student_id, teacher_id, visit_date, time_in) VALUES (NULL, ?, ?, ?)');
+                }
+                $insertStmt->bind_param('iss', $borrowerId, $today, $nowStamp);
+                if (!$insertStmt->execute()) {
+                    throw new Exception('Unable to record time in.');
+                }
+                $attendanceId = (int)$insertStmt->insert_id;
+                $insertStmt->close();
+                $conn->commit();
+                $visitAction = 'time_in';
+                $timeIn = $nowStamp;
+                $timeOut = null;
+                $message = $borrower['full_name'] . ' (' . ucfirst($borrowerType) . ') timed in successfully at ' . date('h:i A') . '.';
             }
-            $insertStmt->bind_param('iss', $borrowerId, $today, $timeIn);
-            if (!$insertStmt->execute()) {
-                throw new Exception('Unable to record time in.');
-            }
-            $insertStmt->close();
-            $conn->commit();
-            $message = $borrower['full_name'] . ' (' . ucfirst($borrowerType) . ') timed in successfully at ' . date('h:i A') . '.';
             $message_type = 'success';
             $lastVisit = [
+                'attendance_id' => $attendanceId,
+                'action' => $visitAction,
                 'full_name' => $borrower['full_name'],
                 'borrower_no' => $borrower['borrower_no'],
                 'borrower_type' => ucfirst($borrowerType),
                 'time_in' => date('h:i A', strtotime($timeIn)),
+                'time_out' => $timeOut ? date('h:i A', strtotime($timeOut)) : null,
             ];
         } catch (Throwable $e) {
             $conn->rollback();
@@ -89,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggl
     }
     if ($isAjax) {
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['ok' => $message_type === 'success', 'message' => $message, 'visit' => $lastVisit]);
+        echo json_encode(['ok' => $message_type === 'success', 'message' => $message, 'action' => $lastVisit['action'] ?? null, 'visit' => $lastVisit]);
         exit();
     }
 }
@@ -103,7 +142,7 @@ foreach (['start_date','end_date'] as $d) {
     }
 }
 $reportDateObject = new DateTime($start_date);
-$listStmt = $conn->prepare("SELECT a.time_in, COALESCE(s.student_no COLLATE utf8mb4_unicode_ci, t.teacher_no COLLATE utf8mb4_unicode_ci) AS borrower_no, COALESCE(s.full_name COLLATE utf8mb4_unicode_ci, t.full_name COLLATE utf8mb4_unicode_ci) AS full_name, CASE WHEN a.student_id IS NULL THEN 'Teacher' ELSE 'Student' END AS borrower_type FROM library_attendance a LEFT JOIN students s ON s.student_id = a.student_id LEFT JOIN teachers t ON t.teacher_id = a.teacher_id WHERE a.visit_date BETWEEN ? AND ? ORDER BY a.time_in DESC");
+$listStmt = $conn->prepare("SELECT a.attendance_id, a.time_in, a.time_out, COALESCE(s.student_no COLLATE utf8mb4_unicode_ci, t.teacher_no COLLATE utf8mb4_unicode_ci) AS borrower_no, COALESCE(s.full_name COLLATE utf8mb4_unicode_ci, t.full_name COLLATE utf8mb4_unicode_ci) AS full_name, CASE WHEN a.student_id IS NULL THEN 'Teacher' ELSE 'Student' END AS borrower_type FROM library_attendance a LEFT JOIN students s ON s.student_id = a.student_id LEFT JOIN teachers t ON t.teacher_id = a.teacher_id WHERE a.visit_date BETWEEN ? AND ? ORDER BY a.time_in DESC");
 $listStmt->bind_param('ss', $start_date, $end_date);
 $listStmt->execute();
 $listResult = $listStmt->get_result();
@@ -114,43 +153,64 @@ $listStmt->close();
 
 $totalVisits = count($attendance);
 
-$openVisits = $totalVisits;
+$openVisits = count(array_filter($attendance, function ($r) { return empty($r['time_out']); }));
 
 if (($_GET['report'] ?? '') === '1'):
     $reportTitleDate = $start_date . ' to ' . $end_date;
+    $monthOptions = printMonthOptions($start_date, $end_date);
+    $selectedMonths = printSelectedMonths($monthOptions);
+    $attendance = array_values(array_filter($attendance, function ($r) use ($selectedMonths) {
+        return in_array(date('Y-m', strtotime($r['time_in'])), $selectedMonths, true);
+    }));
+    $totalVisits = count($attendance);
+    $openVisits = count(array_filter($attendance, function ($r) { return empty($r['time_out']); }));
+    if (count($selectedMonths) < count($monthOptions)) {
+        $reportTitleDate = $selectedMonths ? implode(', ', array_map(function ($m) use ($monthOptions) { return $monthOptions[$m]; }, $selectedMonths)) : 'No months selected';
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Library Attendance Report - <?php echo h($reportTitleDate); ?></title>
+    <title>Time In/Time Out Report - <?php echo h($reportTitleDate); ?></title>
     <style>
-        *{box-sizing:border-box}.kiosk-nav{background:#141F52;color:white;padding:15px 25px}.kiosk-nav h2{margin:0;font-size:20px}body{margin:0;padding:28px;color:#202A44;font-family:Arial,sans-serif}.report{max-width:1050px;margin:0 auto}.report-header{text-align:center;border-bottom:3px solid #141F52;padding-bottom:16px;margin-bottom:22px}.report-header img{width:58px;height:58px;object-fit:contain;border-radius:50%;vertical-align:middle;margin-bottom:8px}.report-header h1{margin:0;color:#141F52;font-size:25px}.report-header p{margin:5px 0;color:#52618D;font-size:13px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}.summary-card{border:1px solid #D2E2F6;border-left:4px solid #141F52;padding:14px;border-radius:6px}.summary-card strong{display:block;font-size:24px;color:#141F52}.summary-card span{font-size:12px;color:#52618D}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px;border:1px solid #D2E2F6;text-align:left}th{background:#141F52;color:#fff}.report-actions{margin-top:20px;display:flex;gap:10px}.report-actions button,.report-actions a{border:0;border-radius:5px;padding:10px 16px;background:#141F52;color:#fff;text-decoration:none;cursor:pointer;font-weight:700}.report-actions a{background:#52618D}@media print{body{padding:0}.report-actions{display:none}.report-header{margin-top:0}}@media(max-width:600px){.summary{grid-template-columns:1fr}}
+<?php echo printReportStyles(); ?>
     </style>
 </head>
 <body>
 <main class="report">
-    <header class="report-header">
-        <img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School Logo">
-        <h1>Jose Abad Santos High School</h1>
-        <p>Library Attendance Report</p>
-        <p><?php echo h($reportTitleDate); ?></p>
-    </header>
+    <?php echo printReportToolbar('?start_date=' . $start_date . '&end_date=' . $end_date, 'Back to Time In/Time Out'); ?>
+    <?php echo printMonthPicker($monthOptions, $selectedMonths, $start_date, $end_date); ?>
+    <?php echo printFrameOpen(); ?>
+    <?php echo printReportHeader('Time In/Time Out Report', $reportTitleDate); ?>
     <section class="summary">
         <div class="summary-card"><strong><?php echo $totalVisits; ?></strong><span>Total Visits</span></div>
-        <div class="summary-card"><strong><?php echo $openVisits; ?></strong><span>Total Time In Records</span></div>
+        <div class="summary-card"><strong><?php echo $openVisits; ?></strong><span>No Time Out Yet</span></div>
     </section>
+    <?php
+    $attTypes = ['Student' => 0, 'Teacher' => 0];
+    $attByDate = [];
+    foreach ($attendance as $row) {
+        $dk = date('Y-m-d', strtotime($row['time_in']));
+        $attByDate[$dk] = ($attByDate[$dk] ?? 0) + 1;
+        $attTypes[$row['borrower_type']] = ($attTypes[$row['borrower_type']] ?? 0) + 1;
+    }
+    echo $selectedMonths
+        ? renderVisitCharts($attByDate, $start_date, $end_date, $selectedMonths)
+        : '<section class="print-chart"><div class="chart-empty">No months selected. Tick at least one month above.</div></section>';
+    echo renderBarChart('Visits by Borrower Type', array_keys($attTypes), [['name' => 'Visits', 'color' => '#567D1F', 'values' => array_values($attTypes)]]);
+    ?>
     <table>
-        <thead><tr><th>#</th><th>Borrower</th><th>Type</th><th>ID Number</th><th>Time In</th></tr></thead>
+        <thead><tr><th>#</th><th>Borrower</th><th>Type</th><th>ID Number</th><th>Time In</th><th>Time Out</th></tr></thead>
         <tbody>
         <?php foreach ($attendance as $index => $row): ?>
-            <tr><td><?php echo $index + 1; ?></td><td><?php echo h($row['full_name']); ?></td><td><?php echo h($row['borrower_type']); ?></td><td><?php echo h($row['borrower_no']); ?></td><td><?php echo h(date('M d, Y h:i A', strtotime($row['time_in']))); ?></td></tr>
+            <tr><td><?php echo $index + 1; ?></td><td><?php echo h($row['full_name']); ?></td><td><?php echo h($row['borrower_type']); ?></td><td><?php echo h($row['borrower_no']); ?></td><td><?php echo h(date('M d, Y h:i A', strtotime($row['time_in']))); ?></td><td><?php echo !empty($row['time_out']) ? h(date('M d, Y h:i A', strtotime($row['time_out']))) : '&mdash;'; ?></td></tr>
         <?php endforeach; ?>
-        <?php if (!$attendance): ?><tr><td colspan="5" style="text-align:center">No attendance recorded for this date.</td></tr><?php endif; ?>
+        <?php if (!$attendance): ?><tr><td colspan="6" style="text-align:center">No time in/time out recorded for this date.</td></tr><?php endif; ?>
         </tbody>
     </table>
-    <div class="report-actions"><button type="button" onclick="window.print()">Print Report</button><a href="?start_date=<?php echo h($start_date); ?>&end_date=<?php echo h($end_date); ?>">Back to Attendance</a></div>
+    <?php echo printFrameClose(); ?>
 </main>
 </body>
 </html>
@@ -160,7 +220,7 @@ if (($_GET['report'] ?? '') === '1'):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Library Attendance - Library Borrowing System</title>
+    <title>Time In/Time Out - Library Borrowing System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <style>
         :root{--navy:#141F52;--slate:#52618D;--sky:#D2E2F6;--mist:#E7EEF7;--bg:#F3F7FC;--ink:#202A44;--green:#567D1F;--green-bg:#EDF5DD;--red:#9B2335;--red-bg:#FBE4E7;--yellow:#F4F916}
@@ -188,15 +248,12 @@ if (($_GET['report'] ?? '') === '1'):
         .status.busy .icon{animation:pulse 1s infinite}
         @keyframes pulse{50%{opacity:.35}}
 
-        .scanner-wrap{margin-top:18px;position:relative;border-radius:14px;overflow:hidden;background:#0c1333;aspect-ratio:4/3;max-height:430px;width:100%}
-        #attendance-reader{width:100%;height:100%}
-        #attendance-reader video{width:100%!important;height:100%!important;object-fit:cover;display:block}
-        #attendance-reader img{display:none}
-        .reticle{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center}
-        .reticle i{width:58%;aspect-ratio:1;border-radius:18px;box-shadow:0 0 0 999px rgba(12,19,51,.45);border:2px solid rgba(255,255,255,.9)}
-        .scanner-msg{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:#fff;padding:24px;font-size:14px;background:#0c1333}
-        .scanner-msg.show{display:flex}
-        .scanner-msg button{margin-top:4px}
+        .scanner-wrapper{text-align:center;background:#E7EEF7;padding:18px;border-radius:8px;margin:18px 0}
+        #attendance-reader{width:100%;max-width:500px;margin:0 auto;border-radius:8px;overflow:hidden}
+        .scanner-controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:15px}
+        .scanner-controls button{padding:8px 16px;font-size:12px;font-weight:700;font-family:inherit;color:#fff;background:#141F52;border:none;border-radius:6px;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+        .scanner-controls button:hover{background:#52618D;transform:translateY(-2px);box-shadow:0 5px 15px rgba(20,31,82,.32)}
+        .scanner-controls button.btn-danger{background:#c0392b}
 
         .btn{border:0;border-radius:10px;padding:13px 20px;background:var(--navy);color:#fff;font:700 14px 'Segoe UI',Tahoma,sans-serif;cursor:pointer;transition:background .15s}
         .btn:hover{background:var(--slate)}
@@ -234,11 +291,11 @@ if (($_GET['report'] ?? '') === '1'):
         .attendance-shell{container-type:inline-size;container-name:att;width:100%}
         .list-card{container-type:inline-size;container-name:lst}
         @container att (max-width:900px){.attendance-container{grid-template-columns:1fr;gap:18px}}
-        @container att (max-width:560px){.attendance-container{padding:0 12px}.card{padding:16px;border-radius:12px}.scanner-wrap{aspect-ratio:1/1;max-height:360px}}
-        @container lst (max-width:440px){.table-wrap{max-height:none;border:0;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}tbody tr{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name time' 'type id';gap:6px 12px;align-items:center;padding:12px 14px;margin-bottom:10px;border:1px solid var(--mist);border-radius:12px;background:#fff!important}tbody td{display:block;padding:0;border:0;font-size:13px}tbody td:nth-child(1){grid-area:name;font-size:15px}tbody td:nth-child(2){grid-area:type}tbody td:nth-child(3){grid-area:id;justify-self:end;color:var(--slate)}tbody td:nth-child(4){grid-area:time;justify-self:end;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tr.empty{display:block!important;text-align:center;border-style:dashed}tr.empty td{padding:22px 8px;display:block} .date-filter>div{flex:1 1 130px}.date-filter input{width:100%}.date-filter .btn{flex:1 1 100%}}
+        @container att (max-width:560px){.attendance-container{padding:0 12px}.card{padding:16px;border-radius:12px}}
+        @container lst (max-width:440px){.table-wrap{max-height:none;border:0;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}tbody tr{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name name' 'type id' 'time out';gap:6px 12px;align-items:center;padding:12px 14px;margin-bottom:10px;border:1px solid var(--mist);border-radius:12px;background:#fff!important}tbody td{display:block;padding:0;border:0;font-size:13px}tbody td:nth-child(1){grid-area:name;font-size:15px}tbody td:nth-child(2){grid-area:type}tbody td:nth-child(3){grid-area:id;justify-self:end;color:var(--slate)}tbody td:nth-child(4){grid-area:time;justify-self:start;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tbody td:nth-child(4)::before{content:'In ';font-weight:400;color:var(--slate)}tbody td:nth-child(5){grid-area:out;justify-self:end;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tbody td:nth-child(5)::before{content:'Out ';font-weight:400;color:var(--slate)}tr.empty{display:block!important;text-align:center;border-style:dashed}tr.empty td{padding:22px 8px;display:block} .date-filter>div{flex:1 1 130px}.date-filter input{width:100%}.date-filter .btn{flex:1 1 100%}}
         @supports not (container-type:inline-size){
             @media(max-width:1180px){.attendance-container{grid-template-columns:1fr}}
-            @media(max-width:480px){.table-wrap{max-height:none;border:0;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}tbody tr{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name time' 'type id';gap:6px 12px;align-items:center;padding:12px 14px;margin-bottom:10px;border:1px solid var(--mist);border-radius:12px;background:#fff!important}tbody td{display:block;padding:0;border:0;font-size:13px}tbody td:nth-child(1){grid-area:name;font-size:15px}tbody td:nth-child(2){grid-area:type}tbody td:nth-child(3){grid-area:id;justify-self:end;color:var(--slate)}tbody td:nth-child(4){grid-area:time;justify-self:end;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tr.empty{display:block!important;text-align:center;border-style:dashed}tr.empty td{padding:22px 8px;display:block}}
+            @media(max-width:480px){.table-wrap{max-height:none;border:0;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}tbody tr{display:grid;grid-template-columns:1fr auto;grid-template-areas:'name name' 'type id' 'time out';gap:6px 12px;align-items:center;padding:12px 14px;margin-bottom:10px;border:1px solid var(--mist);border-radius:12px;background:#fff!important}tbody td{display:block;padding:0;border:0;font-size:13px}tbody td:nth-child(1){grid-area:name;font-size:15px}tbody td:nth-child(2){grid-area:type}tbody td:nth-child(3){grid-area:id;justify-self:end;color:var(--slate)}tbody td:nth-child(4){grid-area:time;justify-self:start;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tbody td:nth-child(4)::before{content:'In ';font-weight:400;color:var(--slate)}tbody td:nth-child(5){grid-area:out;justify-self:end;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}tbody td:nth-child(5)::before{content:'Out ';font-weight:400;color:var(--slate)}tr.empty{display:block!important;text-align:center;border-style:dashed}tr.empty td{padding:22px 8px;display:block}}
         }
         @media(max-width:520px){.card{padding:18px}.manual .row{flex-direction:column}.manual .btn{width:100%}.clock strong{font-size:21px}.attendance-title{font-size:22px}}
     </style>
@@ -252,8 +309,8 @@ if (($_GET['report'] ?? '') === '1'):
     <section class="card" aria-label="Scan station">
         <div class="card-head">
             <div>
-                <h1 class="attendance-title">Library Attendance</h1>
-                <p class="muted">Hold your QR code up to the camera, or type your ID number below. The camera stays on for the next person.</p>
+                <h1 class="attendance-title">Time In/Time Out</h1>
+                <p class="muted">Scan your QR code to time in. Scan it again when you leave to time out. You can also type your ID number below.</p>
             </div>
             <div class="clock" aria-live="off"><strong id="clockTime">--:--</strong><span id="clockDate"></span></div>
         </div>
@@ -261,18 +318,18 @@ if (($_GET['report'] ?? '') === '1'):
         <div class="status<?php echo $message ? ' ' . h($message_type) : ''; ?>" id="status" role="status" aria-live="polite">
             <div class="icon" id="statusIcon"><?php echo $message_type === 'success' ? '&#10003;' : ($message_type === 'error' ? '!' : '&#9641;'); ?></div>
             <div>
-                <div class="title" id="statusTitle"><?php echo $message_type === 'success' ? 'Time in recorded' : ($message_type === 'error' ? 'Could not record' : 'Ready to scan'); ?></div>
+                <div class="title" id="statusTitle"><?php echo $message_type === 'success' ? (($lastVisit['action'] ?? '') === 'time_out' ? 'Time out recorded' : 'Time in recorded') : ($message_type === 'error' ? 'Could not record' : 'Ready to scan'); ?></div>
                 <div class="sub" id="statusSub"><?php echo $message ? h($message) : 'Waiting for the next QR code.'; ?></div>
             </div>
         </div>
 
-        <div class="scanner-wrap">
+        <div class="scanner-wrapper">
             <div id="attendance-reader"></div>
-            <div class="reticle"><i></i></div>
-            <div class="scanner-msg" id="scannerMsg">
-                <div id="scannerMsgText">Starting camera...</div>
-                <button type="button" class="btn light" id="retryCamera" style="display:none">Try camera again</button>
-            </div>
+        </div>
+
+        <div class="scanner-controls">
+            <button type="button" class="btn-small" id="startCamBtn">Start Camera</button>
+            <button type="button" class="btn-small btn-danger" id="stopCamBtn" style="display:none;">Stop Camera</button>
         </div>
 
         <form method="POST" class="manual" id="attendanceForm">
@@ -281,7 +338,7 @@ if (($_GET['report'] ?? '') === '1'):
             <label for="identifier">No QR code? Enter ID number</label>
             <div class="row">
                 <input type="text" id="identifier" name="identifier" placeholder="e.g. STU-20260816-EE8626" autocomplete="off" required autofocus>
-                <button class="btn" type="submit" id="submitBtn">Record Time In</button>
+                <button class="btn" type="submit" id="submitBtn">Time In / Time Out</button>
             </div>
         </form>
     </section>
@@ -298,17 +355,18 @@ if (($_GET['report'] ?? '') === '1'):
         </form>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Name</th><th>Type</th><th>ID No.</th><th>Time In</th></tr></thead>
+                <thead><tr><th>Name</th><th>Type</th><th>ID No.</th><th>Time In</th><th>Time Out</th></tr></thead>
                 <tbody id="visitBody">
                 <?php foreach ($attendance as $row): ?>
-                    <tr>
+                    <tr data-id="<?php echo (int)$row['attendance_id']; ?>">
                         <td class="name"><?php echo h($row['full_name']); ?></td>
                         <td><span class="badge <?php echo h($row['borrower_type']); ?>"><?php echo h($row['borrower_type']); ?></span></td>
                         <td><?php echo h($row['borrower_no']); ?></td>
                         <td><?php echo h(date(($start_date === $end_date) ? 'h:i A' : 'M d, h:i A', strtotime($row['time_in']))); ?></td>
+                        <td><?php echo !empty($row['time_out']) ? h(date(($start_date === $end_date) ? 'h:i A' : 'M d, h:i A', strtotime($row['time_out']))) : '&mdash;'; ?></td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$attendance): ?><tr class="empty"><td colspan="4">No visits recorded for this period yet.</td></tr><?php endif; ?>
+                <?php if (!$attendance): ?><tr class="empty"><td colspan="5">No visits recorded for this period yet.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -327,9 +385,8 @@ if (($_GET['report'] ?? '') === '1'):
     const statusSub = document.getElementById('statusSub');
     const visitBody = document.getElementById('visitBody');
     const visitCount = document.getElementById('visitCount');
-    const scannerMsg = document.getElementById('scannerMsg');
-    const scannerMsgText = document.getElementById('scannerMsgText');
-    const retryBtn = document.getElementById('retryCamera');
+    const startCamBtn = document.getElementById('startCamBtn');
+    const stopCamBtn = document.getElementById('stopCamBtn');
     const showsToday = <?php echo json_encode($start_date === date('Y-m-d') && $end_date === date('Y-m-d')); ?>;
 
     let busy = false, resetTimer = null, lastCode = '', lastCodeAt = 0, scanner = null;
@@ -357,13 +414,27 @@ if (($_GET['report'] ?? '') === '1'):
         } catch (e) { return text; }
     }
 
-    function addRow(v) {
+    function rowHtml(v) {
+        return '<td class="name">' + esc(v.full_name) + '</td><td><span class="badge ' + esc(v.borrower_type) + '">' + esc(v.borrower_type) + '</span></td><td>' + esc(v.borrower_no) + '</td><td>' + esc(v.time_in) + '</td><td>' + (v.time_out ? esc(v.time_out) : '&mdash;') + '</td>';
+    }
+
+    // Time In adds a new row; Time Out fills in the Time Out cell of the existing row.
+    function upsertRow(v) {
         if (!showsToday) return;
+        const existing = visitBody.querySelector('tr[data-id="' + String(v.attendance_id) + '"]');
+        if (existing) {
+            existing.innerHTML = rowHtml(v);
+            existing.classList.remove('new');
+            void existing.offsetWidth;
+            existing.classList.add('new');
+            return;
+        }
         const empty = visitBody.querySelector('.empty');
         if (empty) empty.remove();
         const tr = document.createElement('tr');
         tr.className = 'new';
-        tr.innerHTML = '<td class="name">' + esc(v.full_name) + '</td><td><span class="badge ' + esc(v.borrower_type) + '">' + esc(v.borrower_type) + '</span></td><td>' + esc(v.borrower_no) + '</td><td>' + esc(v.time_in) + '</td>';
+        tr.setAttribute('data-id', String(v.attendance_id));
+        tr.innerHTML = rowHtml(v);
         visitBody.insertBefore(tr, visitBody.firstChild);
         visitCount.textContent = String(parseInt(visitCount.textContent, 10) + 1);
     }
@@ -384,8 +455,13 @@ if (($_GET['report'] ?? '') === '1'):
             });
             const data = await res.json();
             if (data.ok && data.visit) {
-                setStatus('success', data.visit.full_name, data.visit.borrower_type + ' \u2022 timed in at ' + data.visit.time_in, '\u2713');
-                addRow(data.visit);
+                const v = data.visit;
+                if (v.action === 'time_out') {
+                    setStatus('success', v.full_name, v.borrower_type + ' \u2022 timed out at ' + v.time_out, '\u2713');
+                } else {
+                    setStatus('success', v.full_name, v.borrower_type + ' \u2022 timed in at ' + v.time_in, '\u2713');
+                }
+                upsertRow(v);
                 input.value = '';
             } else {
                 setStatus('error', 'Could not record', data.message || 'Something went wrong.', '!');
@@ -407,39 +483,34 @@ if (($_GET['report'] ?? '') === '1'):
     function onScan(decoded) {
         const code = normalizeScan(decoded);
         const now = Date.now();
-        // ignore the same code seen again within 4s so one scan = one record
-        if (busy || (code === lastCode && now - lastCodeAt < 4000)) return;
+        // ignore the same code seen again within 10s so one scan = one record
+        if (busy || (code === lastCode && now - lastCodeAt < 10000)) return;
         lastCode = code; lastCodeAt = now;
         submitCode(code);
     }
 
-    function showCameraMsg(text, canRetry) {
-        scannerMsgText.textContent = text;
-        retryBtn.style.display = canRetry ? '' : 'none';
-        scannerMsg.classList.add('show');
-    }
-
-    async function startScanner() {
-        if (typeof Html5Qrcode === 'undefined') {
-            showCameraMsg('Camera scanner could not load. Use the ID number field below.', false);
+    function startScanner() {
+        if (typeof Html5QrcodeScanner === 'undefined') {
+            document.getElementById('attendance-reader').textContent = 'Camera scanner could not load. Use the ID number field below.';
             return;
         }
-        showCameraMsg('Starting camera...', false);
-        try {
-            if (!scanner) scanner = new Html5Qrcode('attendance-reader');
-            await scanner.start(
-                { facingMode: 'environment' },
-                { fps: 15, qrbox: function (w, h) { const s = Math.floor(Math.min(w, h) * 0.6); return { width: s, height: s }; } },
-                onScan,
-                function () {}
-            );
-            scannerMsg.classList.remove('show');
-        } catch (err) {
-            showCameraMsg('Camera unavailable. Allow camera access in your browser, or use the ID number field below.', true);
-        }
+        startCamBtn.style.display = 'none';
+        stopCamBtn.style.display = 'inline-flex';
+        scanner = new Html5QrcodeScanner('attendance-reader', { facingMode: 'environment', qrbox: undefined }, false);
+        scanner.render(onScan, function () {});
     }
-    retryBtn.addEventListener('click', startScanner);
-    window.addEventListener('load', startScanner);
+
+    function stopScanner() {
+        if (scanner) {
+            scanner.clear();
+            scanner = null;
+        }
+        startCamBtn.style.display = 'inline-flex';
+        stopCamBtn.style.display = 'none';
+    }
+
+    startCamBtn.addEventListener('click', startScanner);
+    stopCamBtn.addEventListener('click', stopScanner);
 
     function tick() {
         const d = new Date();

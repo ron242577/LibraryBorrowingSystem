@@ -4,27 +4,43 @@
  * Downloads a valid book QR selected from the teacher borrowing page.
  */
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/book_copies.php';
+bcEnsureSchema($conn);
 
-if (!isset($_SESSION['teacher_id']) && !isset($_SESSION['teacher_id'])) {
+if (!isset($_SESSION['teacher_id']) && !isset($_SESSION['student_id'])) {
     header('Location: /LibraryBorrowingSystem/login.php');
     exit();
 }
 
 $bookId = (int)($_GET['book_id'] ?? 0);
+$copyId = (int)($_GET['copy_id'] ?? 0);
 
-if ($bookId <= 0) {
+if ($bookId <= 0 && $copyId <= 0) {
     http_response_code(400);
     exit('Invalid book.');
 }
 
-$stmt = $conn->prepare("
-    SELECT book_id, title, qr_code
-    FROM books
-    WHERE book_id = ?
-      AND COALESCE(is_archived,0) = 0
-    LIMIT 1
-");
-$stmt->bind_param('i', $bookId);
+$book = null;
+
+if ($copyId > 0) {
+    $stmt = $conn->prepare("
+        SELECT c.copy_id, c.book_id, b.title, c.qr_code
+        FROM book_copies c
+        INNER JOIN books b ON b.book_id = c.book_id
+        WHERE c.copy_id = ? AND c.copy_status <> 'removed' AND COALESCE(b.is_archived,0) = 0
+        LIMIT 1
+    ");
+    $stmt->bind_param('i', $copyId);
+} else {
+    $stmt = $conn->prepare("
+        SELECT book_id, title, qr_code
+        FROM books
+        WHERE book_id = ?
+          AND COALESCE(is_archived,0) = 0
+        LIMIT 1
+    ");
+    $stmt->bind_param('i', $bookId);
+}
 $stmt->execute();
 $book = $stmt->get_result()->fetch_assoc();
 $stmt->close();

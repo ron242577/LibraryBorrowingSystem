@@ -6,6 +6,9 @@
 
 require_once __DIR__ . '/../session_check.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/print_charts.php';
+require_once __DIR__ . '/../includes/book_copies.php';
+bcEnsureSchema($conn);
 
 if (!isAdmin()) {
     header('Location: /LibraryBorrowingSystem/login.php');
@@ -39,20 +42,25 @@ if ($end_date !== '') {
 }
 if ($search !== '') {
     $term = $conn->real_escape_string($search);
+    // Explicitly normalize the search value and every text operand to the same
+    // utf8mb4 collation. Some existing installations use utf8mb4_bin or a newer
+    // MySQL 8 collation on individual columns, which otherwise causes LIKE errors.
+    $likeTerm = "CONVERT('%$term%' USING utf8mb4) COLLATE utf8mb4_unicode_ci";
     $where[] = "(
-        s.full_name LIKE '%$term%' OR
-        te.full_name LIKE '%$term%' OR
-        s.student_no LIKE '%$term%' OR
-        te.teacher_no LIKE '%$term%' OR
-        b.title LIKE '%$term%' OR
-        b.author LIKE '%$term%' OR
-        b.book_number LIKE '%$term%' OR
-        CAST(t.transaction_id AS CHAR) LIKE '%$term%'
+        (s.full_name COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (te.full_name COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (s.student_no COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (te.teacher_no COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (b.title COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (b.author COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (COALESCE(c.book_number,b.book_number) COLLATE utf8mb4_unicode_ci) LIKE $likeTerm OR
+        (CONVERT(CAST(t.transaction_id AS CHAR) USING utf8mb4) COLLATE utf8mb4_unicode_ci) LIKE $likeTerm
     )";
 }
 $where_sql = implode(' AND ', $where);
 
 $transactions = [];
+$transaction_query_error = null;
 try {
     $query = "SELECT
                 t.transaction_id,
@@ -60,15 +68,18 @@ try {
                 t.due_date,
                 t.return_date,
                 t.status,
-                COALESCE(s.student_no, te.teacher_no) AS borrower_no,
-                COALESCE(s.full_name, te.full_name) AS borrower_name,
-                b.book_number,
-                b.title AS book_title,
-                b.author AS book_author
+                COALESCE(s.student_no, te.teacher_no, '—') AS borrower_no,
+                COALESCE(s.full_name, te.full_name, 'Unknown borrower') AS borrower_name,
+                c.copy_id,
+                COALESCE(c.book_number, b.book_number, CONCAT('ID ', t.book_id)) AS book_number,
+                c.qr_code AS copy_qr_code,
+                COALESCE(NULLIF(b.title, ''), CONCAT('Book #', t.book_id)) AS book_title,
+                COALESCE(b.author, '') AS book_author
               FROM transactions t
               LEFT JOIN students s ON t.student_id = s.student_id
               LEFT JOIN teachers te ON t.teacher_id = te.teacher_id
-              INNER JOIN books b ON t.book_id = b.book_id
+              LEFT JOIN books b ON t.book_id = b.book_id
+              LEFT JOIN book_copies c ON t.copy_id = c.copy_id
               WHERE $where_sql
               ORDER BY t.date_borrowed DESC";
     $result = $conn->query($query);
@@ -77,20 +88,63 @@ try {
             $transactions[] = $row;
         }
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    $transaction_query_error = $e->getMessage();
     logError('Transactions page error: ' . $e->getMessage());
+
+    // Production-safe fallback: always expose the transaction rows even if an
+    // optional book/copy field or collation in an older database differs.
+    try {
+        $fallbackWhere = ['1=1'];
+        if ($filter_status !== 'all') {
+            $fallbackWhere[] = "t.status = '" . $conn->real_escape_string($filter_status) . "'";
+        }
+        if ($start_date !== '') {
+            $fallbackWhere[] = "DATE(t.date_borrowed) >= '" . $conn->real_escape_string($start_date) . "'";
+        }
+        if ($end_date !== '') {
+            $fallbackWhere[] = "DATE(t.date_borrowed) <= '" . $conn->real_escape_string($end_date) . "'";
+        }
+        $fallbackSql = implode(' AND ', $fallbackWhere);
+        $fallbackQuery = "SELECT
+                t.transaction_id, t.date_borrowed, t.due_date, t.return_date, t.status,
+                COALESCE(s.student_no, te.teacher_no, 'N/A') AS borrower_no,
+                COALESCE(s.full_name, te.full_name, 'Unknown borrower') AS borrower_name,
+                NULL AS copy_id,
+                CONCAT('ID ', t.book_id) AS book_number,
+                NULL AS copy_qr_code,
+                CONCAT('Book #', t.book_id) AS book_title,
+                '' AS book_author
+              FROM transactions t
+              LEFT JOIN students s ON t.student_id = s.student_id
+              LEFT JOIN teachers te ON t.teacher_id = te.teacher_id
+              WHERE $fallbackSql
+              ORDER BY t.date_borrowed DESC";
+        $fallbackResult = $conn->query($fallbackQuery);
+        if ($fallbackResult) {
+            while ($row = $fallbackResult->fetch_assoc()) {
+                $transactions[] = $row;
+            }
+        }
+    } catch (Throwable $fallbackError) {
+        logError('Transactions fallback query error: ' . $fallbackError->getMessage());
+    }
 }
 
 if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
     if (empty($transactions)) {
-        echo '<div class="empty">No transaction records found.</div>';
+        if ($transaction_query_error) {
+            echo '<div class="empty">Unable to load transaction records. Please check the database connection/schema.</div>';
+        } else {
+            echo '<div class="empty">No transaction records found.</div>';
+        }
     } else {
-        echo '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Borrower</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr></thead><tbody>';
+        echo '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Borrower</th><th>Book / Physical Copy</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th></tr></thead><tbody>';
         foreach ($transactions as $t) {
             echo '<tr>';
             echo '<td>#'.(int)$t['transaction_id'].'</td>';
             echo '<td><strong>'.h($t['borrower_name']).'</strong><br><small>'.h($t['borrower_no']).'</small></td>';
-            echo '<td><strong>'.h($t['book_title']).'</strong><br><small>'.h($t['book_author']).' · '.h($t['book_number']).'</small></td>';
+            echo '<td><strong>'.h($t['book_title']).'</strong><br><small>'.h($t['book_author']).' · '.h($t['book_number']).($t['copy_qr_code'] ? ' · '.h($t['copy_qr_code']) : '').'</small></td>';
             echo '<td>'.h(date('M d, Y h:i A', strtotime($t['date_borrowed']))).'</td>';
             echo '<td>'.h(date('M d, Y', strtotime($t['due_date']))).'<br><small>Same-day return</small></td>';
             echo '<td>'.($t['return_date'] ? h(date('M d, Y h:i A', strtotime($t['return_date']))) : '—').'</td>';
@@ -127,43 +181,49 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transaction Report - Jose Abad Santos High School</title>
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; color: #202A44; margin: 28px; }
-        .report-header { text-align: center; border-bottom: 3px solid #141F52; padding-bottom: 18px; margin-bottom: 22px; }
-        .report-header h1 { margin: 0 0 7px; color: #141F52; font-size: 25px; }
-        .report-header p { margin: 4px 0; color: #52618D; font-size: 13px; }
-        .summary { display: flex; gap: 14px; margin-bottom: 22px; }
-        .summary-card { flex: 1; border: 1px solid #D2E2F6; border-left: 4px solid #141F52; padding: 14px; border-radius: 8px; }
-        .summary-card strong { display: block; font-size: 24px; color: #141F52; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th, td { padding: 9px; border: 1px solid #D2E2F6; text-align: left; }
-        th { background: #141F52; color: white; }
-        .print-actions { margin-bottom: 18px; text-align: right; }
-        button { border: 0; background: #141F52; color: white; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
-        @media print { .print-actions { display: none; } body { margin: 0; } }
+<?php echo printReportStyles(); ?>
     .auto-search-submit,.auto-filter-submit{display:none !important;}
-    
-        .content-container,
-        .container{margin-top:0 !important;}
-
+    .content-container,.container{margin-top:0 !important;}
 </style>
 </head>
 <body>
-    <div class="print-actions"><button onclick="window.print()">Print / Save PDF</button></div>
-    <div class="report-header">
-        <h1>Jose Abad Santos High School Library Transaction Report</h1>
-        <p>Same-day borrowing and return process</p>
-        <p>Generated: <?php echo h($report_date); ?></p>
-    </div>
+<main class="report">
+    <?php echo printReportToolbar(); ?>
+    <?php echo printFrameOpen(); ?>
+    <?php
+    if ($start_date !== '' && $end_date !== '') $txPeriod = $start_date . ' to ' . $end_date;
+    elseif ($start_date !== '') $txPeriod = 'From ' . $start_date;
+    elseif ($end_date !== '') $txPeriod = 'Up to ' . $end_date;
+    else $txPeriod = 'All dates';
+    if ($filter_status !== 'all') $txPeriod .= ' · Status: ' . ucfirst($filter_status);
+    echo printReportHeader('Library Transaction Report', $txPeriod);
+    ?>
     <div class="summary">
-        <div class="summary-card"><strong><?php echo count($transactions); ?></strong>Records in this report</div>
-        <div class="summary-card"><strong><?php echo $status_counts['borrowed']; ?></strong>Currently Borrowed</div>
-        <div class="summary-card"><strong><?php echo $status_counts['returned']; ?></strong>Returned</div>
+        <div class="summary-card"><strong><?php echo count($transactions); ?></strong><span>Records in this report</span></div>
+        <div class="summary-card"><strong><?php echo $status_counts['borrowed']; ?></strong><span>Currently Borrowed</span></div>
+        <div class="summary-card"><strong><?php echo $status_counts['returned']; ?></strong><span>Returned</span></div>
     </div>
+    <?php
+    $txBorrowed = 0; $txReturned = 0; $txByDay = []; $txByBook = [];
+    foreach ($transactions as $t) {
+        if ($t['status'] === 'returned') $txReturned++; else $txBorrowed++;
+        $d = date('M d', strtotime($t['date_borrowed']));
+        $txByDay[$d] = ($txByDay[$d] ?? 0) + 1;
+        $txByBook[$t['book_title']] = ($txByBook[$t['book_title']] ?? 0) + 1;
+    }
+    $txByDay = array_slice(array_reverse($txByDay, true), -14, null, true);
+    arsort($txByBook);
+    $txByBook = array_slice($txByBook, 0, 10, true);
+    echo renderBarChart('Transactions by Status (records in this report)', ['Borrowed', 'Returned'], [
+        ['name' => 'Records', 'color' => '#141F52', 'values' => [$txBorrowed, $txReturned]],
+    ]);
+    echo renderLineChart('Borrowing Activity per Day (latest 14 days in report)', array_keys($txByDay), array_values($txByDay), '#141F52', 'Borrows');
+    echo renderHorizontalBarChart('Most Borrowed Books in this Report', array_keys($txByBook), array_values($txByBook), '#52618D');
+    ?>
     <table>
         <thead>
             <tr>
-                <th>ID</th><th>Borrower</th><th>Book</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th>
+                <th>ID</th><th>Borrower</th><th>Book / Physical Copy</th><th>Borrowed</th><th>Return By</th><th>Returned</th><th>Status</th>
             </tr>
         </thead>
         <tbody>
@@ -173,7 +233,7 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
             <tr>
                 <td>#<?php echo (int)$t['transaction_id']; ?></td>
                 <td><?php echo h($t['borrower_name']); ?><br><small><?php echo h($t['borrower_no']); ?></small></td>
-                <td><?php echo h($t['book_title']); ?><br><small><?php echo h($t['book_number']); ?></small></td>
+                <td><?php echo h($t['book_title']); ?><br><small><?php echo h($t['book_number']); ?><?php echo !empty($t['copy_qr_code']) ? ' · ' . h($t['copy_qr_code']) : ''; ?></small></td>
                 <td><?php echo h(date('M d, Y h:i A', strtotime($t['date_borrowed']))); ?></td>
                 <td><?php echo h(date('M d, Y', strtotime($t['due_date']))); ?> (same day)</td>
                 <td><?php echo $t['return_date'] ? h(date('M d, Y h:i A', strtotime($t['return_date']))) : '—'; ?></td>
@@ -183,6 +243,8 @@ if (isset($_GET['report']) && $_GET['report'] === '1'):
         </tbody>
     </table>
 
+<?php echo printFrameClose(); ?>
+</main>
 <script id="transactionAutoFilterEnhancement">
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.querySelector('.toolbar form');
@@ -221,8 +283,8 @@ document.addEventListener('DOMContentLoaded', function () {
         .page-header h1 { color: #141F52; margin-bottom: 7px; font-size: 28px; }
         .page-header p { color: #52618D; font-size: 14px; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
-        .stat-card { background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #141F52; box-shadow: 0 2px 8px rgba(0,0,0,.06); text-decoration: none; color: inherit; }
-        .stat-card.active { box-shadow: 0 0 0 2px #F4F916 inset; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px;  box-shadow: 0 2px 8px rgba(0,0,0,.06); text-decoration: none; color: inherit; }
+        .stat-card.active { box-shadow: 0 0 0 2px #000000 inset; }
         .stat-label { color: #52618D; font-size: 12px; font-weight: 700; text-transform: uppercase; }
         .stat-value { color: #141F52; font-size: 30px; font-weight: 800; margin-top: 6px; }
         .toolbar { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -278,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <section class="table-card">
             <?php if (empty($transactions)): ?>
-                <div class="empty">No transaction records found.</div>
+                <div class="empty"><?php echo $transaction_query_error ? 'Unable to load transaction records. Please check the database connection/schema.' : 'No transaction records found.'; ?></div>
             <?php else: ?>
                 <div class="table-wrapper">
                     <table>

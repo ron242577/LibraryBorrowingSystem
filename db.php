@@ -42,6 +42,30 @@ try {
         throw new Exception('Error loading character set utf8mb4: ' . $conn->error);
     }
 
+    // Keep MySQL date/time functions aligned with the application's Asia/Manila clock.
+    // This makes the 3:00 PM automatic attendance timeout deterministic on Laragon/MySQL.
+    $conn->query("SET time_zone = '+08:00'");
+
+    // Backfill the reservation table for databases created before the reservation
+    // module was introduced. Keeping this schema initialization here lets every
+    // module safely share the same table without failing on first request.
+    $conn->query("CREATE TABLE IF NOT EXISTS book_reservations (
+        reservation_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        student_id INT NULL,
+        teacher_id INT NULL,
+        book_id INT NOT NULL,
+        status ENUM('pending','ready','fulfilled','cancelled') NOT NULL DEFAULT 'pending',
+        reserved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ready_at DATETIME NULL,
+        fulfilled_at DATETIME NULL,
+        cancelled_at DATETIME NULL,
+        notes VARCHAR(500) NULL,
+        PRIMARY KEY (reservation_id),
+        KEY idx_reservations_book_status (book_id, status, reserved_at),
+        KEY idx_reservations_student (student_id, status),
+        KEY idx_reservations_teacher (teacher_id, status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     // Teacher reservations share the existing reservation workflow.
     $reservationColumn = $conn->query("SHOW COLUMNS FROM book_reservations LIKE 'teacher_id'");
     if ($reservationColumn && $reservationColumn->num_rows === 0) {
@@ -51,6 +75,24 @@ try {
     $studentReservationColumn = $conn->query("SHOW COLUMNS FROM book_reservations LIKE 'student_id'");
     if ($studentReservationColumn && ($studentReservationDefinition = $studentReservationColumn->fetch_assoc()) && strtoupper((string)$studentReservationDefinition['Null']) === 'NO') {
         $conn->query("ALTER TABLE book_reservations MODIFY student_id INT NULL");
+    }
+
+    // Backfill columns added to the reservation workflow so older installations
+    // can run the same ready/fulfilled/cancelled flow as new databases.
+    $reservationMigrations = [
+        'ready_at' => "ALTER TABLE book_reservations ADD COLUMN ready_at DATETIME NULL AFTER reserved_at",
+        'fulfilled_at' => "ALTER TABLE book_reservations ADD COLUMN fulfilled_at DATETIME NULL AFTER ready_at",
+        'cancelled_at' => "ALTER TABLE book_reservations ADD COLUMN cancelled_at DATETIME NULL AFTER fulfilled_at",
+        'notes' => "ALTER TABLE book_reservations ADD COLUMN notes VARCHAR(500) NULL AFTER cancelled_at",
+    ];
+    foreach ($reservationMigrations as $columnName => $alterSql) {
+        $safeColumn = $conn->real_escape_string($columnName);
+        $columnCheck = $conn->query("SHOW COLUMNS FROM book_reservations LIKE '{$safeColumn}'");
+        if ($columnCheck && $columnCheck->num_rows === 0) {
+            if (!$conn->query($alterSql)) {
+                throw new Exception('Unable to initialize reservation field: ' . $columnName);
+            }
+        }
     }
 
     // Security table used for login throttling. This does not change any password.
@@ -94,6 +136,12 @@ try {
     if ($attendanceTeacherConstraint && $attendanceTeacherConstraint->num_rows === 0) {
         $conn->query("ALTER TABLE library_attendance ADD CONSTRAINT fk_attendance_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id) ON DELETE CASCADE");
     }
+
+    // Close forgotten attendance sessions at 3:00 PM whenever the application receives a request.
+    // The attendance kiosk also polls a dedicated endpoint, so an open kiosk records the timeout
+    // shortly after 3:00 PM even when nobody scans another QR code.
+    require_once __DIR__ . '/includes/attendance_auto_timeout.php';
+    autoCloseForgottenAttendance($conn);
     
     // Register one sanitized database audit entry for every application request/process.
     registerAuditRequestLogger($conn);

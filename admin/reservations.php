@@ -1,5 +1,9 @@
 <?php
-// Safety check: reservation module should not crash if the optional reservation table is unavailable.
+require_once __DIR__ . '/../session_check.php';
+require_once __DIR__ . '/../db.php';
+
+// Safety check: reservation module should not crash if an older database has not
+// yet installed the reservation table. db.php initializes the schema when possible.
 $reservationTableAvailable = false;
 try {
     $checkReservationTable = $conn->query("SHOW TABLES LIKE 'book_reservations'");
@@ -11,8 +15,6 @@ if (!$reservationTableAvailable) {
     echo '<div class="alert alert-warning">Reservation module is unavailable because the reservation table is not installed.</div>';
     return;
 }
-require_once __DIR__ . '/../session_check.php';
-require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/library_rules.php';
 require_once __DIR__ . '/../includes/notification_helper.php';
 require_once __DIR__ . '/../includes/audit_logger.php';
