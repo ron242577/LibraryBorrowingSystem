@@ -707,7 +707,7 @@ $csrf = csrfToken();
 
         <div class="brand-middle">
             <h2>Welcome back to the JASHS Library.</h2>
-            <p>Log in to borrow books, check due dates, and manage your library account.</p>
+            <p>Log in to borrow books, check attendance, and manage your library account.</p>
             <p class="brand-motto">Proud to be Abadians</p>
         </div>
     </div>
@@ -717,7 +717,6 @@ $csrf = csrfToken();
             <div class="logo"><img src="/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg" alt="Jose Abad Santos High School"></div>
             <div class="login-header">
                 <h1>Library Login</h1>
-                <p>Students, teachers, and the Chief Librarian all log in here.</p>
             </div>
 
 
@@ -739,7 +738,7 @@ $csrf = csrfToken();
                         <input type="text" id="identifier" name="identifier" required maxlength="150" autocomplete="username" aria-describedby="identifier-hint" value="<?php echo htmlspecialchars($_POST['identifier'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" placeholder="Username or ID number">
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     </div>
-                    <p class="field-hint" id="identifier-hint">Students and teachers can also use their email, contact number, or QR code.</p>
+                    <p class="field-hint" id="identifier-hint">Students and teachers can also use their email, ID number, contact number, or QR code ID.</p>
                 </div>
                 <div class="form-group">
                     <div class="label-row">

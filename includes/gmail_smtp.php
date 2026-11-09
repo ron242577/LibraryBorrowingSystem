@@ -318,7 +318,7 @@ function fetchRegistrationQrPng(string $qrCode): ?string {
     return ($image !== false && is_string($image) && strlen($image) > 0) ? $image : null;
 }
 
-function sendLibraryAccessCardEmail(string $toEmail, string $fullName, string $idNumber, string $qrCode, string $role = 'student'): bool {
+function sendLibraryAccessCardEmail(string $toEmail, string $fullName, string $idNumber, string $qrCode, string $role = 'student', ?string $providedCardJpeg = null): bool {
     if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('The registered account email is invalid.');
     }
@@ -331,14 +331,25 @@ function sendLibraryAccessCardEmail(string $toEmail, string $fullName, string $i
         throw new RuntimeException('The generated QR code is invalid.');
     }
 
-    $qrBytes = fetchLibraryQrPngBytes($safeQr);
-    if ($qrBytes === null) {
-        throw new RuntimeException('Unable to prepare the QR image for the access-card email. Make sure the local computer has internet access to the QR image service.');
-    }
+    // For the registration flow, the browser can provide the exact JPEG produced by
+    // includes/library_card_client.js. Using those exact bytes avoids differences
+    // between Windows/Chrome fonts and fonts available on Linux shared hosting.
+    if ($providedCardJpeg !== null) {
+        $cardJpeg = $providedCardJpeg;
+        $size = @getimagesizefromstring($cardJpeg);
+        if (!$size || ($size[2] ?? 0) !== IMAGETYPE_JPEG || (int)($size[0] ?? 0) !== 590 || (int)($size[1] ?? 0) !== 372) {
+            throw new RuntimeException('The supplied Library Access Card image is invalid. Please refresh the page and try again.');
+        }
+    } else {
+        $qrBytes = fetchLibraryQrPngBytes($safeQr);
+        if ($qrBytes === null) {
+            throw new RuntimeException('Unable to prepare the QR image for the access-card email. Make sure the local computer has internet access to the QR image service.');
+        }
 
-    $cardJpeg = buildLibraryAccessCardJpeg($safeName, $safeId, $safeQr, $qrBytes);
-    if ($cardJpeg === '') {
-        throw new RuntimeException('Unable to create the Library Access Card JPEG.');
+        $cardJpeg = buildLibraryAccessCardJpeg($safeName, $safeId, $safeQr, $qrBytes);
+        if ($cardJpeg === '') {
+            throw new RuntimeException('Unable to create the Library Access Card JPEG.');
+        }
     }
 
     $safeRecipientName = $safeName !== '' ? $safeName : 'Library User';

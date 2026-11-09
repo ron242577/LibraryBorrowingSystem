@@ -14,12 +14,18 @@
  */
 
 function libraryCardFontCandidates(bool $bold = false): array {
+    // Bundle the exact card font with the application. Hostinger/Linux may not
+    // have Arial installed; falling back to GD's bitmap font changes the card
+    // into the old-looking Gmail version.
+    $bundled = dirname(__DIR__) . '/assets/fonts/' . ($bold ? 'Arimo-Bold.ttf' : 'Arimo-Regular.ttf');
     return $bold ? [
+        $bundled,
         'C:/Windows/Fonts/arialbd.ttf',
         'C:/Windows/Fonts/ARIALBD.TTF',
         '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
         '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf',
     ] : [
+        $bundled,
         'C:/Windows/Fonts/arial.ttf',
         'C:/Windows/Fonts/ARIAL.TTF',
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',

@@ -50,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif (!preg_match('/^[A-Za-z0-9_.-]{4,50}$/', $username)) {
             $message = 'Username must be 4-50 characters and use only letters, numbers, dot, underscore, or hyphen.';
             $message_type = 'error';
-        } elseif (!empty(passwordPolicyErrors($password))) {
-            $message = strongPasswordMessage(passwordPolicyErrors($password));
+        } elseif (!empty(passwordPolicyErrors($password, false))) {
+            $message = strongPasswordMessage(passwordPolicyErrors($password, false));
             $message_type = 'error';
         } elseif (!hash_equals($password, $confirm_password)) {
             $message = 'Password confirmation does not match.';
@@ -109,8 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $new_password = (string)($_POST['new_password'] ?? '');
         $confirm_new_password = (string)($_POST['confirm_new_password'] ?? '');
         
-        if ($new_password === '' || !empty(passwordPolicyErrors($new_password))) {
-            $message = $new_password === '' ? 'Password is required.' : strongPasswordMessage(passwordPolicyErrors($new_password));
+        if ($new_password === '' || !empty(passwordPolicyErrors($new_password, false))) {
+            $message = $new_password === '' ? 'Password is required.' : strongPasswordMessage(passwordPolicyErrors($new_password, false));
             $message_type = 'error';
         } elseif (!hash_equals($new_password, $confirm_new_password)) {
             $message = 'Password confirmation does not match.';
@@ -508,7 +508,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             padding: 40px;
             color: #999;
         }
-    </style>
+            .staff-password-requirements{margin-top:10px;padding:10px 12px;border-radius:10px;background:#F2F6FC;font-size:12.5px;display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+        .staff-password-requirements div{display:flex;align-items:center;gap:7px;color:#7A4A2A}
+        .staff-password-requirements div::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid currentColor;flex-shrink:0;opacity:.7}
+        .staff-password-requirements div.valid{color:#2F6B1F}
+        .staff-password-requirements div.valid::before{background:#2F6B1F url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/80% no-repeat;border-color:#2F6B1F;opacity:1}
+        @media (max-width: 768px){.staff-password-requirements{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
     <?php include __DIR__ . '/../navbar.php'; ?>
@@ -530,7 +536,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         <!-- Add Staff Section -->
         <div class="section">
             <h3>Add New Staff Account</h3>
-            <form method="POST">
+            <form method="POST" id="staffForm">
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="add">
                 
@@ -549,8 +555,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" maxlength="128" autocomplete="new-password" required placeholder="10+ chars, upper/lower/number/symbol">
-                        <div style="font-size:12px;color:#52618D;margin-top:7px;">Minimum 10 characters with uppercase, lowercase, number, and special character.</div>
+                        <input type="password" id="password" name="password" maxlength="128" autocomplete="new-password" required placeholder="10+ chars, upper/lower/number" aria-describedby="staffPasswordRequirements">
+                        <div class="staff-password-requirements" id="staffPasswordRequirements">
+                            <div class="invalid" data-rule="length">Minimum 10 characters</div>
+                            <div class="invalid" data-rule="upper">Uppercase letter (A-Z)</div>
+                            <div class="invalid" data-rule="lower">Lowercase letter (a-z)</div>
+                            <div class="invalid" data-rule="number">Number (0-9)</div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="confirm_password">Confirm Password</label>
@@ -656,8 +667,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 
                 <div class="form-group">
                     <label for="new_password">New Password</label>
-                    <input type="password" id="new_password" name="new_password" maxlength="128" autocomplete="new-password" required placeholder="10+ chars, upper/lower/number/symbol">
-                    <div style="font-size:12px;color:#52618D;margin-top:7px;">Minimum 10 characters with uppercase, lowercase, number, and special character.</div>
+                    <input type="password" id="new_password" name="new_password" maxlength="128" autocomplete="new-password" required placeholder="10+ chars, upper/lower/number" aria-describedby="resetPasswordRequirements">
+                    <div class="staff-password-requirements" id="resetPasswordRequirements">
+                        <div class="invalid" data-rule="length">Minimum 10 characters</div>
+                        <div class="invalid" data-rule="upper">Uppercase letter (A-Z)</div>
+                        <div class="invalid" data-rule="lower">Lowercase letter (a-z)</div>
+                        <div class="invalid" data-rule="number">Number (0-9)</div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="confirm_new_password">Confirm New Password</label>
@@ -673,25 +689,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </div>
     
     <script>
+        function updateStaffPasswordRules(input, containerId) {
+            const p = input ? input.value : '';
+            const checks = {
+                length: p.length >= 10,
+                upper: /[A-Z]/.test(p),
+                lower: /[a-z]/.test(p),
+                number: /[0-9]/.test(p)
+            };
+            Object.keys(checks).forEach(function(key) {
+                const item = document.querySelector('#' + containerId + ' [data-rule="' + key + '"]');
+                if (item) item.className = checks[key] ? 'valid' : 'invalid';
+            });
+            if (input) input.dataset.valid = Object.values(checks).every(Boolean) ? '1' : '0';
+            return Object.values(checks).every(Boolean);
+        }
+
+        function wireStaffPassword(formId, passwordId, confirmId, requirementsId) {
+            const form = document.getElementById(formId);
+            const pass = document.getElementById(passwordId);
+            const confirm = document.getElementById(confirmId);
+            if (!form || !pass) return;
+
+            const validate = function() {
+                updateStaffPasswordRules(pass, requirementsId);
+                if (confirm) confirm.setCustomValidity(confirm.value === pass.value ? '' : 'Passwords do not match.');
+            };
+            pass.addEventListener('input', validate);
+            if (confirm) confirm.addEventListener('input', validate);
+            form.addEventListener('submit', function(event) {
+                if (!updateStaffPasswordRules(pass, requirementsId)) {
+                    event.preventDefault();
+                    pass.focus();
+                    return;
+                }
+                if (confirm && confirm.value !== pass.value) {
+                    event.preventDefault();
+                    confirm.setCustomValidity('Passwords do not match.');
+                    confirm.reportValidity();
+                }
+            });
+            validate();
+        }
+
+        wireStaffPassword('staffForm', 'password', 'confirm_password', 'staffPasswordRequirements');
+        wireStaffPassword('resetForm', 'new_password', 'confirm_new_password', 'resetPasswordRequirements');
+
         function openResetModal(userId, staffName) {
             document.getElementById('resetUserId').value = userId;
             document.getElementById('staffName').textContent = 'Staff: ' + staffName;
             document.getElementById('new_password').value = '';
             document.getElementById('confirm_new_password').value = '';
+            updateStaffPasswordRules(document.getElementById('new_password'), 'resetPasswordRequirements');
+            document.getElementById('confirm_new_password').setCustomValidity('');
             document.getElementById('resetModal').classList.add('show');
         }
-        
+
         function closeResetModal() {
             document.getElementById('resetModal').classList.remove('show');
         }
-        
-        // Close modal when clicking outside
+
         window.onclick = function(event) {
             const modal = document.getElementById('resetModal');
-            if (event.target == modal) {
-                modal.classList.remove('show');
-            }
-        }
+            if (event.target == modal) modal.classList.remove('show');
+        };
     </script>
 <?php require_once __DIR__ . '/../includes/ui_feedback.php'; ?>
 </body>

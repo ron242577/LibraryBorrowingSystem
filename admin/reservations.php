@@ -32,26 +32,19 @@ expireStaleReservations($conn);
 
 $rules_message = '';
 $rules_message_type = '';
-$max_active_books = getLibraryRule($conn, 'max_active_books_per_student', 3);
 $reservation_expiry_days = getLibraryRule($conn, 'reservation_expiry_days', 3);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_library_rules') {
     try {
         requireValidCsrf($_POST['csrf_token'] ?? '');
-        $newMaxBooks = (int)($_POST['max_active_books_per_student'] ?? 3);
         $newExpiryDays = (int)($_POST['reservation_expiry_days'] ?? 3);
 
-        if ($newMaxBooks < 1 || $newMaxBooks > 20) {
-            throw new Exception('Maximum active books must be between 1 and 20.');
-        }
         if ($newExpiryDays < 1 || $newExpiryDays > 30) {
             throw new Exception('Reservation expiry must be between 1 and 30 days.');
         }
 
-        setLibraryRule($conn, 'max_active_books_per_student', $newMaxBooks);
         setLibraryRule($conn, 'reservation_expiry_days', $newExpiryDays);
 
-        $max_active_books = $newMaxBooks;
         $reservation_expiry_days = $newExpiryDays;
         $rules_message = 'Borrowing and reservation rules updated successfully.';
         $rules_message_type = 'success';
@@ -67,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 null,
                 null,
                 [
-                    'max_active_books_per_student' => $newMaxBooks,
                     'reservation_expiry_days' => $newExpiryDays
                 ]
             );
@@ -217,16 +209,11 @@ h1{margin:0 0 8px}.muted{color:#52618D;font-size:13px;margin-bottom:20px}
 <div class="container">
 <div class="card rules-card">
 <h2>Borrowing &amp; Reservation Rules</h2>
-<div class="muted">Configure the limits applied to students system-wide.</div>
+<div class="muted">Configure reservation expiry. Borrowing has no system-wide active-book limit.</div>
 <?php if($rules_message): ?><div class="alert <?php echo $rules_message_type==='success'?'success':'error'; ?>"><?php echo h($rules_message); ?></div><?php endif; ?>
 <form method="POST" class="rules-form">
 <?php echo csrfField(); ?>
 <input type="hidden" name="action" value="save_library_rules">
-<div class="rules-field">
-<label for="max_active_books_per_student">Maximum Active Books per Student</label>
-<input type="number" id="max_active_books_per_student" name="max_active_books_per_student" min="1" max="20" value="<?php echo (int)$max_active_books; ?>" required>
-<small>Applies to student borrowing and QR transactions.</small>
-</div>
 <div class="rules-field">
 <label for="reservation_expiry_days">Reservation Expiry (Days)</label>
 <input type="number" id="reservation_expiry_days" name="reservation_expiry_days" min="1" max="30" value="<?php echo (int)$reservation_expiry_days; ?>" required>

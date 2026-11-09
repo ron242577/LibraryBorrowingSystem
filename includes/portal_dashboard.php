@@ -4,7 +4,7 @@
  *
  * Usage (inside the page body, after the header):
  *   require_once __DIR__ . '/../includes/portal_dashboard.php';
- *   renderPortalDashboard($conn, 'student', $student, $max_active_books);
+ *   renderPortalDashboard($conn, 'student', $student);
  *
  * Shows: greeting + library ID QR, alerts (overdue / due today),
  * key numbers, currently borrowed books,
@@ -70,7 +70,7 @@ function pdListFromJson($value): string
     return $value;
 }
 
-function renderPortalDashboard(mysqli $conn, string $role, ?array $user, int $maxActive): void
+function renderPortalDashboard(mysqli $conn, string $role, ?array $user): void
 {
     if (!$user) return;
 
@@ -162,7 +162,6 @@ function renderPortalDashboard(mysqli $conn, string $role, ?array $user, int $ma
     $greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good evening');
     $firstName = trim(explode(' ', trim((string)$user['full_name']))[0]);
     $loanCount = count($loans);
-    $slotPct = $maxActive > 0 ? min(100, (int)round(($loanCount / $maxActive) * 100)) : 0;
     $qrDownload = $role === 'teacher' ? '/LibraryBorrowingSystem/teacher/download_qr.php' : '/LibraryBorrowingSystem/student/download_qr.php';
     $qrImage = '/LibraryBorrowingSystem/qr_codes/' . rawurlencode($qrCode) . '.png';
     $cardLogo = '/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg';
@@ -352,10 +351,15 @@ body.dark .pd-section-title{color:var(--pd-ink)}
     <div class="pd-stats">
         <div class="pd-card pd-stat">
             <div class="lbl">Borrowed now</div>
-            <div class="val"><?php echo $loanCount; ?> <small>/ <?php echo (int)$maxActive; ?></small></div>
-            <div class="pd-bar<?php echo $slotPct >= 100 ? ' full' : ''; ?>" role="progressbar" aria-valuemin="0" aria-valuemax="<?php echo (int)$maxActive; ?>" aria-valuenow="<?php echo $loanCount; ?>"><span style="width:<?php echo $slotPct; ?>%"></span></div>
-            <div class="sub"><?php echo max(0, $maxActive - $loanCount); ?> slot<?php echo ($maxActive - $loanCount) === 1 ? '' : 's'; ?> left</div>
+            <div class="val"><?php echo $loanCount; ?></div>
+            <div class="sub">No active-book limit</div>
         </div>
+        <div class="pd-card pd-stat">
+            <div class="lbl">Books borrowed</div>
+            <div class="val"><?php echo $totalBorrowed; ?></div>
+            <div class="sub"><?php echo $onTimePct === null ? 'All-time total' : $onTimePct . '% returned on time'; ?></div>
+        </div>
+        
         <div class="pd-card pd-stat">
             <div class="lbl">Books returned</div>
             <div class="val"><?php echo $totalReturned; ?></div>
@@ -365,11 +369,6 @@ body.dark .pd-section-title{color:var(--pd-ink)}
             <div class="lbl">Visits this month</div>
             <div class="val"><?php echo $visitsMonth; ?></div>
             <div class="sub"><?php echo !empty($lastVisit[0]) ? 'Last: ' . pdH(date('M j, g:i A', strtotime($lastVisit[0]['time_in']))) : 'No visits yet'; ?></div>
-        </div>
-        <div class="pd-card pd-stat">
-            <div class="lbl">Books borrowed</div>
-            <div class="val"><?php echo $totalBorrowed; ?></div>
-            <div class="sub"><?php echo $onTimePct === null ? 'All-time total' : $onTimePct . '% returned on time'; ?></div>
         </div>
     </div>
 

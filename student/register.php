@@ -152,6 +152,7 @@ if (isset($_GET['completed']) && !empty($_SESSION['registration_success']) && is
     $new_teacher_qr = $successData['qr_code'] ?? null;
     $generated_qr = $successData['qr_code'] ?? null;
     $registration_email_sent = !empty($successData['email_sent']);
+    $registration_email_pending = !$registration_email_sent && !empty($successData['email_pending']);
     $registration_full_name = trim((string)($successData['full_name'] ?? ''));
     $registration_card_id = trim((string)($registration_success_role === 'teacher' ? ($successData['teacher_no'] ?? '') : ($successData['student_id_number'] ?? '')));
 }
@@ -247,22 +248,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api'])) {
                 $teacherId = (int)$conn->insert_id;
                 $stmt->close();
 
+                // Send the card after the completed page renders the exact browser card.
                 $registrationEmailSent = false;
                 $registrationEmailError = '';
-                try {
-                    // The verification email is sent first. Only after the user
-                    // enters the correct code do we generate and send the access card.
-                    $registrationEmailSent = sendLibraryAccessCardEmail(
-                        $pending['email'],
-                        $pending['full_name'],
-                        $pending['teacher_no'],
-                        $qrCode,
-                        'teacher'
-                    );
-                } catch (Throwable $mailError) {
-                    $registrationEmailError = $mailError->getMessage();
-                    logError('Teacher access-card email error after verification: ' . $registrationEmailError);
-                }
+                $registrationEmailPending = true;
 
                 $_SESSION['registration_success'] = [
                     'registration_role' => 'teacher',
@@ -273,12 +262,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api'])) {
                     'qr_code' => $qrCode,
                     'email_sent' => $registrationEmailSent,
                     'email_error' => $registrationEmailError,
+                    'email_pending' => $registrationEmailPending,
                 ];
                 clearPendingRegistration();
                 echo json_encode([
                     'success' => true,
                     'email_sent' => $registrationEmailSent,
-                    'message' => 'Email verified. Your teacher account has been created. Your Library Access Card has been sent to your email address.',
+                    'message' => 'Email verified. Your teacher account has been created. Your Library Access Card is being prepared and will be sent to your email address.',
                     'redirect' => '/LibraryBorrowingSystem/student/register.php?completed=1'
                 ]);
                 exit();
@@ -319,21 +309,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api'])) {
             $studentId = (int)$conn->insert_id;
             $stmt->close();
 
+            // The card email is intentionally sent from the completed registration page.
+            // That page renders the exact same 590x372 JPEG used by the user's download
+            // action, eliminating server-font/layout differences on shared hosting.
             $registrationEmailSent = false;
             $registrationEmailError = '';
-            try {
-                // The verification code must be accepted before this email is sent.
-                $registrationEmailSent = sendLibraryAccessCardEmail(
-                    $pending['email'],
-                    $pending['full_name'],
-                    $pending['student_no'],
-                    $qrCode,
-                    'student'
-                );
-            } catch (Throwable $mailError) {
-                $registrationEmailError = $mailError->getMessage();
-                logError('Student access-card email error after verification: ' . $registrationEmailError);
-            }
+            $registrationEmailPending = true;
 
             $_SESSION['registration_success'] = [
                 'student_id' => $studentId,
@@ -343,13 +324,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['api'])) {
                 'qr_code' => $qrCode,
                 'email_sent' => $registrationEmailSent,
                 'email_error' => $registrationEmailError,
+                'email_pending' => $registrationEmailPending,
             ];
             clearPendingRegistration();
 
             echo json_encode([
                 'success' => true,
                 'email_sent' => $registrationEmailSent,
-                'message' => 'Email verified. Your student account has been created. Your Library Access Card has been sent to your email address.',
+                'message' => 'Email verified. Your student account has been created. Your Library Access Card is being prepared and will be sent to your email address.',
                 'redirect' => '/LibraryBorrowingSystem/student/register.php?completed=1'
             ]);
             exit();
@@ -822,13 +804,18 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                                 <div class="success-qr-code"><?php echo htmlspecialchars($new_teacher_qr); ?></div>
                             </div><?php endif; ?>
 
-                            <div style="max-width:620px;margin:18px auto 0;padding:16px 18px;border:1px solid <?php echo $registration_email_sent ? '#BCD688' : '#E3B38F'; ?>;border-radius:12px;background:<?php echo $registration_email_sent ? '#F7FBEF' : '#FFF6EF'; ?>;color:<?php echo $registration_email_sent ? '#344E15' : '#7A3A0E'; ?>;text-align:left;">
-                                <strong style="display:block;margin-bottom:6px;">
-                                    <?php echo $registration_email_sent ? 'Library Access Card sent successfully' : 'Account created, but the Library Access Card could not be emailed'; ?>
+                            <div id="registration-email-status"
+                                 data-email-pending="<?php echo $registration_email_pending ? '1' : '0'; ?>"
+                                 data-email-sent="<?php echo $registration_email_sent ? '1' : '0'; ?>"
+                                 style="max-width:620px;margin:18px auto 0;padding:16px 18px;border:1px solid <?php echo ($registration_email_sent || $registration_email_pending) ? '#BCD688' : '#E3B38F'; ?>;border-radius:12px;background:<?php echo ($registration_email_sent || $registration_email_pending) ? '#F7FBEF' : '#FFF6EF'; ?>;color:<?php echo ($registration_email_sent || $registration_email_pending) ? '#344E15' : '#7A3A0E'; ?>;text-align:left;">
+                                <strong id="registration-email-status-title" style="display:block;margin-bottom:6px;">
+                                    <?php echo $registration_email_sent ? 'Library Access Card sent successfully' : ($registration_email_pending ? 'Preparing your Library Access Card email…' : 'Account created, but the Library Access Card could not be emailed'); ?>
                                 </strong>
-                                <span style="font-size:13px;line-height:1.55;">
+                                <span id="registration-email-status-text" style="font-size:13px;line-height:1.55;">
                                     <?php if ($registration_email_sent): ?>
                                         Your Library Access Card was sent to <strong><?php echo htmlspecialchars($successData['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></strong>. Check your Gmail inbox and Spam/Junk folder.
+                                    <?php elseif ($registration_email_pending): ?>
+                                        Your card is being prepared using the same format shown in your download. Please keep this page open for a moment while we send it to <strong><?php echo htmlspecialchars($successData['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></strong>.
                                     <?php else: ?>
                                         Your account was created after successful email verification, but the card email could not be delivered. Please check the Gmail configuration.
                                     <?php endif; ?>
@@ -884,12 +871,12 @@ if (!$verification_pending && !empty($_SESSION['registration_pending_data']) && 
                                 <label>Student Number <span class="required">*</span></label>
                                 <input type="text" name="student_no" placeholder="e.g., 136412345678" 
                                        value="<?php echo htmlspecialchars($_POST['student_no'] ?? ''); ?>" required>
-                                <div class="helper-text">Your institutional student number</div>
+                                <div class="helper-text">Your institutional student ID number</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Section <span class="required">*</span></label>
-                                <input type="text" name="student_group" placeholder="e.g., 10 - Rizal" 
+                                <input type="text" name="student_group" placeholder="e.g., Rizal" 
                                        value="<?php echo htmlspecialchars($_POST['student_group'] ?? ''); ?>" required>
                                 <div class="helper-text">Your class section</div>
                             </div>
@@ -1279,5 +1266,73 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 
 <?php require_once __DIR__ . '/../includes/qr_lightbox.php'; ?>
+<?php if ($success && !empty($registration_email_pending)): ?>
+<script>
+(function () {
+    'use strict';
+
+    var statusBox = document.getElementById('registration-email-status');
+    var titleEl = document.getElementById('registration-email-status-title');
+    var textEl = document.getElementById('registration-email-status-text');
+    if (!statusBox || statusBox.dataset.emailPending !== '1') return;
+
+    var cardData = {
+        fullName: <?php echo json_encode($registration_full_name, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        idNumber: <?php echo json_encode($registration_card_id, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        qrCode: <?php echo json_encode($generated_qr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        qrSrc: <?php echo json_encode('/LibraryBorrowingSystem/qr_codes/' . rawurlencode((string)$generated_qr) . '.png', JSON_UNESCAPED_SLASHES); ?>,
+        logoSrc: <?php echo json_encode('/LibraryBorrowingSystem/Img/jAbadSantos_Logo.jpg', JSON_UNESCAPED_SLASHES); ?>
+    };
+    var endpoint = <?php echo json_encode('/LibraryBorrowingSystem/student/send_registration_card.php'); ?>;
+    var csrf = <?php echo json_encode(csrfToken()); ?>;
+
+    function setState(title, html, ok) {
+        if (titleEl) titleEl.textContent = title;
+        if (textEl) textEl.innerHTML = html;
+        statusBox.style.borderColor = ok ? '#BCD688' : '#E3B38F';
+        statusBox.style.background = ok ? '#F7FBEF' : '#FFF6EF';
+        statusBox.style.color = ok ? '#344E15' : '#7A3A0E';
+        statusBox.dataset.emailPending = ok ? '0' : '1';
+    }
+
+    async function sendExactCard() {
+        setState('Preparing your Library Access Card email…', 'Generating the same server-rendered card used by the download, then sending it to your registered email address.', true);
+        var form = new FormData();
+        form.append('csrf_token', csrf);
+
+        setState('Sending your Library Access Card…', 'Your card is ready. Sending it now to your registered email address.', true);
+
+        var response = await fetch(endpoint, {
+            method: 'POST',
+            body: form,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        var data = await response.json().catch(function () { return null; });
+        if (!response.ok || !data || !data.success) {
+            throw new Error(data && data.message ? data.message : 'The Library Access Card email could not be sent.');
+        }
+
+        setState('Library Access Card sent successfully', 'Your Library Access Card was sent to <strong><?php echo htmlspecialchars($successData['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></strong>. Check your Gmail inbox and Spam/Junk folder.', true);
+    }
+
+    // Start only after the QR/card scripts have been loaded.
+    function start() {
+        sendExactCard().catch(function (error) {
+            setState('Account created, but the Library Access Card could not be emailed',
+                (error && error.message ? error.message : 'The card email could not be sent.') + ' Please refresh this page and try again.',
+                false
+            );
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+        start();
+    }
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
