@@ -35,6 +35,22 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
     min-width: 640px;
 }
 
+/* Summary/detail cards: allow long emails, QR IDs, and other tokens to wrap
+   inside their grid cells instead of expanding the card beyond its container. */
+.summary-grid,
+.summary-item,
+.summary-value {
+    min-width: 0;
+}
+.summary-item {
+    overflow: hidden;
+}
+.summary-value {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+}
+
 /* Shared overlays */
 .modal-box,
 .modal-content,

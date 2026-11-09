@@ -304,20 +304,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                         $student_id = $student['student_id'] !== null ? (int)$student['student_id'] : null;
                         $teacher_id = $student['teacher_id'] !== null ? (int)$student['teacher_id'] : null;
                         $book_id = (int)$book['book_id'];
-                        $max_active_books = getLibraryRule($conn, 'max_active_books_per_student', 3);
-                        $active_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM transactions WHERE status='borrowed' AND ((student_id IS NOT NULL AND student_id=?) OR (teacher_id IS NOT NULL AND teacher_id=?))");
-                        $active_stmt->bind_param('ii', $student_id, $teacher_id);
-                        $active_stmt->execute();
-                        $active_count = (int)$active_stmt->get_result()->fetch_assoc()['total'];
-                        $active_stmt->close();
+                        $readyReservation = getReadyReservationForBook($conn, $book_id);
 
-                        if ($active_count >= $max_active_books) {
-                            $message = 'This student has reached the maximum of ' . $max_active_books . ' active borrowed book(s).';
-                            $message_type = 'error';
-                        } else {
-                            $readyReservation = getReadyReservationForBook($conn, $book_id);
-
-                            if ($readyReservation && ($student['borrower_type'] === 'teacher' || (int)$readyReservation['student_id'] !== $student_id)) {
+                        if ($readyReservation && ($student['borrower_type'] === 'teacher' || (int)$readyReservation['student_id'] !== $student_id)) {
                                 $message = 'This copy is reserved for another student.';
                                 $message_type = 'error';
                             } else {
@@ -429,7 +418,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                                     }
                                 }
                             }
-                        }
                     }
                 }
             }
@@ -500,10 +488,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         .summary-card { border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden; margin: 15px 0; display: none; }
         .summary-card.show { display: block; }
         .summary-card-header { padding: 14px 18px; background: #F7F9FC; border-bottom: 1px solid #e5e5e5; font-weight: 700; }
-        .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; }
-        .summary-item { padding: 14px 18px; border-right: 1px solid #E7EEF7; border-bottom: 1px solid #E7EEF7; }
+        .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; min-width: 0; }
+        .summary-item { padding: 14px 18px; border-right: 1px solid #E7EEF7; border-bottom: 1px solid #E7EEF7; min-width: 0; overflow: hidden; }
         .summary-label { font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700; letter-spacing: .4px; margin-bottom: 4px; }
-        .summary-value { font-size: 15px; font-weight: 700; color: #202A44; }
+        .summary-value { font-size: 15px; font-weight: 700; color: #202A44; min-width: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
         .mode-banner { padding: 16px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #141F52; background: #EDF3FA; font-size: 14px; line-height: 1.5; }
         .mode-banner.return { background: #FBFDCB; border-left-color: #F4F916; color: #5C5F05; }
         .mode-banner.borrow { background: #EDF5DD; border-left-color: #567D1F; color: #344E15; }
@@ -565,12 +553,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 <div class="step" id="step1" onclick="goToStep(1)">
                     <div class="step-number">1</div>
                     <h4>Borrower QR</h4>
-                    <p>Required for borrowing; optional for returns</p>
+                    <p>Complete this step before scanning the book QR</p>
                 </div>
                 <div class="step" id="step2" onclick="goToStep(2)">
                     <div class="step-number">2</div>
                     <h4>Book QR</h4>
-                    <p>System detects borrow or return</p>
+                    <p>Available after borrower is confirmed</p>
                 </div>
                 <div class="step" id="step3" onclick="goToStep(3)">
                     <div class="step-number">3</div>
@@ -591,13 +579,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 <div class="scanner-header">
                     <div>
                         <div class="scanner-title">Step 1: Scan Borrower QR Code</div>
-                        <div class="scanner-subtitle">Required when the book is available and will be borrowed. Optional for returns.</div>
+                        <div class="scanner-subtitle">Complete Step 1 first, then scan the book QR code.</div>
                     </div>
                     <span class="status-pill pending" id="studentStatus">Waiting</span>
                 </div>
 
                 <div class="info-box">
-                    For borrowing, scan or enter a student or teacher QR code first. For returning a borrowed book, you may skip this step and scan the book QR code.
+                    Scan or enter the student or teacher QR code first. Once the borrower is confirmed, Step 2 will unlock and you can scan the book QR code.
                 </div>
 
                 <div class="scanner-wrapper">
@@ -694,10 +682,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         }
 
         function goToStep(stepNumber) {
-            const step = document.getElementById('step' + stepNumber);
-            if (step && step.classList.contains('disabled')) {
-                return; // Prevent navigation to disabled steps
-            }
             const section = document.getElementById('section' + stepNumber);
             if (section) {
                 section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -729,6 +713,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         }
 
         function startScannerBook() {
+            if (!studentValid) {
+                setStatus('studentStatus', 'Complete Step 1 first', 'error');
+                goToStep(1);
+                return;
+            }
             document.getElementById('startBtnBook').style.display = 'none';
             document.getElementById('stopBtnBook').style.display = 'inline-flex';
             bookScanner = new Html5QrcodeScanner('qr-reader-book', { facingMode: 'environment', qrbox: undefined }, false);
@@ -794,6 +783,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         }
 
         function confirmBookManual() {
+            if (!studentValid) {
+                setStatus('studentStatus', 'Complete Step 1 first', 'error');
+                goToStep(1);
+                return;
+            }
             const code = document.getElementById('book_qr').value.trim();
             if (!code) {
                 setStatus('bookStatus', 'Missing QR', 'error');
@@ -811,6 +805,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                         studentValid = true;
                         setStatus('studentStatus', 'Confirmed', 'ready');
                         renderStudentSummary(data.student);
+                        updateSteps();
                         if (jumpNext) goToStep(2);
                     } else {
                         studentValid = false;
@@ -827,6 +822,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
         }
 
         function lookupBook(code, jumpNext) {
+            if (!studentValid) {
+                setStatus('studentStatus', 'Complete Step 1 first', 'error');
+                goToStep(1);
+                return;
+            }
             setStatus('bookStatus', 'Checking...', 'pending');
             const borrowerCode = document.getElementById('student_qr').value.trim();
             fetch('?api=lookup_book&book_qr=' + encodeURIComponent(code) + '&student_qr=' + encodeURIComponent(borrowerCode))
@@ -908,15 +908,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
 
         function updateSteps() {
             [1,2,3].forEach(number => {
-                document.getElementById('step' + number).classList.remove('completed');
+                document.getElementById('step' + number).classList.remove('completed', 'disabled');
                 document.getElementById('section' + number).classList.remove('disabled');
             });
 
-            // Borrower QR is optional for returns, but required for borrowing.
-            // The Book QR step must always remain available so an existing loan can be returned.
-            if (!bookValid) {
-                document.getElementById('section3').classList.add('disabled');
-            } else if (transactionMode === 'borrow' && !studentValid) {
+            // Step 2 stays locked until Step 1 is successfully confirmed.
+            // Step 3 stays locked until a valid book QR has been checked.
+            if (!studentValid) {
+                document.getElementById('step2').classList.add('disabled');
+                document.getElementById('section2').classList.add('disabled');
+            }
+            if (!bookValid || !studentValid) {
+                document.getElementById('step3').classList.add('disabled');
                 document.getElementById('section3').classList.add('disabled');
             }
 
@@ -938,7 +941,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'proce
                 document.getElementById('transactionForm').setAttribute('data-confirm-message', 'Return this book now? This will complete the active borrowing transaction.');
                 document.getElementById('transactionForm').setAttribute('data-confirm-text', 'Return Book');
                 modeBanner.className = 'mode-banner return';
-                modeBanner.textContent = 'Return detected for this exact physical copy. Borrower QR is optional, but when supplied it must match the active borrower.';
+                modeBanner.textContent = 'Return detected for this exact physical copy. The confirmed borrower in Step 1 must match the active borrower.';
                 document.getElementById('step3').classList.add('completed');
             } else if (transactionMode === 'borrow' && studentValid) {
                 submitBtn.disabled = false;

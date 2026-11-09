@@ -21,7 +21,6 @@ $reserved_book_ids = [];
 $teacher_id = (int)$_SESSION['teacher_id'];
 $teacher_qr = $_SESSION['teacher_qr'] ?? '';
 
-$max_active_books = getLibraryRule($conn, 'max_active_books_per_teacher', 3);
 expireStaleReservations($conn);
 
 try {
@@ -373,14 +372,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
                 if (in_array($book['book_condition'] ?? '', ['Damaged','Lost'], true)) {
                     throw new Exception('This book is marked as ' . $book['book_condition'] . ' and cannot be borrowed.');
-                }
-
-                $activeCount = countActiveBorrowings($conn, $teacher_id);
-                if ($activeCount >= $max_active_books) {
-                    throw new Exception(
-                        'You have reached the maximum of ' . $max_active_books .
-                        ' active borrowed book(s). Return a book before borrowing another.'
-                    );
                 }
 
                 $duplicate_stmt = $conn->prepare("
@@ -1528,7 +1519,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </header>
     
     <div class="container">
-        <?php require_once __DIR__ . '/../includes/portal_dashboard.php'; renderPortalDashboard($conn, 'teacher', $teacher, (int)$max_active_books); ?>
+        <?php require_once __DIR__ . '/../includes/portal_dashboard.php'; renderPortalDashboard($conn, 'teacher', $teacher); ?>
 
         <!-- Search Section -->
         <div class="search-section">
@@ -1561,9 +1552,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <!-- Books Results Column -->
             <div class="results-section">
                 <h2>Available Books (<span id="bookCount"><?php echo count($books); ?></span>)</h2>
-                <div style="margin:-10px 0 14px;color:#52618D;font-size:12px;">
-                    Maximum active books: <strong><?php echo (int)$max_active_books; ?></strong>. Reservations do not count toward this limit.
-                </div>
                 
                 <div class="results-list" id="booksList">
                     <?php if (empty($books) && $teacher): ?>

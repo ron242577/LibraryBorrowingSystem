@@ -1,7 +1,7 @@
 <?php
 /**
  * Borrowing and reservation policy helpers.
- * Defaults: maximum 3 active borrowed books; reservations expire after 3 days.
+ * Reservation policy helper; reservations expire after 3 days. Borrowing has no active-book limit.
  */
 function ensureLibraryRulesTable(mysqli $conn): void
 {
@@ -20,7 +20,6 @@ function ensureLibraryRulesTable(mysqli $conn): void
     }
 
     $defaults = [
-        'max_active_books_per_student' => '3',
         'reservation_expiry_days' => '3'
     ];
 

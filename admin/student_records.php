@@ -676,32 +676,61 @@ if (isset($_GET['ajax_student']) && is_numeric($_GET['ajax_student'])) {
     $sid = intval($_GET['ajax_student']);
     $out = ['student' => null, 'transactions' => []];
 
-    $ss = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, card_valid_until, email, qr_code, status, is_archived, archived_at, created_at
-                           FROM students WHERE student_id = ?");
-    $ss->bind_param('i', $sid);
-    $ss->execute();
-    $sr = $ss->get_result();
-    if ($sr->num_rows > 0) {
-        $out['student'] = $sr->fetch_assoc();
+    try {
+        $ss = $conn->prepare("SELECT student_id, student_no, full_name, student_group, department, year_level, contact_number, card_valid_until, email, qr_code, status, is_archived, archived_at, created_at
+                               FROM students WHERE student_id = ? LIMIT 1");
+        if (!$ss) {
+            throw new Exception('Unable to prepare student detail query: ' . $conn->error);
+        }
+        $ss->bind_param('i', $sid);
+        if (!$ss->execute()) {
+            throw new Exception('Unable to load student details: ' . $ss->error);
+        }
+        $sr = $ss->get_result();
+        if ($sr->num_rows > 0) {
+            $out['student'] = $sr->fetch_assoc();
 
-        $hs = $conn->prepare("
-            SELECT t.transaction_id, t.date_borrowed, t.due_date, t.return_date,
-                   t.status, b.title, b.author
-            FROM transactions t
-            LEFT JOIN books b ON t.book_id = b.book_id
-            WHERE t.student_id = ?
-            ORDER BY t.date_borrowed DESC
-        ");
-        $hs->bind_param('i', $sid);
-        $hs->execute();
-        $hr = $hs->get_result();
-        while ($row = $hr->fetch_assoc()) $out['transactions'][] = $row;
-        $hs->close();
+            // Keep the student modal working even when an older transaction has
+            // a missing/deleted book row. The physical copy is used as a
+            // fallback label instead of returning NULL title data to JavaScript.
+            $hs = $conn->prepare("
+                SELECT t.transaction_id, t.date_borrowed, t.due_date, t.return_date,
+                       t.status, t.copy_id,
+                       COALESCE(NULLIF(b.title, ''), NULLIF(c.book_number, ''), 'Book unavailable') AS title,
+                       COALESCE(NULLIF(b.author, ''), 'Author unavailable') AS author,
+                       c.book_number
+                FROM transactions t
+                LEFT JOIN books b ON t.book_id = b.book_id
+                LEFT JOIN book_copies c ON t.copy_id = c.copy_id
+                WHERE t.student_id = ?
+                ORDER BY t.date_borrowed DESC
+            ");
+            if (!$hs) {
+                throw new Exception('Unable to prepare transaction history query: ' . $conn->error);
+            }
+            $hs->bind_param('i', $sid);
+            if (!$hs->execute()) {
+                throw new Exception('Unable to load transaction history: ' . $hs->error);
+            }
+            $hr = $hs->get_result();
+            while ($row = $hr->fetch_assoc()) $out['transactions'][] = $row;
+            $hs->close();
+        }
+        $ss->close();
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    } catch (Throwable $e) {
+        if (isset($ss) && $ss instanceof mysqli_stmt) $ss->close();
+        if (isset($hs) && $hs instanceof mysqli_stmt) $hs->close();
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'student' => null,
+            'transactions' => [],
+            'error' => 'Unable to load student details.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
-    $ss->close();
-
-    header('Content-Type: application/json');
-    echo json_encode($out);
     exit();
 }
 
@@ -2008,12 +2037,29 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         document.getElementById('studentModal').classList.add('show');
         document.body.style.overflow = 'hidden';
 
-        fetch('?ajax_student=' + studentId)
-            .then(r => r.json())
+        fetch('?ajax_student=' + encodeURIComponent(studentId), {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        })
+            .then(async (response) => {
+                const raw = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(raw);
+                } catch (parseError) {
+                    throw new Error('The server returned an invalid student-details response.');
+                }
+                if (!response.ok) {
+                    throw new Error(data.error || 'Unable to load student details.');
+                }
+                return data;
+            })
             .then(data => renderModal(data))
-            .catch(() => {
+            .catch((error) => {
                 document.getElementById('modalBody').innerHTML =
-                    '<div class="modal-loading" style="color:#c0392b;">Failed to load student details.</div>';
+                    '<div class="modal-loading" style="color:#c0392b;">' +
+                    escHtml(error && error.message ? error.message : 'Failed to load student details.') +
+                    '</div>';
             });
     }
 
@@ -2042,7 +2088,7 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
         }
 
         const s  = data.student;
-        const tx = data.transactions;
+        const tx = Array.isArray(data.transactions) ? data.transactions : [];
 
         document.getElementById('modalTitle').textContent = s.full_name;
 
@@ -2060,18 +2106,23 @@ if (isset($_GET['ajax_teacher']) && is_numeric($_GET['ajax_teacher'])) {
 
         let txHTML = '';
         if (tx.length === 0) {
-            txHTML = '<div class="empty-tx">📚 No borrowing history yet.</div>';
+            txHTML = '<div class="empty-tx">No borrowing history yet.</div>';
         } else {
-            const rows = tx.map(t => `
+            const rows = tx.map(t => {
+                const title = String(t.title || (t.book_number ? 'Book Copy ' + t.book_number : 'Book unavailable'));
+                const author = String(t.author || 'Author unavailable');
+                const status = String(t.status || 'unknown');
+                return `
                 <tr>
                     <td>
-                        <strong>${escHtml(t.title.length > 28 ? t.title.substring(0,28)+'…' : t.title)}</strong><br>
-                        <small style="color:#999;">${escHtml(t.author)}</small>
+                        <strong>${escHtml(title.length > 28 ? title.substring(0,28)+'…' : title)}</strong><br>
+                        <small style="color:#999;">${escHtml(author)}</small>
                     </td>
                     <td>${fmtDate(t.date_borrowed)}</td>
                     <td>${fmtDate(t.due_date)} <small style="color:#999;">(same day)</small></td>
-                    <td>${txBadge(t.status)}</td>
-                </tr>`).join('');
+                    <td>${txBadge(status)}</td>
+                </tr>`;
+            }).join('');
 
             txHTML = `
                 <div class="stu-tx-table">
